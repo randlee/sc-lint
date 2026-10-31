@@ -111,3 +111,29 @@ The planning direction approved for this line is:
   - hard-fail policy enforcement across all supported interface families
   - consumer-adoption skill design
   - minimal marketplace publication for that adoption skill
+
+## Compatibility Assessment — PORT-010 Site Allowances (2026-10-31)
+
+The item-scoped allowance adds `Directive::SiteAllow`, the public
+`DirectiveError` type, checked `SiteRuleId` and `SiteAllowReason` newtypes,
+`PortabilityError::InvalidSiteAllow` and `PortabilityError::UnknownRule`, the
+non-exhaustive `AllowedFinding` type, and the optional `FindingsReport.allowed`
+field. `DirectiveError` and `AllowedFinding` prevent downstream exhaustive
+matching or construction of those new types. The existing `Directive` and
+`PortabilityError` enums remain exhaustive, and adding the report field breaks
+downstream Rust struct literals. These are source-breaking Rust API changes
+for consumers that exhaustively match those enums or construct
+`FindingsReport` directly; they must be treated as semver-breaking when
+selecting the release version and surfaced by the Rust API compatibility
+check. This change does not claim source compatibility for those call sites.
+
+The machine report change is separately versioned. Reports without suppressed
+allowances remain schema `0.1.0` and validate against the closed
+`analyzer-report-v1` artifact. Reports with an `allowed` array use schema
+`0.2.0` and validate against the closed `analyzer-report-v2` artifact. The
+versioned dispatcher applies to every Rust analyzer report: the boundary
+analyzer already emits `0.2.0` for its graph report and is validated against
+the shared v2 schema, where `allowed` remains optional. Unsupported versions
+fail with `backend_payload_drift` at `/schema_version`. Consumers using a
+strict v1 validator must upgrade before using a report containing `allowed`;
+the v2 property is not wire-compatible with those validators.

@@ -2683,8 +2683,7 @@ fn port010_unix_fn_in_unpaired_file_reported() {
 
 #[test]
 fn port010_site_allow() {
-    let report = analyze_single_source(
-        r#"
+    let source = r#"
         pub struct User;
         impl User {
             #[doc = "Unix uid accessor"]
@@ -2697,9 +2696,23 @@ fn port010_site_allow() {
         #[cfg(unix)]
         pub fn sibling() {}
 
+        #[cfg(unix)]
+        #[sc_lint(allow(PORT-010), reason = "This public function intentionally uses a POSIX-only API.")]
+        pub fn deliberately_platform_only() {}
+
         #[sc_lint(allow(PORT-010), reason = "The module is intentionally platform-specific.")] mod nested { #[cfg(unix)] pub fn inner() {} }
-        "#,
-    );
+        "#;
+    let source_lines = source.lines().collect::<Vec<_>>();
+    let function_line = source_lines
+        .iter()
+        .position(|line| line.contains("pub fn deliberately_platform_only"))
+        .expect("free function is present");
+    let expected_line = source_lines[..function_line]
+        .iter()
+        .rposition(|line| line.contains("#[cfg(unix)]"))
+        .expect("free function has a cfg attribute")
+        + 1;
+    let report = analyze_single_source(source);
     let port010 = report
         .findings
         .iter()
@@ -2716,13 +2729,28 @@ fn port010_site_allow() {
             .iter()
             .any(|finding| finding.message.contains("inner"))
     );
-    assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
-    assert_eq!(*report.allowed[0].rule_id(), RuleId::Port010);
+    assert_eq!(report.allowed.len(), 2, "{:#?}", report.allowed);
+    let method_allowance = report
+        .allowed
+        .iter()
+        .find(|entry| entry.item() == "User::current_uid")
+        .expect("inherent method allowance");
+    assert_eq!(*method_allowance.rule_id(), RuleId::Port010);
     assert_eq!(
-        report.allowed[0].reason(),
+        method_allowance.reason(),
         "This public helper intentionally exposes the POSIX uid API."
     );
-    assert_eq!(report.allowed[0].item(), "User::current_uid");
+    let function_allowance = report
+        .allowed
+        .iter()
+        .find(|entry| entry.item() == "deliberately_platform_only")
+        .expect("free function allowance");
+    assert_eq!(*function_allowance.rule_id(), RuleId::Port010);
+    assert_eq!(
+        function_allowance.reason(),
+        "This public function intentionally uses a POSIX-only API."
+    );
+    assert_eq!(function_allowance.line(), expected_line);
     assert_eq!(report.schema_version, "0.2.0");
     let json = serde_json::to_value(&report).expect("report serializes");
     assert_eq!(
@@ -2733,7 +2761,7 @@ fn port010_site_allow() {
 }
 
 #[test]
-fn site_allow_attribute_path_and_no_cascade() {
+fn site_allow_no_cascade() {
     let report = analyze_single_source(
         r#"
         #[sc_lint(allow(PORT-010), reason = "The impl is intentionally Unix-only.")]
@@ -2767,10 +2795,15 @@ fn site_allow_attribute_path_and_no_cascade() {
             .any(|finding| finding.message.contains("sibling"))
     );
     assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
+    assert_eq!(report.allowed[0].item(), "deliberate");
+    assert_eq!(
+        report.allowed[0].reason(),
+        "This function is deliberately POSIX-only."
+    );
 }
 
 #[test]
-fn site_allow_unknown_rule_has_source_location() {
+fn site_allow_unknown_rule() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -2791,6 +2824,29 @@ fn site_allow_unknown_rule_has_source_location() {
         PortabilityError::UnknownRule { line: 1, .. }
     ));
     assert!(message.contains("PORTABILITY.UNKNOWN_RULE"), "{message}");
+    assert!(message.contains("recovery: use PORT-010"), "{message}");
+}
+
+#[test]
+fn site_allow_unsupported_rule_is_unknown_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-001), reason = \"not a site-allow rule\")]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("PORT-001 has no item-scoped allowance behavior");
+    assert!(matches!(
+        error,
+        PortabilityError::UnknownRule { line: 1, .. }
+    ));
+    assert!(error.to_string().contains("PORTABILITY.UNKNOWN_RULE"));
 }
 
 #[test]
@@ -2812,7 +2868,11 @@ fn malformed_site_allow_is_a_typed_source_error() {
         error,
         PortabilityError::InvalidSiteAllow { line: 1, .. }
     ));
-    assert!(error.to_string().contains("lib.rs:1"));
+    let message = error.to_string();
+    assert!(message.contains("lib.rs:1"));
+    assert!(message.contains("PORTABILITY.INVALID_SITE_ALLOW"));
+    assert!(message.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"));
+    assert!(message.contains("recovery: add reason"));
 }
 
 #[test]

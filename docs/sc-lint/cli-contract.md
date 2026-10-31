@@ -547,11 +547,21 @@ If the delegated binary:
 
 ### Rust analyzer backend reports
 
-The Rust analyzer backends emit `FindingsReport` JSON. The top-level CLI
-validates each report against the published
-[`analyzer-report-v1` JSON Schema](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
-before normalization. A shape mismatch fails as `backend_protocol` with code
-`backend_payload_drift` and the failing instance path in `key_path`.
+The Rust analyzer backends emit `FindingsReport` JSON. Before normalization,
+the top-level CLI selects the published schema by `schema_version`:
+
+- `0.1.0` is validated against
+  [`analyzer-report-v1`](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json).
+- `0.2.0` is validated against
+  [`analyzer-report-v2`](../../crates/sc-lint-schema/schema/analyzer-report-v2.schema.json).
+- Any other version fails as `backend_protocol` with code
+  `backend_payload_drift` and `key_path` `/schema_version`.
+
+Both versions are shared by all Rust analyzers. In particular, the boundary
+analyzer's `0.2.0` report is validated by v2; the optional `allowed` property
+is emitted when a portability allowance suppresses a finding. A shape mismatch
+also fails as `backend_payload_drift`, with the failing instance path in
+`key_path`.
 
 ### Portability site allowances
 
@@ -562,26 +572,26 @@ finding is reported in schema `0.2.0` as an `allowed` entry containing
 one-based `line`.
 
 Malformed directives return `PORTABILITY.INVALID_SITE_ALLOW` with the source
-path, line, stable directive code, cause, and recovery. Directive codes and
-recoveries are:
+path, line, stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
+Directive codes and recoveries are:
 
 | Code | Cause | Recovery |
 | --- | --- | --- |
-| `EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
-| `MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
-| `EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
-| `QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
-| `DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
-| `REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
-| `MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
-| `DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
-| `UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
-| `MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
-| `NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
+| `DIRECTIVE.SITE_ALLOW.MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
+| `DIRECTIVE.SITE_ALLOW.QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
+| `DIRECTIVE.SITE_ALLOW.REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
+| `DIRECTIVE.SITE_ALLOW.MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
+| `DIRECTIVE.SITE_ALLOW.DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
+| `DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
+| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
 
-`PORTABILITY.UNKNOWN_RULE` identifies a syntactically valid but unknown
-portability rule id and provides the source path and line. Use a rule id
-declared by the portability analyzer.
+`PORTABILITY.UNKNOWN_RULE` identifies an unsupported portability rule id and
+provides the source path, line, cause, and recovery. Site allowances currently
+support only `PORT-010`; use that id or remove the allowance.
 
 ### Python adapter backend
 

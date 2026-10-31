@@ -118,13 +118,13 @@ impl From<anyhow_crate::Error> for PortabilityErrorSource {
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
-    #[error("invalid site allowance at {}:{line}: {error}", path.display())]
+    #[error("PORTABILITY.INVALID_SITE_ALLOW at {}:{line}: {error}", path.display())]
     InvalidSiteAllow {
         path: PathBuf,
         line: usize,
         error: DirectiveError,
     },
-    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unknown rule `{rule}`", path.display())]
+    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unsupported portability rule `{rule}`; recovery: use PORT-010 or remove the allowance", path.display())]
     UnknownRule {
         path: PathBuf,
         line: usize,
@@ -233,26 +233,12 @@ fn analyze_workspace_configured_with_metadata_loader(
 
 fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
     match source.downcast::<site_allow::SiteAllowError>() {
-        Ok(error) if error.error.code() == "UNKNOWN_RULE" => {
-            let id = error.error.cause().split('`').nth(1).unwrap_or_default();
-            match SiteRuleId::parse(id.to_owned()) {
-                Ok(rule) => PortabilityError::UnknownRule {
-                    path: error.path,
-                    line: error.line,
-                    rule,
-                },
-                Err(directive_error) => PortabilityError::InvalidSiteAllow {
-                    path: error.path,
-                    line: error.line,
-                    error: directive_error,
-                },
-            }
+        Ok(site_allow::SiteAllowError::InvalidDirective { path, line, error }) => {
+            PortabilityError::InvalidSiteAllow { path, line, error }
         }
-        Ok(error) => PortabilityError::InvalidSiteAllow {
-            path: error.path,
-            line: error.line,
-            error: error.error,
-        },
+        Ok(site_allow::SiteAllowError::UnknownRule { path, line, rule }) => {
+            PortabilityError::UnknownRule { path, line, rule }
+        }
         Err(source) => PortabilityError::AnalyzeFindings {
             root: root.to_path_buf(),
             source: source.into(),

@@ -112,6 +112,40 @@ fn published_analyzer_report_schema_rejects_unknown_keys() {
     let relaxed = jsonschema::validator_for(&relaxed).expect("relaxed schema compiles");
     assert!(relaxed.is_valid(&top_level));
     assert!(relaxed.is_valid(&in_finding));
+
+    let v2_fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/findings-report-v2.json"))
+            .expect("v2 report fixture is JSON");
+    let mut v2_top_level = v2_fixture.clone();
+    v2_top_level["unexpected"] = serde_json::json!(true);
+    let mut v2_in_finding = v2_fixture.clone();
+    v2_in_finding["findings"] = serde_json::json!([{
+        "rule_id": "RULE-001",
+        "kind": "contract_fixture",
+        "message": "machine contract fixture",
+        "owner_ids": ["crate::example::example"],
+        "node_ids": ["crate::example::example::item"],
+        "unexpected": true
+    }]);
+    let mut v2_in_allowed = v2_fixture.clone();
+    v2_in_allowed["allowed"][0]["unexpected"] = serde_json::json!(true);
+
+    for (value, expected_path) in [
+        (&v2_top_level, "$"),
+        (&v2_in_finding, "/findings/0"),
+        (&v2_in_allowed, "/allowed/0"),
+    ] {
+        let error = validate_analyzer_report(value).expect_err("v2 rejects unknown keys");
+        assert_eq!(error.instance_path, expected_path, "{error}");
+    }
+
+    let mut relaxed_v2: serde_json::Value =
+        serde_json::from_str(analyzer_report_schema()).expect("v2 schema is JSON");
+    without_additional_properties(&mut relaxed_v2);
+    let relaxed_v2 = jsonschema::validator_for(&relaxed_v2).expect("relaxed v2 schema compiles");
+    assert!(relaxed_v2.is_valid(&v2_top_level));
+    assert!(relaxed_v2.is_valid(&v2_in_finding));
+    assert!(relaxed_v2.is_valid(&v2_in_allowed));
 }
 
 #[test]

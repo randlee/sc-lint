@@ -2242,6 +2242,34 @@ fn analyzer_schema_drift_maps_to_structured_backend_protocol_error() {
 }
 
 #[test]
+fn analyzer_v2_allowed_report_normalizes_and_rejects_malformed_allowed_entries() {
+    let valid = include_str!("../../sc-lint-schema/tests/fixtures/findings-report-v2.json");
+    let expected: Value = serde_json::from_str(valid).expect("v2 fixture is JSON");
+    let normalized = crate::dispatch::normalize_backend_json("sc-lint-portability", valid)
+        .expect("valid v2 report normalizes");
+    assert_eq!(normalized["schema_version"], "0.2.0");
+    assert_eq!(normalized["allowed"], expected["allowed"]);
+
+    let mut malformed = expected;
+    malformed["allowed"][0]
+        .as_object_mut()
+        .expect("allowed entry object")
+        .remove("reason");
+    let error =
+        crate::dispatch::normalize_backend_json("sc-lint-portability", &malformed.to_string())
+            .expect_err("malformed allowed entries drift from the v2 schema");
+    assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+    assert_eq!(error.code(), "backend_payload_drift");
+    assert_eq!(error.details["key_path"], "/allowed/0");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("/allowed/0"))
+    );
+}
+
+#[test]
 fn missing_boundary_planning_maps_to_cli_config_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(

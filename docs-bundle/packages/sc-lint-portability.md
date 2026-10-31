@@ -66,9 +66,21 @@ version-matched macro crate and admit it in each annotated crate's boundary:
 sc-lint-attributes = "0.8.2"
 ```
 
+Add `sc-lint-attributes` to the `dependencies.allowed_dependencies` array in
+the existing boundary record for every annotated consumer crate. For example,
+the complete top-level record shape is:
+
 ```toml
+boundary_id = "BOUNDARY-Example"
+owner_package = "example"
+owner_crate_path = "example"
+name = "Example"
+
+[public]
+facade = "example::api"
+
 [dependencies]
-allowed_dependencies = ["sc-lint-attributes", "...existing allowed packages..."]
+allowed_dependencies = ["sc-lint-attributes", "existing-package"]
 ```
 
 Reports containing suppressed findings use schema version `0.2.0` and include

@@ -21,11 +21,19 @@ pub(super) struct SiteAllowance {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("{path}:{line}: {error}")]
-pub(super) struct SiteAllowError {
-    pub(super) path: PathBuf,
-    pub(super) line: usize,
-    pub(super) error: DirectiveError,
+pub(super) enum SiteAllowError {
+    #[error("{path}:{line}: {error}")]
+    InvalidDirective {
+        path: PathBuf,
+        line: usize,
+        error: DirectiveError,
+    },
+    #[error("{path}:{line}: unsupported portability rule `{rule}`")]
+    UnknownRule {
+        path: PathBuf,
+        line: usize,
+        rule: SiteRuleId,
+    },
 }
 
 pub(super) fn collect_site_allowances(
@@ -77,17 +85,8 @@ impl SiteAllowVisitor<'_> {
                     continue;
                 };
                 for rule in &rules {
-                    if rule.as_str().starts_with("PORT-")
-                        && !is_known_portability_rule(rule.as_str())
-                    {
-                        self.fail(
-                            line,
-                            DirectiveError::new(
-                                "UNKNOWN_RULE",
-                                format!("unknown portability rule id `{rule}`"),
-                                "use a rule id declared by the portability analyzer",
-                            ),
-                        );
+                    if rule.as_str().starts_with("PORT-") && rule.as_str() != "PORT-010" {
+                        self.fail_unknown_rule(line, rule.clone());
                         return;
                     }
                 }
@@ -103,7 +102,7 @@ impl SiteAllowVisitor<'_> {
     }
 
     fn fail(&mut self, line: usize, error: DirectiveError) {
-        let error = SiteAllowError {
+        let error = SiteAllowError::InvalidDirective {
             path: self.path.to_path_buf(),
             line,
             error,
@@ -111,6 +110,16 @@ impl SiteAllowVisitor<'_> {
         // The visitor preserves the first source-order error.
         if self.error.is_none() {
             self.error = Some(error);
+        }
+    }
+
+    fn fail_unknown_rule(&mut self, line: usize, rule: SiteRuleId) {
+        if self.error.is_none() {
+            self.error = Some(SiteAllowError::UnknownRule {
+                path: self.path.to_path_buf(),
+                line,
+                rule,
+            });
         }
     }
 }
@@ -228,22 +237,6 @@ fn is_sc_lint_attribute(attr: &Attribute) -> bool {
         .is_some_and(|segment| segment.ident == "sc_lint")
         && (segments.len() == 1
             || (segments.len() == 2 && segments[0].ident == "sc_lint_attributes"))
-}
-
-fn is_known_portability_rule(rule: &str) -> bool {
-    matches!(
-        rule,
-        "PORT-001"
-            | "PORT-002"
-            | "PORT-003"
-            | "PORT-004"
-            | "PORT-005"
-            | "PORT-006"
-            | "PORT-007"
-            | "PORT-008"
-            | "PORT-009"
-            | "PORT-010"
-    )
 }
 
 pub(super) fn apply_site_allowances(

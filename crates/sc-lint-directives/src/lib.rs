@@ -85,6 +85,7 @@ impl SiteAllowReason {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DirectiveError {
     code: &'static str,
     cause: String,
@@ -94,7 +95,7 @@ pub struct DirectiveError {
 impl DirectiveError {
     pub fn new(code: &'static str, cause: impl Into<String>, recovery: impl Into<String>) -> Self {
         Self {
-            code,
+            code: qualify_site_allow_code(code),
             cause: cause.into(),
             recovery: recovery.into(),
         }
@@ -147,8 +148,39 @@ impl DirectiveError {
             "NON_LITERAL_REASON" => "use a string literal for the reason",
             _ => "correct the site allowance syntax",
         };
-        Self::new(code, message.to_owned(), recovery)
+        let qualified_code = qualify_site_allow_code(code);
+        let cause = message
+            .strip_prefix(qualified_code)
+            .and_then(|remainder| remainder.strip_prefix(": "))
+            .and_then(|remainder| remainder.split_once("; recovery:").map(|(cause, _)| cause))
+            .unwrap_or(message);
+        Self::new(code, cause.to_owned(), recovery)
     }
+}
+
+fn qualify_site_allow_code(code: &'static str) -> &'static str {
+    match code {
+        "EMPTY_RULES" => "DIRECTIVE.SITE_ALLOW.EMPTY_RULES",
+        "MISSING_REASON" => "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+        "EMPTY_REASON" => "DIRECTIVE.SITE_ALLOW.EMPTY_REASON",
+        "QUOTED_RULE_ID" => "DIRECTIVE.SITE_ALLOW.QUOTED_RULE_ID",
+        "DUPLICATE_RULE_ID" => "DIRECTIVE.SITE_ALLOW.DUPLICATE_RULE_ID",
+        "REASON_WITHOUT_ALLOW" => "DIRECTIVE.SITE_ALLOW.REASON_WITHOUT_ALLOW",
+        "MULTIPLE_ALLOW" => "DIRECTIVE.SITE_ALLOW.MULTIPLE_ALLOW",
+        "DUPLICATE_REASON" => "DIRECTIVE.SITE_ALLOW.DUPLICATE_REASON",
+        "UNKNOWN_ELEMENT" => "DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT",
+        "MALFORMED_RULE_ID" => "DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID",
+        "NON_LITERAL_REASON" => "DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON",
+        other => other,
+    }
+}
+
+fn structure_site_allow_parse_error(error: Error) -> Error {
+    if error.to_string().contains("DIRECTIVE.SITE_ALLOW.") {
+        return error;
+    }
+    let structured = DirectiveError::from_diagnostic(&error.to_string());
+    Error::new(error.span(), structured.to_string())
 }
 
 impl fmt::Display for DirectiveError {
@@ -170,48 +202,10 @@ pub struct AttributeInput {
 impl Parse for AttributeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut directives = Vec::new();
-        let mut site_rules: Option<Vec<SiteRuleId>> = None;
-        let mut site_reason: Option<SiteAllowReason> = None;
+        let mut site_allow = SiteAllowParts::default();
         while !input.is_empty() {
             if input.peek(Ident) && !input.peek2(Token![.]) {
-                let key = input.parse::<Ident>()?;
-                match key.to_string().as_str() {
-                    "allow" => {
-                        if site_rules.is_some() {
-                            return Err(Error::new(
-                                key.span(),
-                                "MULTIPLE_ALLOW: multiple site allow elements",
-                            ));
-                        }
-                        site_rules = Some(parse_site_rules(input, &key)?);
-                    }
-                    "reason" => {
-                        if site_reason.is_some() {
-                            return Err(Error::new(
-                                key.span(),
-                                "DUPLICATE_REASON: duplicate site allow reason",
-                            ));
-                        }
-                        input.parse::<Token![=]>()?;
-                        if !input.peek(LitStr) {
-                            return Err(Error::new(
-                                key.span(),
-                                "NON_LITERAL_REASON: reason must be a string literal",
-                            ));
-                        }
-                        let literal = input.parse::<LitStr>()?;
-                        site_reason = Some(
-                            SiteAllowReason::new(literal.value())
-                                .map_err(|e| Error::new(literal.span(), e.to_string()))?,
-                        );
-                    }
-                    _ => {
-                        return Err(Error::new(
-                            key.span(),
-                            "UNKNOWN_ELEMENT: unknown site directive element",
-                        ));
-                    }
-                }
+                site_allow.parse_element(input)?;
             } else {
                 directives.push(parse_directive(input)?);
             }
@@ -220,25 +214,127 @@ impl Parse for AttributeInput {
             }
             input.parse::<Token![,]>()?;
         }
-        if let Some(rules) = site_rules {
-            let reason = site_reason.ok_or_else(|| {
-                input.error("MISSING_REASON: site allow requires `reason = \"...\"`")
-            })?;
-            directives.push(Directive::SiteAllow { rules, reason });
-        } else if site_reason.is_some() {
-            return Err(input.error("REASON_WITHOUT_ALLOW: reason requires a site allow"));
-        }
+        site_allow.finish(input, &mut directives)?;
         Ok(Self { directives })
     }
 }
 
+#[derive(Default)]
+struct SiteAllowParts {
+    rules: Option<Vec<SiteRuleId>>,
+    reason: Option<SiteAllowReason>,
+}
+
+impl SiteAllowParts {
+    fn parse_element(&mut self, input: ParseStream<'_>) -> Result<()> {
+        let key = input
+            .parse::<Ident>()
+            .map_err(structure_site_allow_parse_error)?;
+        match key.to_string().as_str() {
+            "allow" => self.parse_rules(input, &key),
+            "reason" => self.parse_reason(input, &key),
+            _ => Err(Error::new(
+                key.span(),
+                site_allow_error_message(
+                    "UNKNOWN_ELEMENT",
+                    "unknown site directive element",
+                    "remove unsupported elements from the attribute",
+                ),
+            )),
+        }
+    }
+
+    fn parse_rules(&mut self, input: ParseStream<'_>, key: &Ident) -> Result<()> {
+        if self.rules.is_some() {
+            return Err(Error::new(
+                key.span(),
+                site_allow_error_message(
+                    "MULTIPLE_ALLOW",
+                    "multiple site allow elements",
+                    "combine all rule ids in one allow(...) element",
+                ),
+            ));
+        }
+        self.rules = Some(parse_site_rules(input, key)?);
+        Ok(())
+    }
+
+    fn parse_reason(&mut self, input: ParseStream<'_>, key: &Ident) -> Result<()> {
+        if self.reason.is_some() {
+            return Err(Error::new(
+                key.span(),
+                site_allow_error_message(
+                    "DUPLICATE_REASON",
+                    "duplicate site allow reason",
+                    "provide one reason element",
+                ),
+            ));
+        }
+        input
+            .parse::<Token![=]>()
+            .map_err(structure_site_allow_parse_error)?;
+        if !input.peek(LitStr) {
+            return Err(Error::new(
+                key.span(),
+                site_allow_error_message(
+                    "NON_LITERAL_REASON",
+                    "reason must be a string literal",
+                    "use a string literal for the reason",
+                ),
+            ));
+        }
+        let literal = input.parse::<LitStr>()?;
+        self.reason = Some(
+            SiteAllowReason::new(literal.value())
+                .map_err(|error| Error::new(literal.span(), error.to_string()))?,
+        );
+        Ok(())
+    }
+
+    fn finish(self, input: ParseStream<'_>, directives: &mut Vec<Directive>) -> Result<()> {
+        match (self.rules, self.reason) {
+            (Some(rules), Some(reason)) => {
+                directives.push(Directive::SiteAllow { rules, reason });
+                Ok(())
+            }
+            (Some(_), None) => Err(input.error(site_allow_error_message(
+                "MISSING_REASON",
+                "site allow requires `reason = \"...\"`",
+                "add reason = \"...\" to the allowance",
+            ))),
+            (None, Some(_)) => Err(input.error(site_allow_error_message(
+                "REASON_WITHOUT_ALLOW",
+                "reason requires a site allow",
+                "add an allow(...) element or remove reason",
+            ))),
+            (None, None) => Ok(()),
+        }
+    }
+}
+
+fn site_allow_error_message(code: &'static str, cause: &str, recovery: &str) -> String {
+    DirectiveError::new(code, cause, recovery).to_string()
+}
+
 fn parse_site_rules(input: ParseStream<'_>, allow_ident: &Ident) -> Result<Vec<SiteRuleId>> {
+    parse_site_rules_inner(input, allow_ident).map_err(structure_site_allow_parse_error)
+}
+
+fn parse_site_rules_inner(input: ParseStream<'_>, allow_ident: &Ident) -> Result<Vec<SiteRuleId>> {
     let content;
     syn::parenthesized!(content in input);
     let mut rules: Vec<SiteRuleId> = Vec::new();
     while !content.is_empty() {
         if content.peek(LitStr) {
-            return Err(content.error("QUOTED_RULE_ID: rule ids must be unquoted identifiers"));
+            return Err(Error::new(
+                content.span(),
+                DirectiveError::new(
+                    "QUOTED_RULE_ID",
+                    "rule ids must be unquoted identifiers",
+                    "write rule ids as identifiers, for example PORT-010",
+                )
+                .to_string(),
+            ));
         }
         let first = content.parse::<Ident>()?;
         let mut rule = first.to_string();
@@ -252,13 +348,26 @@ fn parse_site_rules(input: ParseStream<'_>, allow_ident: &Ident) -> Result<Vec<S
                 rule.push_str(&content.parse::<LitInt>()?.to_string());
                 break;
             } else {
-                return Err(content.error("MALFORMED_RULE_ID: malformed site allow rule id"));
+                return Err(Error::new(
+                    content.span(),
+                    DirectiveError::new(
+                        "MALFORMED_RULE_ID",
+                        "malformed site allow rule id",
+                        "write an analyzer prefix and numeric suffix, for example PORT-010",
+                    )
+                    .to_string(),
+                ));
             }
         }
         if rules.iter().any(|existing| existing.as_str() == rule) {
             return Err(Error::new(
                 allow_ident.span(),
-                "DUPLICATE_RULE_ID: duplicate site allow rule id",
+                DirectiveError::new(
+                    "DUPLICATE_RULE_ID",
+                    "duplicate site allow rule id",
+                    "list each rule id once",
+                )
+                .to_string(),
             ));
         }
         rules.push(
@@ -271,7 +380,12 @@ fn parse_site_rules(input: ParseStream<'_>, allow_ident: &Ident) -> Result<Vec<S
     if rules.is_empty() {
         return Err(Error::new(
             allow_ident.span(),
-            "EMPTY_RULES: site allow requires at least one rule id",
+            DirectiveError::new(
+                "EMPTY_RULES",
+                "site allow requires at least one rule id",
+                "provide at least one unquoted rule id",
+            )
+            .to_string(),
         ));
     }
     Ok(rules)
@@ -337,6 +451,7 @@ fn parse_scope(input: ParseStream<'_>) -> Result<Scope> {
 mod tests {
     use super::AttributeInput;
     use super::Directive;
+    use super::SiteAllowReason;
     use super::SiteRuleId;
     use quote::quote;
 
@@ -452,6 +567,14 @@ mod tests {
             let error = syn::parse2::<AttributeInput>(tokens).expect_err(label);
             assert!(error.to_string().contains(code), "{label}: {error}");
         }
+    }
+
+    #[test]
+    fn site_allow_error_codes_are_prefixed_and_actionable() {
+        let error = SiteAllowReason::new(" \t").expect_err("blank reasons are rejected");
+        assert_eq!(error.code(), "DIRECTIVE.SITE_ALLOW.EMPTY_REASON");
+        assert_eq!(error.cause(), "site allowance reason must not be empty");
+        assert_eq!(error.recovery(), "add a specific reason string");
     }
 
     #[test]
