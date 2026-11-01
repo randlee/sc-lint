@@ -12,6 +12,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
 - [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
+- [docs/sc-lint/adr/ADR-022-tools-and-consumer-configuration.md](./sc-lint/adr/ADR-022-tools-and-consumer-configuration.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -532,6 +533,11 @@ The product should support both:
   The consumer repository owns `just test`; sc-lint provides a recommended
   `test` recipe, which the installer adds only when the consumer has none.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
+
+  Proposed CLI amendment: [REQ-CLI-028](./sc-lint/cli-requirements.md#req-cli-028--proposed-pending-rand-acceptance)
+  defines host-selected lint rows and optional `default_lint_profile` behavior.
+  It is Pending Rand acceptance and does not change this accepted
+  requirement until accepted.
 
   Supersession (Phase G, ADR-015 Decision 1–2 and 4): the consumer-facing
   installation mechanism is the adoption kit (`packages/sc-lint-adoption`

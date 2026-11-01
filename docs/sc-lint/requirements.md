@@ -30,7 +30,8 @@ explicit without defining duplicate requirements:
   parsing, configuration, output, and exit-code ownership.
 - `REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA` define machine-mode and
   envelope stability.
-- `REQ-CLI-001` through `REQ-CLI-025` and `REQ-CLI-027` define
+- `REQ-CLI-001` through `REQ-CLI-025` and `REQ-CLI-027` through
+  `REQ-CLI-028` define
   command-specific CLI behavior. `REQ-CLI-026` is a retired historical id and
   is not reused.
 - `REQ-LOG-001` through `REQ-LOG-009` define the logging contract in

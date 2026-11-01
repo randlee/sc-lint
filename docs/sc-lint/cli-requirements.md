@@ -7,6 +7,7 @@ Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+- [`./adr/ADR-022-tools-and-consumer-configuration.md`](./adr/ADR-022-tools-and-consumer-configuration.md)
 
 ADR-005 governs release-1 profile and `xwin` policy and supersedes earlier
 provisional rollout notes for cross-target preflight membership.
@@ -447,6 +448,82 @@ specialized backend tools and mixed Rust/Python implementations.
   (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31
   ("approve"); ADR-022 provides context for the consumer configuration
   surface.)
+
+- `REQ-CLI-028` — **Proposed; Pending Rand acceptance**
+  Consumer lint rows may declare `host = "linux" | "macos" | "windows"` to
+  select the operating-system host on which that row's command and literal
+  `env` values apply. `host` is independent of `platform`: `platform` continues
+  to identify the target OS and, when `target` is present, must match that
+  target triple. A row without `host` keeps its existing host-selection
+  behavior. A row with `host` is eligible only on that host, even when an
+  explicit step selector or `--platform-scope all` selects its name. A
+  host-mismatched selected row is a non-failing skip, reported with its
+  declared host, actual host, platform, target and stable reason
+  `host_mismatch`. Invalid or non-string host values fail configuration with
+  `PROFILE.INVALID_HOST`, naming the row and field and listing the accepted
+  values.
+
+  `host` and `platform` filters compose conjunctively: the host filter chooses
+  where the command and its environment run; the platform scope chooses rows
+  by their target OS. `--platform-scope all` bypasses platform-scope filtering
+  only; it never overrides a declared host. Named profiles preserve their
+  declared order and membership, and `all` includes every declared row, but
+  both remain subject to host selection. A direct row selector also cannot
+  bypass `host`. The planner reports the row's host selector and actual host
+  for every planned or skipped row. `after_all` is a barrier among the
+  host-eligible, platform-selected execution rows: it starts after all other
+  such rows finish; rows excluded by the host or platform filters do not hold
+  the barrier. Existing rows without `host` preserve their current selection,
+  skip, and report behavior.
+
+  The consumer may also set optional `default_lint_profile = "<name>"` directly in
+  `[tool.sc-lint]`. With the key absent, a bare lint invocation retains today's
+  complete-profile behavior. When present, a lint invocation without an
+  explicit selector uses that named profile. The name must resolve to a
+  declared named lint profile; an empty, unknown, or reserved `all` value is a
+  configuration error (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`) that identifies
+  `default_lint_profile` and the available names. Explicit named-profile selection
+  remains unchanged. Explicit `all` always requests every declared row and is
+  still subject to host and platform filtering. Thus a CI-only row can be
+  excluded from bare `just lint` by setting the default to a local profile,
+  while `just lint ci all` explicitly selects the CI profile and all platform
+  rows. The `default_lint_profile` key is at `[tool.sc-lint]`: TOML cannot define
+  `[tool.sc-lint.lint]` as a table because `[[tool.sc-lint.lint]]` is already
+  the lint-row array-of-tables.
+
+  **Worked example (atm-core).** Declare native clippy rows for Linux, macOS
+  and Windows with matching `host` and `platform`. Each row uses
+  `.bootstrap-venv/bin/python` for `PYO3_PYTHON` on Linux/macOS and
+  `.bootstrap-venv/Scripts/python.exe` on Windows. Declare Windows-target
+  clippy rows for all three hosts with `platform = "windows"` and
+  `target = "x86_64-pc-windows-msvc"`; their host-specific environments use
+  the same Unix-versus-Windows interpreter paths. On Linux and macOS, the
+  Windows-target rows use `cargo xwin`; on Windows they use native cargo.
+  Include those rows in the explicit `ci` named profile but not the `local`
+  default profile. `just lint` therefore omits them on every developer host;
+  `just lint ci all` includes them, selects the matching host row, and runs a
+  Windows-target clippy check on every CI OS.
+
+  | Row | `host` | `platform` / `target` | Command path | `PYO3_PYTHON` | Profile |
+  | --- | --- | --- | --- | --- | --- |
+  | native Linux | `linux` | `linux` / none | native cargo | `.bootstrap-venv/bin/python` | `local`, `ci` |
+  | native macOS | `macos` | `macos` / none | native cargo | `.bootstrap-venv/bin/python` | `local`, `ci` |
+  | native Windows | `windows` | `windows` / none | native cargo | `.bootstrap-venv/Scripts/python.exe` | `local`, `ci` |
+  | Windows target on Linux | `linux` | `windows` / `x86_64-pc-windows-msvc` | cargo xwin | `.bootstrap-venv/bin/python` | `ci` |
+  | Windows target on macOS | `macos` | `windows` / `x86_64-pc-windows-msvc` | cargo xwin | `.bootstrap-venv/bin/python` | `ci` |
+  | Windows target on Windows | `windows` | `windows` / `x86_64-pc-windows-msvc` | native cargo | `.bootstrap-venv/Scripts/python.exe` | `ci` |
+
+  Alternatives considered: `env_by_host` embeds host branching in environment
+  configuration instead of composing a row's environment with its execution
+  host; a venv placeholder makes sc-lint interpret consumer-specific
+  filesystem conventions; a Unix alias conflates Linux and macOS despite
+  distinct host identities and interpreter paths. For #784, per-step
+  `default = false` adds a second inclusion rule to every row and makes “all”
+  less direct; the consumer-level `default_lint_profile` keeps rows declarative
+  and gives bare invocation one named default while explicit `all` stays
+  complete.
+
+  (Source: #822 and #784, Phase 0.8.4. Proposed amendment to [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md); status remains Pending until Rand accepts in his own words.)
 
 ## Contract References
 
