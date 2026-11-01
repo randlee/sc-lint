@@ -269,6 +269,7 @@ def test_workflow_only_triggers_for_release_or_explicit_dispatch():
     assert workflow["on"]["workflow_run"]["types"] == ["completed"]
     assert workflow["permissions"] == {"contents": "read"}
     plan = workflow["jobs"]["plan"]
+    assert workflow["jobs"]["plan"]["if"] == "${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' }}"
     assert plan["permissions"] == {"contents": "read", "actions": "read"}
     assert "needs.plan.outputs.verify" in workflow["jobs"]["native"]["if"]
     assert "permissions" not in workflow["jobs"]["native"]
@@ -446,9 +447,6 @@ def test_unsuccessful_release_job_checks_for_published_release(conclusion, publi
 
 
 def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path):
-    import yaml
-    workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
-    assert workflow["jobs"]["plan"]["if"] == "${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' }}"
     client = ReleaseRun()
     original_json = client.json
     def jobs_with_failed_publish(endpoint):
