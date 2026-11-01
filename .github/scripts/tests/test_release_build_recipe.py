@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".github/scripts/build_release_target.sh"
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize(
     ("kind", "target", "runner", "manylinux", "expected"),
     [
@@ -57,6 +58,7 @@ def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expec
         assert any("pip install cargo-zigbuild==0.20.1 ziglang==0.12.1" in line for line in lines)
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize(("system", "value", "expected"), [
     ("maturin", "", "unset"), ("setuptools", "", "unset"), ("maturin", "11.0", "11.0"),
 ])
@@ -87,6 +89,7 @@ def test_both_workflows_use_the_same_build_recipe():
         assert wheels["run"] == "bash .github/scripts/build_release_target.sh wheel"
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize("arm", [False, True])
 def test_winget_patterns_are_selected_by_target_not_list_position(tmp_path, arm):
     workflow = yaml.safe_load((ROOT / ".github/workflows/winget-publish.yml").read_text())

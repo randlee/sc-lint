@@ -263,6 +263,7 @@ def test_node24_runtime_floors():
     assert "softprops/action-gh-release@v3" in (INSTALL.PACKAGE_ROOT / ".github/workflows/release.yml").read_text()
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize('immutable,expected', [(True, 0), (False, 1)])
 def test_download_step_requires_immutable_release(tmp_path, immutable, expected):
     import os

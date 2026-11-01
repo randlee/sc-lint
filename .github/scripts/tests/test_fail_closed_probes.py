@@ -6,6 +6,7 @@ executes it against a stubbed `gh`, asserting that only a confirmed 404
 """
 
 from __future__ import annotations
+import pytest
 
 import os
 import stat
@@ -136,6 +137,7 @@ def run_release_probe(
     )
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_probe_confirmed_absent_reports_absent(tmp_path: Path) -> None:
     for mode in ("absent", "http-404"):
         result, outputs = run_release_probe(tmp_path, mode=mode, probe="true")
@@ -143,6 +145,7 @@ def test_release_probe_confirmed_absent_reports_absent(tmp_path: Path) -> None:
         assert outputs["release_state"] == "absent"
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_probe_fails_closed_on_transient_api_error(tmp_path: Path) -> None:
     result, outputs = run_release_probe(tmp_path, mode="transient", probe="true")
     assert result.returncode != 0
@@ -151,6 +154,7 @@ def test_release_probe_fails_closed_on_transient_api_error(tmp_path: Path) -> No
     assert "release_state" not in outputs
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_probe_reports_complete_when_every_asset_is_present(tmp_path: Path) -> None:
     result, outputs = run_release_probe(
         tmp_path, mode="found", probe="true", release_json=COMPLETE_RELEASE_JSON
@@ -159,6 +163,7 @@ def test_release_probe_reports_complete_when_every_asset_is_present(tmp_path: Pa
     assert outputs["release_state"] == "complete"
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_probe_reports_incomplete_for_missing_assets_or_draft(tmp_path: Path) -> None:
     missing_assets_json = '{"isDraft": false, "assets": [{"name": "checksums.txt"}]}'
     result, outputs = run_release_probe(
@@ -176,6 +181,7 @@ def test_release_probe_reports_incomplete_for_missing_assets_or_draft(tmp_path: 
     assert outputs["release_state"] == "incomplete"
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_verify_mode_still_hard_fails_each_bad_state(tmp_path: Path) -> None:
     result, _ = run_release_probe(tmp_path, mode="absent", probe="false")
     assert result.returncode != 0
@@ -207,6 +213,7 @@ def test_release_verify_mode_still_hard_fails_each_bad_state(tmp_path: Path) -> 
     assert outputs["release_state"] == "complete"
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_probe_rejects_invalid_tags_before_any_lookup(tmp_path: Path) -> None:
     result, outputs = run_release_probe(
         tmp_path, mode="found", probe="true", tag="not-a-tag"
@@ -286,12 +293,14 @@ def run_winget_probe(
     )
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_winget_probe_confirmed_absent_proceeds_to_submission(tmp_path: Path) -> None:
     result, outputs = run_winget_probe(tmp_path, contents_mode="absent", search_mode="none")
     assert result.returncode == 0, result.stderr
     assert outputs["already_published"] == "false"
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_winget_probe_skips_when_manifest_or_pr_already_exists(tmp_path: Path) -> None:
     result, outputs = run_winget_probe(tmp_path, contents_mode="found")
     assert result.returncode == 0, result.stderr
@@ -306,6 +315,7 @@ def test_winget_probe_skips_when_manifest_or_pr_already_exists(tmp_path: Path) -
     assert "pull request (open or merged) already exists" in result.stdout
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_winget_probe_fails_closed_on_transient_manifest_lookup_error(tmp_path: Path) -> None:
     result, outputs = run_winget_probe(tmp_path, contents_mode="error")
     assert result.returncode != 0
@@ -314,6 +324,7 @@ def test_winget_probe_fails_closed_on_transient_manifest_lookup_error(tmp_path: 
     assert "already_published" not in outputs
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_winget_probe_fails_closed_on_pr_search_failures(tmp_path: Path) -> None:
     result, outputs = run_winget_probe(
         tmp_path, contents_mode="absent", search_mode="error"

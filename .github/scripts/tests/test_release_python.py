@@ -121,6 +121,7 @@ def test_pr_workflow_discovery_covers_all_event_forms(tmp_path):
     assert {path.name for path in pr_triggered_workflows(tmp_path)} == {"one.yml", "two.yaml", "three.yml"}
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
 def test_actual_publish_shell_uses_standalone_manifest_with_mock_cargo(tmp_path, workflow_name):
     import os
@@ -148,6 +149,7 @@ esac
     assert (tmp_path / 'cargo-args').read_text().splitlines() == ['publish', '--manifest-path', 'bindings/standalone/Cargo.toml', '--locked']
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize("platform,accepted", [("win_amd64", True), ("manylinux_2_28_x86_64", False)])
 def test_declared_wheel_verifier_executes_bash_environment_contract(tmp_path, platform, accepted):
     import os
@@ -168,6 +170,7 @@ def test_declared_wheel_verifier_executes_bash_environment_contract(tmp_path, pl
     assert (result.returncode == 0) is accepted, result.stderr
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_python_setup_selects_manifest_toolchain_for_all_maturin_builds(tmp_path):
     import os
     import shutil
