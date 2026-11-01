@@ -460,10 +460,17 @@ specialized backend tools and mixed Rust/Python implementations.
   xwin from the actual host, platform and target.
 
   Test selectors do not accept `host`; this amendment does not add host
-  selection to test rows. Selection order is: (1) expand the selected
-  step/profile membership, (2) validate each selected row's fields and
-  host/platform relationship, (3) apply the platform-scope filter, (4) apply
-  the optional host filter, and (5) call `decide` for remaining rows. The scope
+  selection to test rows. At config load, decode and validate the type and
+  supported value of `host` on every declared lint row, whether or not the
+  row's profile is selected. A non-string or value outside `linux`, `macos`,
+  and `windows` fails with the profile-plan config error detail
+  `PROFILE.INVALID_HOST`. After load, selection order is: (1) expand the
+  selected step/profile membership, (2) validate each selected row's fields
+  and host/platform relationship, (3) apply the platform-scope filter, (4)
+  apply the optional host filter, and (5) call `decide` for remaining rows.
+  The host/platform contradiction check for a no-target row stays in selected
+  row validation, before scope filtering; it does not reject an unselected
+  row. The scope
   filter matches existing `scope_selects` behavior: default `host` includes
   untagged rows and rows whose
   `platform` matches the actual host; `all` includes every platform row; a
@@ -550,14 +557,15 @@ specialized backend tools and mixed Rust/Python implementations.
 
   Add proposed `ProfilePlanDetailCode::InvalidHost`
   (`PROFILE.INVALID_HOST`) and `ProfilePlanDetailCode::UnknownDefaultLintProfile`
-  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). A host value that is malformed,
-  non-string, unsupported, or that contradicts `platform` on a row without
-  `target`, fails
+  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). A host value that is non-string or
+  unsupported fails with `PROFILE.INVALID_HOST` at config load for every
+  declared lint row, including rows outside the selected profile. A host that
+  contradicts `platform` on a row without `target` fails with
   `PROFILE.INVALID_HOST` during selected-member validation, before platform
-  scope filtering; even a scope-filtered selected row with an invalid host
-  fails. A host without `platform` filters by host alone. With a `target`,
-  host and target platform may differ, enabling cross-host rows. The config key
-  also needs to be admitted in `SC_LINT_KEYS` and represented in
+  scope filtering; this relationship check applies only to selected rows. A
+  host without `platform` filters by host alone. With a `target`, host and
+  target platform may differ, enabling cross-host rows. The config key also
+  needs to be admitted in `SC_LINT_KEYS` and represented in
   `ScLintConfigFile` when implemented.
 
   **Worked example (atm-core).** Use this consumer configuration. It uses a
@@ -655,13 +663,16 @@ specialized backend tools and mixed Rust/Python implementations.
      the same config with `sc-lint test` or explicit `--profile ci` succeeds.
      An empty named profile continues to produce `PROFILE.EMPTY_MEMBERS`, and
      declaring profile `all` continues to produce `PROFILE.AMBIGUOUS_NAME`.
-  6. Verify malformed/unsupported host values and a no-target host/platform
-     mismatch produce `PROFILE.INVALID_HOST` before scope filtering, including
-     when the row would be scope-filtered. Verify a host without platform
-     filters by host alone. Name the cases
+  6. Verify non-string and unsupported host values produce
+     `PROFILE.INVALID_HOST` during config load, even on a lint row outside the
+     selected profile. Verify the no-target host/platform mismatch produces
+     `PROFILE.INVALID_HOST` during selected-member validation before scope
+     filtering, including when the selected row would be scope-filtered.
+     Verify a host without platform filters by host alone. Name the cases
      `invalid_host_fails_before_platform_scope_filter`,
      `host_platform_mismatch_without_target_is_invalid`, and
-     `host_without_platform_filters_by_host_only`.
+     `host_without_platform_filters_by_host_only`, and
+     `invalid_host_on_unselected_profile_fails_at_config_load`.
 
   **Compatibility.** Existing configurations without these keys are
   unchanged. Before this change, `host` fails as an unknown lint-row field and
