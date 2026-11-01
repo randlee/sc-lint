@@ -21,18 +21,18 @@ path = "src/lib.rs"
 [dependencies]
 anyhow.workspace = true
 cargo_metadata.workspace = true
-dunce = "1"
+dunce = "1.0.5"
 serde.workspace = true
 serde_json.workspace = true
 sc-lint-directives.workspace = true
 sc-lint-analyzer-support.workspace = true
 sc-lint-schema.workspace = true
-clap = { version = "4", features = ["derive"] }
-syn = { version = "2", features = ["full", "parsing", "visit"] }
-quote = "1"
+clap = { version = "4.6.7", features = ["derive"] }
+syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }
+quote = "1.0.47"
 rayon.workspace = true
-toml = "0.8"
-thiserror = "1"
+toml = "1.1.8"
+thiserror = "2.0.21"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.27.0"

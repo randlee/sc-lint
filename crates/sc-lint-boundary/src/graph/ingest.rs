@@ -6,6 +6,16 @@ use super::reference_collector::collect_references_with;
 use super::*;
 use std::collections::BTreeSet;
 
+/// Inline modules carry items, but no source-file frontmatter, shebang, or attributes.
+fn inline_module_syntax(items: Vec<Item>) -> File {
+    File {
+        frontmatter: None,
+        shebang: None,
+        attrs: Vec::new(),
+        items,
+    }
+}
+
 fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for item in items {
@@ -89,11 +99,7 @@ pub(super) fn ingest_module_items(
 
                 if let Some((_, items)) = item_mod.content {
                     let child_module_dir = module_dir.join(&name);
-                    let inline_file = File {
-                        shebang: None,
-                        attrs: Vec::new(),
-                        items,
-                    };
+                    let inline_file = inline_module_syntax(items);
                     let inline_task = SourceFileTask {
                         context: context.clone(),
                         parent_module_id: NodeId::new(child_module_id.clone()),
@@ -384,8 +390,8 @@ pub(super) fn ingest_module_items(
                 let trait_path = item_impl
                     .trait_
                     .as_ref()
-                    .map(|(_, path, _)| trait_path_key(path));
-                let impl_node_id = if let Some((_, path, _)) = &item_impl.trait_ {
+                    .map(|(path, _)| trait_path_key(path));
+                let impl_node_id = if let Some((path, _)) = &item_impl.trait_ {
                     NodeId::new(format!("{owner_node_id}::{}", trait_impl_key(&owner, path)))
                 } else {
                     NodeId::new(format!("{owner_node_id}::impl::inherent"))
@@ -458,7 +464,7 @@ pub(super) fn ingest_module_items(
                     owner_node_id.clone(),
                 );
 
-                if let Some((_, path, _)) = &item_impl.trait_ {
+                if let Some((path, _)) = &item_impl.trait_ {
                     let trait_reference_path = trait_path_key(path);
                     let trait_target_node_id = resolve_reference_target(
                         context,
