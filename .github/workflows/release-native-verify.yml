@@ -1,0 +1,63 @@
+name: Release Native Verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release tag (for example v0.8.3)"
+        required: true
+        type: string
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Select the exact release and native targets from its manifest
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --run-id "$RELEASE_RUN_ID" --output "$GITHUB_OUTPUT"
+
+  native:
+    needs: plan
+    name: Native ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          architecture: ${{ matrix.python_arch }}
+      - name: Verify native archive binaries and pip-installed wheel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: python .github/scripts/release_native_verify.py verify --tag "$RELEASE_TAG" --target "$RELEASE_TARGET"
