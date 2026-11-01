@@ -422,9 +422,53 @@ def test_manual_dispatch_checks_the_release_even_if_no_run_id():
     assert not any("/jobs?" in call for call in client.calls)
 
 
-@pytest.mark.parametrize("jobs", [[], [{"name": "release", "conclusion": "failure"}]])
-def test_unknown_or_failed_production_state_is_not_a_rehearsal(jobs):
+@pytest.mark.parametrize("jobs", [[], [{"name": "release", "conclusion": None}]])
+def test_unknown_production_state_fails(jobs):
     client = ReleaseRun()
     client.json = lambda endpoint: {"total_count": len(jobs), "jobs": jobs}
-    with pytest.raises(ValueError, match="cannot establish production status|did not succeed"):
+    with pytest.raises(ValueError, match="cannot establish production status"):
         native.production_release_run(client, "42")
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
+def test_unsuccessful_release_job_skips_with_reason(conclusion, capsys):
+    client = ReleaseRun(conclusion)
+    assert native.plan_release(client, {}, "", "42") is None
+    assert len(client.calls) == 1
+    assert f"conclusion: {conclusion}" in capsys.readouterr().out
+
+
+def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path):
+    import yaml
+    workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
+    assert "failure" in workflow["jobs"]["plan"]["if"]
+    client = ReleaseRun()
+    original_json = client.json
+    def jobs_with_failed_publish(endpoint):
+        if "/jobs?" in endpoint:
+            return {"total_count": 2, "jobs": [
+                {"name": "publish", "conclusion": "failure"},
+                {"name": "release", "conclusion": "success"},
+            ]}
+        return original_json(endpoint)
+    monkeypatch.setattr(client, "json", jobs_with_failed_publish)
+    monkeypatch.setattr(native, "GitHub", lambda *args: client)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('[project]\narchive_prefix="tool"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
+    output = tmp_path / "outputs"
+    assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
+    assert output.read_text().startswith("verify=true\ntag=v1.2.3\n")
+
+
+def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, tmp_path):
+    monkeypatch.setattr(native, "GitHub", lambda *args: ReleaseRun("skipped"))
+    output = tmp_path / "outputs"
+    assert native.main(["plan", "--run-id", "42", "--output", str(output)]) == 0
+    assert output.read_text() == 'verify=false\ntag=\nmatrix={"include":[]}\n'
+
+
+def test_release_job_api_name_matches_workflow():
+    import yaml
+    workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
+    assert "release" in workflow["jobs"]
+    assert workflow["jobs"]["release"].get("name", "release") == "release"

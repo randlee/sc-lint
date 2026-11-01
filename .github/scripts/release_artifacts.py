@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, explicit_asset_patterns, wheel_asset_pattern
+from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, explicit_asset_patterns
 
 import re
 import shutil
@@ -33,7 +33,6 @@ from release_manifest import (
     _require_project,
     load_channel_contracts,
     load_manifest,
-    release_archive_name,
     release_archive_pattern,
     manifest_python_upload_tool,
     manifest_rust_toolchain,

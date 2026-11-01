@@ -21,7 +21,8 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 from verify_release_arch import EXPECTED, machine, verify as verify_wheel_arch
-from release_artifacts import release_archive_name, release_archive_pattern, wheel_asset_pattern
+from release_manifest import release_archive_name, release_archive_pattern
+from release_python import wheel_asset_pattern
 
 # This is host policy, not a release-target inventory. The manifest owns that inventory.
 NATIVE_RUNNERS = {
@@ -153,11 +154,11 @@ def production_release_run(client: GitHub, run_id: str) -> bool:
     if len(jobs) != 1:
         raise ValueError(f"Release run {run_id}: cannot establish production status; expected one release job, found {len(jobs)}")
     conclusion = jobs[0].get("conclusion")
-    if conclusion == "skipped":
-        print(f"Skipping native verification: Release run {run_id} did not run its production release job (conclusion: skipped).", flush=True)
+    if conclusion in {"skipped", "failure", "cancelled"}:
+        print(f"Skipping native verification: Release run {run_id} did not complete its production release job successfully (conclusion: {conclusion}).", flush=True)
         return False
     if conclusion != "success":
-        raise ValueError(f"Release run {run_id}: production release job did not succeed ({conclusion!r})")
+        raise ValueError(f"Release run {run_id}: cannot establish production status; release job conclusion is {conclusion!r}")
     return True
 
 
@@ -287,7 +288,7 @@ def verify_release(client: GitHub, tag: str, target: str, destination: Path, *, 
         assert_version(run, [str(python), "-I", "-c", code], manifest["project"]["name"], version)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("plan", "verify"))
     parser.add_argument("--tag", default="")
@@ -295,7 +296,7 @@ def main() -> int:
     parser.add_argument("--target")
     parser.add_argument("--manifest", type=Path, default=Path(MANIFEST_PATH))
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         if args.command == "plan":
