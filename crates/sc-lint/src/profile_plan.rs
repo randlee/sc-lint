@@ -606,8 +606,9 @@ pub(crate) fn decode_lint_step_fields(
 /// Rejects profile-only fields on a consumer test row.
 ///
 /// # Errors
-/// Returns `UNKNOWN_STEP_FIELD` because test rows support only `name` and
-/// `command`; platform profile selection applies exclusively to lint rows.
+/// Returns `UNKNOWN_STEP_FIELD` because test rows support only `name`,
+/// `command` and `after_all`; platform profile selection applies exclusively
+/// to lint rows.
 pub(crate) fn reject_test_step_fields(
     step: &str,
     platform: Option<&toml::Value>,
@@ -627,7 +628,7 @@ pub(crate) fn reject_test_step_fields(
         Some(step),
         Some(field),
         format!("test step `{step}` has unsupported field `{field}`"),
-        "Test steps accept only `name` and `command`; move platform selection to a lint step.",
+        "Test steps accept only `name`, `command` and `after_all`; move platform selection to a lint step.",
     ))
 }
 

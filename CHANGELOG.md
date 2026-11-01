@@ -4,12 +4,6 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
-### Fixed
-
-- The adoption kit's `profiles.json` schema accepts the Rust consumer lint-step
-  fields, including `env`, `cwd`, and `after_all`, and validates test-layer
-  entries against the supported test-step shape (#822).
-
 ## [0.8.3] — 2026-11-01
 
 Phase M ships the atm-core P1 tool fixes (#786, #720, #136, #385, #198,

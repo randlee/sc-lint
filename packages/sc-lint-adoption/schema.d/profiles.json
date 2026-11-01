@@ -20,7 +20,11 @@
               "platform": { "type": "string", "enum": ["linux", "macos", "windows"] },
               "target": { "type": "string" },
               "after_all": { "type": "boolean" },
-              "env": { "type": "object", "additionalProperties": { "type": "string" } },
+              "env": {
+                "type": "object",
+                "propertyNames": { "type": "string", "minLength": 1, "pattern": "^[^=\\u0000]+$" },
+                "additionalProperties": { "type": "string" }
+              },
               "cwd": { "type": "string", "pattern": "^(?![/\\\\])(?![A-Za-z]:)(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" }
             }
           }

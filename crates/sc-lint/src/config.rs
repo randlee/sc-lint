@@ -817,7 +817,7 @@ fn profile_step_execution(
                         "test step `{name}` has unknown field `{}`",
                         if step.env.is_some() { "env" } else { "cwd" }
                     ),
-                    "Test profile rows accept only `name` and `command`.",
+                    "Test profile rows accept only `name`, `command` and `after_all`.",
                 ),
                 path,
             ));

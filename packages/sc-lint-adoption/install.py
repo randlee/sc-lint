@@ -114,6 +114,9 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
         missing = set(schema.get("required", [])) - set(value)
         if missing: raise ValueError(f"{label} has missing required fields: {sorted(missing)}")
+        if "propertyNames" in schema:
+            for key in value:
+                _schema_value(key, schema["propertyNames"], f"{label} key")
         for key, item in value.items():
             if key in properties:
                 _schema_value(item, properties[key], f"{label}.{key}")
@@ -170,7 +173,7 @@ def lint_profiles_table(lint_profiles: dict) -> str:
 
 
 def lint_step(name: str, step: object) -> str:
-    """Renders one lint row; semantics (platform, target, shape) belong to the sc-lint binary."""
+    """Render one lint row; cross-target and command semantics belong to sc-lint."""
     command, tags = (step, {}) if isinstance(step, list) else (step["command"], step)
     lines = [f"name = {json.dumps(tags.get('name', name))}", f"command = {toml_value(command)}"]
     lines += [f"{key} = {toml_value(tags[key])}" for key in ("platform", "target", "after_all", "env", "cwd") if key in tags]
