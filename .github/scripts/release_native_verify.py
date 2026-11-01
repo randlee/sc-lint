@@ -83,6 +83,12 @@ class StripRedirectCredentials(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
+class GitHubError(ValueError):
+    def __init__(self, endpoint: str, status: int):
+        self.status = status
+        super().__init__(f"GitHub {endpoint}: HTTP {status}; required release asset or run artifact is unavailable")
+
+
 class GitHub:
     def __init__(self, repository: str, token: str):
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
@@ -103,7 +109,7 @@ class GitHub:
             with self.opener.open(request, timeout=60) as response:
                 return response.read()
         except urllib.error.HTTPError as error:
-            raise ValueError(f"GitHub {endpoint}: HTTP {error.code}; required release asset or run artifact is unavailable") from error
+            raise GitHubError(endpoint, error.code) from error
 
     def json(self, endpoint: str) -> dict:
         return json.loads(self.get(endpoint))
@@ -139,8 +145,8 @@ def tag_from_run(client: GitHub, manifest: dict, run_id: str) -> str:
     return "v" + versions[0]
 
 
-def production_release_run(client: GitHub, run_id: str) -> bool:
-    """Only a successful production release job enables automatic asset execution."""
+def production_release_run(client: GitHub, run_id: str) -> str | None:
+    """Return an established production job conclusion, or explain a non-production skip."""
     if not run_id.isdecimal():
         raise ValueError("automatic verification requires the triggering Release run id")
     jobs = []
@@ -151,24 +157,33 @@ def production_release_run(client: GitHub, run_id: str) -> bool:
         if page * 100 >= data["total_count"]:
             break
         page += 1
+    if not jobs:
+        print(f"Skipping native verification: Release run {run_id} has no production release job.", flush=True)
+        return None
     if len(jobs) != 1:
         raise ValueError(f"Release run {run_id}: cannot establish production status; expected one release job, found {len(jobs)}")
     conclusion = jobs[0].get("conclusion")
-    if conclusion in {"skipped", "failure", "cancelled"}:
-        print(f"Skipping native verification: Release run {run_id} did not complete its production release job successfully (conclusion: {conclusion}).", flush=True)
-        return False
-    if conclusion != "success":
+    if conclusion == "skipped":
+        print(f"Skipping native verification: Release run {run_id} did not run its production release job (conclusion: skipped).", flush=True)
+        return None
+    if conclusion not in {"success", "failure", "cancelled"}:
         raise ValueError(f"Release run {run_id}: cannot establish production status; release job conclusion is {conclusion!r}")
-    return True
+    return conclusion
 
 
 def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str) -> tuple[str, dict] | None:
-    if not tag and not production_release_run(client, run_id):
+    conclusion = "success" if tag else production_release_run(client, run_id)
+    if conclusion is None:
         return None
     tag = tag or tag_from_run(client, manifest, run_id)
     release_version(tag)
-    # A production job that succeeded without publishing its release must fail, not skip.
-    client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")
+    try:
+        client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")
+    except GitHubError as error:
+        if error.status != 404 or conclusion == "success":
+            raise
+        print(f"Skipping native verification: Release run {run_id} release job concluded {conclusion} and {tag} has no published release (HTTP 404).", flush=True)
+        return None
     return tag, native_matrix(client.manifest(tag))
 
 

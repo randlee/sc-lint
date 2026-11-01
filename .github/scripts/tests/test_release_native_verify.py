@@ -373,7 +373,7 @@ class ReleaseRun(RunArtifact):
         if endpoint == "releases/tags/v1.2.3":
             self.calls.append(endpoint)
             if not self.published:
-                raise ValueError("HTTP 404: production GitHub release is missing")
+                raise native.GitHubError(endpoint, 404)
             return {"assets": []}
         return super().json(endpoint)
 
@@ -400,7 +400,7 @@ def test_production_release_is_planned_for_native_verification():
 
 def test_production_missing_release_fails_instead_of_skipping():
     client = ReleaseRun(published=False)
-    with pytest.raises(ValueError, match="production GitHub release is missing"):
+    with pytest.raises(ValueError, match="HTTP 404"):
         native.plan_release(client, client.manifest_data, "", "42")
 
 
@@ -422,7 +422,7 @@ def test_manual_dispatch_checks_the_release_even_if_no_run_id():
     assert not any("/jobs?" in call for call in client.calls)
 
 
-@pytest.mark.parametrize("jobs", [[], [{"name": "release", "conclusion": None}]])
+@pytest.mark.parametrize("jobs", [[{"name": "release", "conclusion": None}], [{"name": "release", "conclusion": "success"}] * 2])
 def test_unknown_production_state_fails(jobs):
     client = ReleaseRun()
     client.json = lambda endpoint: {"total_count": len(jobs), "jobs": jobs}
@@ -431,17 +431,24 @@ def test_unknown_production_state_fails(jobs):
 
 
 @pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
-def test_unsuccessful_release_job_skips_with_reason(conclusion, capsys):
-    client = ReleaseRun(conclusion)
-    assert native.plan_release(client, {}, "", "42") is None
-    assert len(client.calls) == 1
-    assert f"conclusion: {conclusion}" in capsys.readouterr().out
+@pytest.mark.parametrize("published", [True, False])
+def test_unsuccessful_release_job_checks_for_published_release(conclusion, published, capsys):
+    client = ReleaseRun(conclusion, published=published)
+    plan = native.plan_release(client, client.manifest_data, "", "42")
+    assert "releases/tags/v1.2.3" in client.calls
+    if published:
+        assert plan[0] == "v1.2.3"
+        assert plan[1]["include"][0]["target"] == "x86_64-unknown-linux-gnu"
+    else:
+        assert plan is None
+        reason = capsys.readouterr().out
+        assert conclusion in reason and "HTTP 404" in reason
 
 
 def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path):
     import yaml
     workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
-    assert "failure" in workflow["jobs"]["plan"]["if"]
+    assert workflow["jobs"]["plan"]["if"] == "${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' }}"
     client = ReleaseRun()
     original_json = client.json
     def jobs_with_failed_publish(endpoint):
@@ -462,8 +469,11 @@ def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path)
 
 def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, tmp_path):
     monkeypatch.setattr(native, "GitHub", lambda *args: ReleaseRun("skipped"))
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text("[project]\n")
+    monkeypatch.chdir(tmp_path)
     output = tmp_path / "outputs"
-    assert native.main(["plan", "--run-id", "42", "--output", str(output)]) == 0
+    assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
     assert output.read_text() == 'verify=false\ntag=\nmatrix={"include":[]}\n'
 
 
@@ -472,3 +482,23 @@ def test_release_job_api_name_matches_workflow():
     workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
     assert "release" in workflow["jobs"]
     assert workflow["jobs"]["release"].get("name", "release") == "release"
+
+
+def test_absent_release_job_skips_with_reason(capsys):
+    client = ReleaseRun()
+    client.json = lambda endpoint: {"total_count": 1, "jobs": [{"name": "build", "conclusion": "failure"}]}
+    assert native.plan_release(client, {}, "", "42") is None
+    assert "has no production release job" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
+def test_release_probe_errors_other_than_404_fail(conclusion):
+    client = ReleaseRun(conclusion)
+    original_json = client.json
+    def denied_release(endpoint):
+        if endpoint.startswith("releases/tags/"):
+            raise native.GitHubError(endpoint, 403)
+        return original_json(endpoint)
+    client.json = denied_release
+    with pytest.raises(native.GitHubError, match="HTTP 403"):
+        native.plan_release(client, client.manifest_data, "", "42")

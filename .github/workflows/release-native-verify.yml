@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(fromJSON('["success","failure"]'), github.event.workflow_run.conclusion) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' }}
     runs-on: ubuntu-latest
     outputs:
       verify: ${{ steps.plan.outputs.verify }}
