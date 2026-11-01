@@ -57,8 +57,8 @@ consumer friction arises.
    A new consumer setting goes on one of these surfaces.
 
 3. **Parallel keys.** A lint step and a test command selector accept the same
-   execution keys: `command`, `env`, `cwd`, platform restriction and
-   `after_all`.
+   execution keys: `command`, `env`, `env_paths` (proposed by amendment
+   decision 4), `cwd`, platform restriction and `after_all`.
 
 4. **PORT-010 site allowance.** PORT-010 can be allowed at a single site with
    `#[sc_lint(allow(PORT-010), reason = "...")]`. This is the exception path
@@ -127,8 +127,17 @@ in his own words. The proposed requirement and full worked example are in
    the local profile. The example keeps native Windows clippy in `local` and
    uses a distinct CI-only explicit-target `--all-targets` row, so the latter
    adds target-wide CI coverage rather than duplicating default-target clippy.
-   Host-specific literal environments also keep interpreter choice in the
+   Host-specific consumer environments also keep interpreter choice in the
    consumer configuration, consistent with the base ADR's ownership boundary.
+4. **Decision: config-root-relative path environment.** Add optional
+   `env_paths` to lint steps and test selectors. It maps environment keys to
+   paths: relative values resolve against the directory containing the loaded
+   config file, while absolute values pass through unchanged. Do not
+   canonicalize paths, resolve symlinks, check existence, or prepend to `PATH`.
+   Keep `env` literal. Build scripts such as PyO3's may run with the package
+   directory as their cwd, so a repo-relative value in `env` resolves from the
+   wrong directory. `env_paths` lets the consumer declare the path explicitly
+   without sc-lint knowing a venv placeholder or layout.
 
 The detailed semantics, validation, compatibility, report examples and
 acceptance criteria are owned by REQ-CLI-028.
@@ -139,7 +148,9 @@ Alternatives considered:
   configuration instead of keeping each command and its literal environment
   together in a selectable row.
 - Venv placeholder: rejected because it makes sc-lint interpret a
-  consumer-specific filesystem convention.
+  consumer-specific filesystem convention. `env_paths` instead carries an
+  explicit consumer-declared path and gives sc-lint no knowledge of venv
+  layout.
 - Unix alias: rejected because Linux and macOS are distinct host values with
   different interpreter paths and execution support.
 - Per-step `default = false`: rejected because it adds a second inclusion

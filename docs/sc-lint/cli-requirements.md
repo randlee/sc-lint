@@ -451,8 +451,8 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-028` — **Proposed; Pending Rand acceptance**
   Consumer lint rows only may declare `host = "linux" | "macos" | "windows"` to
-  select the operating-system host on which that row's command and literal
-  `env` values apply. `host` is independent of `platform`: `platform` continues
+  select the operating-system host on which that row's command and declared
+  environment apply. `host` is independent of `platform`: `platform` continues
   to identify the target OS and, when `target` is present, must match that
   target triple. A row without `host` keeps its existing behavior. A host
   mismatch is an eligibility skip only; it does not choose the command path.
@@ -498,6 +498,22 @@ specialized backend tools and mixed Rust/Python implementations.
   CI-only Windows-host row from bare developer lint while the CI profile still
   explicitly selects it; it does not change the Unix host-scope filtering of
   the Linux/macOS xwin rows.
+
+  `env` remains a literal string table: sc-lint passes each value unchanged
+  and does not interpret it as a path. Optional `env_paths` is a table of
+  environment keys to path strings accepted by lint rows and test selectors.
+  Relative values are joined to the absolute directory containing the loaded
+  config file and passed as absolute paths; absolute values pass through
+  unchanged. Do not canonicalize paths, resolve symlinks, or check existence.
+  This is the way to pass config-root-relative paths to child processes.
+  `env_paths` does not compose or prepend `PATH`; `PATH` composition is out of
+  scope.
+
+  `env_paths` keys follow the `env` key rules: non-empty, with no `=` or NUL.
+  Values must be non-empty strings without NUL. Validate both tables at config
+  load for every declared lint row and test selector, including rows outside
+  the selected lint profile. A key declared in both `env` and `env_paths` is
+  invalid and fails config loading with `PROFILE.DUPLICATE_STEP_ENV_KEY`.
 
   In `data.steps[]`, `host` always means the actual host. For a row that
   declares a host selector, add `host_selector` to its Run row and to every
@@ -568,6 +584,10 @@ specialized backend tools and mixed Rust/Python implementations.
   needs to be admitted in `SC_LINT_KEYS` and represented in
   `ScLintConfigFile` when implemented.
 
+  Add proposed `ProfilePlanDetailCode::DuplicateStepEnvKey`
+  (`PROFILE.DUPLICATE_STEP_ENV_KEY`) for a key declared in both `env` and
+  `env_paths` on the same lint row or test selector.
+
   **Worked example (atm-core).** Use this consumer configuration. It uses a
   unique name for every row. The Windows-host Windows-target row is a distinct
   CI-only `--all-targets --target` check; the native Windows row remains a
@@ -587,19 +607,19 @@ specialized backend tools and mixed Rust/Python implementations.
   name = "atm-core-clippy-linux"
   command = ["cargo", "clippy"]
   platform = "linux"
-  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
 
   [[tool.sc-lint.lint]]
   name = "atm-core-clippy-macos"
   command = ["cargo", "clippy"]
   platform = "macos"
-  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
 
   [[tool.sc-lint.lint]]
   name = "atm-core-clippy-native-windows"
   command = ["cargo", "clippy"]
   platform = "windows"
-  env = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
 
   [[tool.sc-lint.lint]]
   name = "atm-core-clippy-windows-linux"
@@ -607,7 +627,7 @@ specialized backend tools and mixed Rust/Python implementations.
   platform = "windows"
   target = "x86_64-pc-windows-msvc"
   host = "linux"
-  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
 
   [[tool.sc-lint.lint]]
   name = "atm-core-clippy-windows-macos"
@@ -615,7 +635,7 @@ specialized backend tools and mixed Rust/Python implementations.
   platform = "windows"
   target = "x86_64-pc-windows-msvc"
   host = "macos"
-  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
 
   [[tool.sc-lint.lint]]
   name = "atm-core-clippy-windows"
@@ -623,8 +643,13 @@ specialized backend tools and mixed Rust/Python implementations.
   platform = "windows"
   target = "x86_64-pc-windows-msvc"
   host = "windows"
-  env = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
   ```
+
+  These `PYO3_PYTHON` values use `env_paths` because cargo runs build scripts
+  with the package directory as their working directory; a relative value in
+  `env` would resolve from that package directory. `env_paths` resolves each
+  value from the config root. It does not prepend to `PATH`.
 
   `sc-lint lint ci --consumer --profile ci --platform-scope all` runs the two
   Unix-host target rows through cargo xwin and the Windows-host row through
@@ -673,14 +698,27 @@ specialized backend tools and mixed Rust/Python implementations.
      `host_platform_mismatch_without_target_is_invalid`, and
      `host_without_platform_filters_by_host_only`, and
      `invalid_host_on_unselected_profile_fails_at_config_load`.
+  7. Verify `env_paths` is accepted by lint rows and test selectors; malformed
+     tables, invalid keys, empty values, and NUL values fail at config load.
+     Verify relative values resolve from an injected config root on Linux,
+     macOS and Windows, including Windows separator handling; absolute values
+     pass through unchanged, and nonexistent paths are not rejected. Verify a
+     key in both `env` and `env_paths` fails at config load with
+     `PROFILE.DUPLICATE_STEP_ENV_KEY`. Verify a path through a symlink retains
+     the symlink path rather than resolving its target.
 
   **Compatibility.** Existing configurations without these keys are
-  unchanged. Before this change, `host` fails as an unknown lint-row field and
+  unchanged. Before this change, `host` and `env_paths` fail as unknown
+  lint-row fields, and `env_paths` is unsupported on test selectors;
   `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting
   `default_lint_profile` changes that consumer's bare lint run to the
-  named profile; explicit selectors are unaffected. Both keys require
-  sc-lint 0.8.4 or newer, once accepted and implemented; older versions reject
-  them during configuration validation.
+  named profile; explicit selectors are unaffected. `host` and
+  `default_lint_profile` require sc-lint 0.8.4 or newer, once accepted and
+  implemented; older versions reject them during configuration validation.
+  `env_paths` is also proposed for implementation on lint rows and test
+  selectors. When implemented, the adoption kit schema at
+  `packages/sc-lint-adoption/schema.d/profiles.json` must add `env_paths`; this
+  PR does not change that schema.
 
   (Source: #822 and #784, Phase 0.8.4. Proposed amendment to [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md); status remains Pending until Rand accepts in his own words.)
 
