@@ -1042,7 +1042,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sc-lint"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "clap",
  "dunce",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-analyzer-support"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1076,7 +1076,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-attributes"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-boundary"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1107,7 +1107,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-directives"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -1115,12 +1115,13 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-portability"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "clap",
  "rayon",
  "sc-lint-analyzer-support",
+ "sc-lint-directives",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -1132,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-py"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "pyo3",
  "sc-lint",
@@ -1140,7 +1141,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-runtime"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1157,7 +1158,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-schema"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "jsonschema",
  "serde",

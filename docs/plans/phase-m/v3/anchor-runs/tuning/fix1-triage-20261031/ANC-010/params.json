@@ -1,0 +1,39 @@
+{
+ "tool_calls": 40,
+ "rounds": {
+  "1": [
+   "B0",
+   "B1",
+   "B2",
+   "B3"
+  ],
+  "2": [
+   "B4",
+   "B5",
+   "B6"
+  ],
+  "3": [
+   "B7",
+   "B8",
+   "B9",
+   "B10",
+   "B11",
+   "B12",
+   "B13"
+  ]
+ },
+ "scope": "relevant reopened (question_defect, fix1 lint-m-1 triage); addressed and contradicted reopened for sub-0.6 cells (coordinator's every-probability-at-or-above-0.6 goal)",
+ "oracle_predecessor": {
+  "sha256": "046514db9ed23f273ee5898ca24d14a99ed60c0e4d954727923f9126ce6eb1bd",
+  "relation": "append_only: 17 v1 cases byte-identical; C-CTX-1..3 and C-ADD-1 added from ANC-010 v3 scope and statement"
+ },
+ "citations": [
+  "ANC-010 v3 (locked) scope: 'The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.'",
+  "ANC-010 v3 statement: 'an item carrying #[sc_lint(allow(PORT-010), reason = \"...\")] is not reported by PORT-010' (C-ADD-1; fixtures FX-PASS-1, FX-FAIL-1)",
+  "phase-m-intent-v3 (intent.md be7bdec8..., cut 2026-10-31): '#786 other shapes, including S8. These use a per-site #[sc_lint(allow(PORT-010), reason = \"...\")] (ADR-022 decision 4)'"
+ ],
+ "explanation": "Accepted. The current override (3b9e9da4...) misjudges items that mention the PORT-010 site allowance only as another sprint's route, or only in requirement wording. It answers relevant yes on C-CTX-3 (0.25/0.28, expected no) and is at 0.35/0.37 on C-CTX-2. These probes were frozen in the append-only successor oracle 87851b5c... (21 cases) before any Jev call of this triage. On the m-1 diagnostic it answers yes at 0.38-0.44, which reproduces the fix1 cell. Round 1 relevant candidates that framed the subject as crate code work broke both approved fixtures. Round 2 R4 keeps the original outcome framing and adds only the context rule, and is exact. Rounds 2-3 also reopened addressed (P-CONFLICT-1, 'PORT-010 ignores the attribute', sat at 0.28-0.58 or flipped) and contradicted (P-TOPICAL deferral at 0.53-0.61). B13 (R4+A4+K1) is exact: 126/126 cells, 42/42 threshold-0.0 verdicts, 21/21 stable, zero regressions against B0 and zero on the 17 v1 cases. It has 125/126 cells >= 0.8, minimum 0.76, no cell below 0.6, and no production-threshold mismatch, including both approved fixtures. The m-1 diagnostic (as-is and with ceremony) is not_applicable 4/4, relevance no 0.62-0.70; the tune did not aim at it.",
+ "planner_action": "lint-m-1 needs no ANC-010 edit. After review, replace the ANC-010 entry in overrides-plan.json with the sealed question set (proposed file overrides-plan.proposed.json in the triage directory), store tuning_history_after, then re-run check-fixtures and the planning gate at 0.6.",
+ "reasons": {},
+ "authority_recommendations": []
+}

@@ -439,6 +439,15 @@ specialized backend tools and mixed Rust/Python implementations.
   (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
+- `REQ-CLI-027`
+  Consumer profile failures show both child stdout and stderr. When a log
+  root is configured, every executed step writes its raw stdout and stderr to
+  its own file under `<log-root>/steps/`, named from the step name (made
+  filesystem-safe and unique), overwritten each run.
+  (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31
+  ("approve"); ADR-022 provides context for the consumer configuration
+  surface.)
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:

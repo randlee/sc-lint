@@ -15,10 +15,11 @@ TARGETS = [
  {"id":"macos-x86_64","os":"macos-15-intel","target":"x86_64-apple-darwin","platform":"macosx_10_13_x86_64","deployment_target":"10.13"},
  {"id":"macos-arm64","os":"macos-latest","target":"aarch64-apple-darwin","platform":"macosx_11_0_arm64","deployment_target":"11.0"},
  {"id":"windows-x86_64","os":"windows-latest","target":"x86_64-pc-windows-msvc","platform":"win_amd64"},
+ {"id":"windows-arm64","os":"windows-latest","target":"aarch64-pc-windows-msvc","platform":"win_arm64"},
 ]
 
 
-def test_five_platform_contract_renders_and_validates(tmp_path):
+def test_six_platform_contract_renders_and_validates(tmp_path):
     values = InstallValuesTests.valid_values()
     values["python_distributions"][0]["wheels"] = TARGETS
     source = tmp_path / "input.json"
@@ -29,7 +30,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
     import tomllib
     distribution = tomllib.loads(output.read_text())["python_distributions"][0]
     assert distribution["wheels"] == TARGETS
-    assert len(wheel_targets(distribution)) == 5
+    assert len(wheel_targets(distribution)) == 6
     paths = [Path(f'example-1.2.3-cp310-abi3-{target["platform"]}.whl') for target in TARGETS]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
@@ -58,9 +59,8 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     wheels = release["jobs"]["build-python-wheels"]
     assert wheels["runs-on"] == "${{ matrix.os }}"
     assert all("maturin-action" not in step.get("uses", "") for step in wheels["steps"])
-    declared = next(step for step in wheels["steps"] if step.get("name") == "Build declared wheel target (maturin)")
-    assert '--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig' in declared["run"]
-    assert '--target "$WHEEL_TARGET"' in declared["run"]
+    declared = next(step for step in wheels["steps"] if step.get("name") == "Build declared wheel")
+    assert declared["run"] == "bash .github/scripts/build_release_target.sh wheel"
     assert declared["env"]["MACOSX_DEPLOYMENT_TARGET"] == "${{ matrix.deployment_target }}"
     assert 'maturin[zig]==1.9.4' in (root / "actions/setup-python-release-build/action.yml").read_text()
     assert "has_release_binaries" in release["jobs"]["build"]["if"]
@@ -68,6 +68,57 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     assert {"build-python-wheels", "build-python-sdists", "build-npm"} <= set(github_release["needs"])
     assert "!failure()" in github_release["if"]
     assert "needs.build.result == 'skipped'" in github_release["if"]
+
+
+def test_prerelease_builds_and_publishes_declared_wheels():
+    import yaml
+    root = INSTALL.PACKAGE_ROOT / ".github/workflows"
+    workflow = yaml.safe_load((root / "prerelease-archive.yml").read_text())
+    job = workflow["jobs"]["build-wheels"]
+    assert job["strategy"]["matrix"] == "${{ fromJSON(needs.plan.outputs.wheel_matrix) }}"
+    build = next(step for step in job["steps"] if step.get("name") == "Build declared wheel")
+    assert build["run"] == "bash .github/scripts/build_release_target.sh wheel"
+    assert any("verify_release_arch.py" in step.get("run", "") for step in job["steps"])
+    release = workflow["jobs"]["release"]
+    assert "build-wheels" in release["needs"]
+    publication = next(step for step in release["steps"] if step.get("name") == "Generate checksums and publish GitHub prerelease assets")
+    assert "-name '*.whl'" in publication["run"]
+
+
+def pr_triggered_workflows(workflows):
+    import yaml
+    for path in workflows.iterdir():
+        if path.suffix not in (".yml", ".yaml"):
+            continue
+        workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
+        triggers = workflow.get("on", {})
+        if isinstance(triggers, str):
+            triggers = [triggers]
+        if {"pull_request", "pull_request_target", "merge_group"}.intersection(triggers):
+            yield path
+
+
+def test_new_arm_release_targets_never_enter_pr_ci():
+    workflows = INSTALL.PACKAGE_ROOT / ".github/workflows"
+    checked = set()
+    for path in pr_triggered_workflows(workflows):
+        checked.add(path.name)
+        text = path.read_text()
+        for marker in ("aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc", "aarch64-apple-darwin",
+                       "manylinux_2_28_aarch64", "win_arm64", "macosx_11_0_arm64", "ubuntu-24.04-arm",
+                       "windows-11-arm", "linux-arm64", "windows-arm64", "macos-arm64",
+                       "release-target-matrix", "python-wheel-matrix", "build_release_target.sh"):
+            assert marker not in text, f"{path.name} contains {marker}"
+    assert {"ci.yml", "action-fixtures.yml"} <= checked
+
+
+def test_pr_workflow_discovery_covers_all_event_forms(tmp_path):
+    for name, content in {
+        "one.yml": "on: pull_request\n", "two.yaml": "on: [push, pull_request_target]\n",
+        "three.yml": "on:\n  merge_group:\n", "release.yml": "on: push\n",
+    }.items():
+        (tmp_path / name).write_text(content)
+    assert {path.name for path in pr_triggered_workflows(tmp_path)} == {"one.yml", "two.yaml", "three.yml"}
 
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
@@ -92,7 +143,7 @@ esac
     cargo = tmp_path / 'cargo'
     cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > cargo-args\n')
     cargo.chmod(0o755)
-    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True)
+    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert (tmp_path / 'cargo-args').read_text().splitlines() == ['publish', '--manifest-path', 'bindings/standalone/Cargo.toml', '--locked']
 

@@ -98,18 +98,29 @@ This applies to:
 
 - `PORT-010` flags production `#[cfg(unix)]` items and impl methods when they
   do not have either a Windows companion or a portable ungated fallback.
+- S3: a non-test same-name, same-kind `#[cfg(not(unix))]` sibling in the
+  same lexical scope satisfies parity: crate root, inline/file module or the
+  same inherent impl. Trait impls retain their existing treatment.
+- S6: exact `#[cfg(unix)] mod x;` declarations and items in proven Unix-only
+  out-of-line modules are exempt, including public modules/items. Resolution
+  follows `x.rs`, `x/mod.rs` and `#[path]`. Missing or ambiguous files give no
+  Unix-only proof for their items; the exact declaration remains exempt.
+- Other shapes or deliberate Unix-only items use a reasoned item-level
+  `#[sc_lint(allow(PORT-010), reason = "...")]` allowance. Unallowed real gaps
+  remain reported. See the [ADR-010 companion-shapes amendment](./sc-lint/adr/ADR-010-portability-scope-and-parity.md#amendment-2026-10-30--port-010-companion-shapes).
 - The canonical parity helpers live in
   `crates/sc-lint-portability/src/predicates.rs`, including
   `is_cfg_unix_production_item(...)`, `has_windows_companion(...)`,
   `has_portable_fallback(...)`, and the impl-method companion checks.
 - `#[cfg(test)]` siblings do not satisfy production parity; companions must be
   production-facing.
-- If no Windows companion exists, provide an ungated portable implementation or
-  an explicit Windows-gated companion instead of leaving the Unix branch alone.
+- Outside S3/S6, provide a companion or an ungated portable implementation,
+  or use the reasoned site-allowance path for an intentional exception.
 - A private `#[cfg(unix)]` function or module, or a private inherent-impl
   method, in either file of a configured `platform_adapters` pair is exempt.
-  `pub`, `pub(crate)`, `pub(super)`, `pub(in ..)` items and trait-impl methods
-  in those files retain their parity checks.
+  That adapter exemption does not cover `pub`, `pub(crate)`, `pub(super)`,
+  `pub(in ..)` items or trait-impl methods; S3/S6 and site allowances apply
+  independently.
 
 ## Related Docs
 

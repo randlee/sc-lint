@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "yes",
+   "confidence": 0.85
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B3",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-009\", \"statement\": \"sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.\", \"scope\": \"The item changes when PORT-010 reports or stops reporting a #[cfg(unix)] item.\"}, \"item\": {\"id\": \"fix1t-ANC-009/FX-PASS-1\", \"title\": \"ANC-009 pass fixture\", \"text\": \"PORT-010 keeps reporting a production #[cfg(unix)] function with no #[cfg(windows)] companion and no portable fallback. Evidence: test port010_real_gap_still_reported passes, showing one finding for that fixture.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"No such commitment is written, or the item skips such items broadly.\", \"unclear\": \"A sentence touches this but cannot be read as the commitment or not.\", \"yes\": \"Such a commitment is written, for example as a still-reported negative or an unannotated sibling that is still reported.\"}, \"instructions\": \"Is there a sentence in `item.text` committing that PORT-010 still reports a #[cfg(unix)] item that has no companion, no portable fallback and no allowance of its own? Plans that skip such items by file, path, name or switch contain no such commitment. Judge only whether the commitment is written.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"No: only annotated items or recognised companion shapes stop being reported, or the item is silent or unrelated.\", \"unclear\": \"It cannot be told whether such an item would stop being reported.\", \"yes\": \"Yes: the plan stops reporting such an unannotated, unpaired item, for example by file, path, name or switch.\"}, \"instructions\": \"Would some production #[cfg(unix)] item that has no #[cfg(windows)] companion, no portable fallback and no per-site allowance of its own stop being reported under the plan in `item.text`? A reasoned per-site allowance that covers only the one annotated item (for example #[sc_lint(allow(PORT-010), reason = \\\"...\\\")]) and recognising a specific companion shape are not blanket suppression. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.\", \"unclear\": \"The item text is too vague to tell what part of the system it touches.\", \"yes\": \"The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.\"}, \"instructions\": \"The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "991311859a1d87384a91b01226e7d2918eb3e94294ce197883a859e0d6e37f13",
+ "case_id": "FX-PASS-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.85,\"probabilities\":{\"no\":0.09,\"unclear\":0.01,\"yes\":0.9}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}}},\"usage\":{\"input_tokens\":1068,\"output_tokens\":117}}",
+ "raw_response_sha256": "3d0f01033536545646ccc0fef75bc31ba14da70fe9b10d5e7a4eb9dc97109e0a",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-009/B3/FX-PASS-1/r1",
+ "semantic_verdict": "satisfied",
+ "spec": {
+  "addressed": "A3",
+  "contradicted": "K3",
+  "relevant": "R0"
+ }
+}

@@ -35,9 +35,15 @@ entries suppress only the named rule's findings at the listed paths; they do
 not hide other findings in the same file. See
 [configuration](../configuration.md) for syntax and filter precedence.
 
-Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
-`#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
-tracked for follow-up in GitHub issue #720.
+PORT-010 recognizes a non-test, same-name, same-kind `#[cfg(not(unix))]`
+sibling in the same lexical scope: crate root (including `main.rs`), inline or
+file module, or the same inherent impl (S3). Trait impls retain their existing
+treatment. It also recognizes `#[cfg(unix)] mod x;` declarations and items in
+proven Unix-only out-of-line modules, including public items (S6). Resolution
+follows `x.rs`, `x/mod.rs` and `#[path]`. Missing or ambiguous files give no
+Unix-only proof for their items; the exact Unix-gated module declaration is
+exempt independently of resolution. Other shapes or deliberate Unix-only
+items use a reasoned `#[sc_lint(allow(PORT-010), reason = "...")]` site allowance.
 
 ## Finding interpretation and CI
 
@@ -45,6 +51,48 @@ Treat portability findings as required unless the source contains an explicit,
 reviewed platform fallback or a configured private-adapter exemption applies.
 CI should run the complete profile and retain the normalized report for all
 supported targets.
+
+### Reviewed PORT-010 site allowance
+
+Use an item-level allowance only when the public API is deliberately
+Unix-specific and its reason names that cause:
+
+```rust
+#[cfg(unix)]
+#[sc_lint(allow(PORT-010), reason = "This helper intentionally exposes the POSIX uid API.")]
+pub fn current_uid() -> u32 { /* ... */ }
+```
+
+The exception covers only the annotated item. It does not cover an impl's
+methods, siblings, a module, or a file. Consumers using the attribute add the
+version-matched macro crate and admit it in each annotated crate's boundary:
+
+```toml
+[dependencies]
+sc-lint-attributes = "0.8.3"
+```
+
+Add `sc-lint-attributes` to the `dependencies.allowed_dependencies` array in
+the existing boundary record for every annotated consumer crate. For example,
+the complete top-level record shape is:
+
+```toml
+boundary_id = "BOUNDARY-Example"
+owner_package = "example"
+owner_crate_path = "example"
+name = "Example"
+
+[public]
+facade = "example::api"
+
+[dependencies]
+allowed_dependencies = ["sc-lint-attributes", "existing-package"]
+```
+
+Reports containing suppressed findings use schema version `0.2.0` and include
+the `allowed` array with the rule, reason, path, line, and item identity. Empty
+allowance reports remain schema version `0.1.0` and omit `allowed`. Consumers
+must upgrade strict v1 validators before enabling the new report form.
 
 ## Common failures
 

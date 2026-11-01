@@ -1,0 +1,12 @@
+70449b71c399122b85163c8b5d55ae4799798dfdb1123d2db818208faa9763d4  anchors.json
+be7bdec8ba9ae053efdbef2386bf6334f67dadd97a9800e0391a125322ad1241  intent.md
+6916e9ff36aabc3566d456692c4198587e5753e4202c48d60ae58d5f0f28e99a  overrides-plan.json
+5bc75cab74535344f568998f87491a7ed8117e7c90c978d88ed796cb6509f0c3  anchor-runs/plan-gate-review-fix1-20261031/lint-m-1.item.txt
+8e32272ef76cd9fa21797e65e954c2879a481095ce81a6e55c8197d670f81b23  anchor-runs/plan-gate-review-fix1-20261031/lint-m-1.run.json
+0be161815940d5a270a8deea0ac1e2a20ecab533865979c9400ebba15d470fc3  anchor-runs/plan-gate-review-fix1-20261031/lint-m-3.item.txt
+93ebdaa34c1e57b10982256dd4f7b0d9abb44ade7a0523ff70184eaadfc65c2a  anchor-runs/plan-gate-review-fix1-20261031/lint-m-3.run.json
+a81a06ff931072255df96c511c9c3dd91eae0cdfc5a3472837b19d436379f67f  anchor-runs/plan-gate-review-fix1-20261031/lint-m-4.item.txt
+dfc2675cbc603562bdb5770430df2f05dc95eaadfef6697114d2ae0fd9a44f38  anchor-runs/plan-gate-review-fix1-20261031/lint-m-4.run.json
+046514db9ed23f273ee5898ca24d14a99ed60c0e4d954727923f9126ce6eb1bd  anchor-runs/tuning/ANC-010/planning-v3/oracle.json
+fef6327371df8463f629d4b9a285e2c7b466a2ab2057867c1fd014737710357d  anchor-runs/tuning/ANC-010/planning-v3/tuning-history-after.json
+dc24c410282121b9ecea2eda574131f15ff5fb22eb6d80054f9c946449aa776b  ../../../sc-lint/adr/ADR-010-portability-scope-and-parity.md

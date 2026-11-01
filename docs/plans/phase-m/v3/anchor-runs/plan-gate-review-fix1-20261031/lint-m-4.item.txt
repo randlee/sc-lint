@@ -1,0 +1,33 @@
+# m-4: port010-site-allow
+
+## Description
+
+### Goal
+#786 S8 and the other shapes beyond S3/S6: PORT-010 must be allowable at a single site. An item carrying #[sc_lint(allow(PORT-010), reason = "...")] is not reported by PORT-010 (ADR-022 decision 4). This is the exception path for deliberate POSIX-only public helpers such as current_uid and is_owned_by_uid.
+### Deliverables
+1. Directive grammar (design): add Directive::SiteAllow { rules, reason }, separate from Allow. Rule ids are unquoted tokens (PORT-010); reason = "..." is required and non-empty. boundary.* directives parse exactly as before (frozen corpus test unchanged); boundary ignores SiteAllow and portability ignores boundary.* directives.
+2. Portability honours it: PORT-010 does not report an item carrying #[sc_lint(...)] or #[sc_lint_attributes::sc_lint(...)] with allow(PORT-010). The allowance covers only that item; an allow on an impl block does not cascade to its methods, and nothing covers a module's contents, a file or a sibling.
+3. Errors: malformed site allows and unknown PORT rule ids are typed errors with file and line; ids owned by other analyzers are ignored by portability.
+4. Report (REQ-PRODUCT-002DA; ADR-011): FindingsReport gains an optional allowed array for allowances that suppressed a finding. Existing no-allowance reports keep schema_version 0.1.0 and omit allowed. Reports containing allowed use schema_version 0.2.0 and the new analyzer-report-v2.schema.json, which explicitly declares allowed optional and keeps additionalProperties:false. Preserve analyzer-report-v1.schema.json as the old closed contract and own both schema artifacts and fixtures. The validator dispatches by version and accepts old fixtures plus new valid allowed entries; unknown fields/malformed entries still fail. A version bump is required because an old strict v1 validator rejects this new property; it is not claimed wire-compatible with old validators. Upgrade consumers before using the new report form.
+5. Tests: port010_site_allow (annotated pub #[cfg(unix)] fn current_uid not reported, unannotated sibling reported, one allowed entry), site_allow_grammar_corpus (every accepted and rejected form in the design table), site_allow_unknown_rule, site_allow_no_cascade. Fold analyzer isolation and omission-when-empty assertions into the frozen directive corpus and existing json_contract tests. Include stacked cfg/doc/inline attributes, an inherent impl method and a public function in port010_site_allow.
+6. Keep sc-lint-attributes a no-op for behavior and public API; it builds on stable Linux, macOS and Windows through the existing CI matrix. Document adoption in docs-bundle/packages/sc-lint-portability.md: add the sc-lint-attributes dependency and list it in each consumer crate's boundary allowed_dependencies so SCB-DEPENDENCY stays clean. Every allowance reason names the item's actual cause.
+7. Update docs/architecture.md Backend Crate Isolation and docs/sc-lint-portability/** for the portability -> directives edge under ADR-022 decision 4 and ADR-013; add the PORT-010 allowance traceability entry to docs/sc-lint-directives/requirements.md. Existing forbidden_edges against sc-lint-attributes stay unchanged; only the declared allowed_dependencies gains sc-lint-directives.
+### Does Not Close
+No repository-wide switch or path exclusion. Extending allow to other analyzers is later ADR-022 work.
+### Active Trace
+ANC-010, ANC-009. ADR-022 decision 4; ADR-010 amendment 2026-10-30 (per-site allowance).
+
+## Acceptance criteria
+
+### Acceptance Criteria
+- issue:#786 S8: an item annotated #[sc_lint(allow(PORT-010), reason = "...")] produces no PORT-010 finding and appears in allowed with its reason; an unannotated sibling in the same file is still reported (port010_site_allow).
+- Every row of the grammar table behaves as specified (site_allow_grammar_corpus); unknown PORT ids are typed errors; an impl-block allow does not cover its methods; boundary.* parsing and boundary results are unchanged; the frozen directive corpus and existing json_contract tests cover analyzer isolation and omission of an empty allowed array in unchanged 0.1.0 reports.
+- Boundary inventories admit the new portability -> directives edge and the boundary check passes; docs/sc-lint-directives/requirements.md documents the grammar.
+- atm-core sign-off 01M69P0C2R3S1BH78TYKHM9RPW: port010_site_allow covers stacked cfg/doc/inline attributes, an inherent impl method and a pub fn. sc-lint-attributes remains a no-op for behavior/public API and builds in the existing stable Linux/macOS/Windows CI matrix. Adoption docs explain dependency/boundary registration and item-specific reasons.
+- REQ-PRODUCT-002DA / ADR-011: json_contract accepts the original closed v1 fixture and a v2 (0.2.0) fixture with declared optional allowed entries, rejects unknown keys and malformed allowed entries, and proves an old v1 validator rejects the new property. Report version selection and upgrade guidance match deliverable 4; no version bump is hidden.
+- Directive error codes/recovery and RuleId/reason invariants match the design; docs/architecture.md, portability docs and directives traceability match the approved edge, with forbidden_edges unchanged.
+### Validation
+- cargo test -p sc-lint-directives -p sc-lint-attributes -p sc-lint-boundary -p sc-lint-schema -p sc-lint-analyzer-support -p sc-lint-portability -p sc-lint --no-fail-fast
+- just lint
+- just test
+Record the new tests failing on the develop baseline first.

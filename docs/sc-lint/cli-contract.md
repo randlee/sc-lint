@@ -299,7 +299,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
-| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
+| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order; optional step_log_destination and step_log_error when a step log write fails (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
 | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
 Codes are typed constants in their owning module (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`; adapter payload drift in `python_adapter.rs`) and cause text interpolates names.
@@ -359,19 +359,32 @@ Cargo manifest, or analyzer package:
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in
-  the configuration directory (or a test selector's `cwd` below it). Steps
+  the configuration directory (or a step's `cwd` below it). Lint steps accept
+  `env` and `cwd` with the same rules as test command selectors: environment
+  values are passed verbatim, and `cwd` is relative to the configuration
+  directory. Steps
   run in parallel (cargo `argv[0]` steps serialized in declaration order,
   `after_all` steps last) and fail slow: every step runs, and any failure
   fails the aggregate command with one `profile.steps_failed` error.
 - `profile.steps_failed` (exit 5) carries `details.failed_steps[]`, one
-  `{"index", "name", "exit_code", "message"}` per failed step in declaration
-  order; `index` is the zero-based position in `data.steps[]` (platform-skipped
-  rows included), `exit_code` is `null` when the process did not start or the
-  step panicked, and `message` is the step error and its cause. Under
+  `{index, name, exit_code, message}` per failed step in declaration order;
+  `index` is the zero-based position in `data.steps[]` (platform-skipped rows
+  included), `exit_code` is `null` when the process did not start or the step
+  panicked, and `message` is the step error and its cause. When that step's
+  configured log cannot be written, its entry also has optional
+  `step_log_destination` (the intended log path) and `step_log_error` (the
+  write error). A log-write failure makes the step failed whether its child
+  passed or failed; the entry keeps the child's real `exit_code` (`null` only
+  if it had none), and stdout and stderr remain in the report. Under
   `--fail-fast` it also carries `details.skipped_steps[]`, one
   `{"index", "name", "reason": "fail-fast"}` per step that never started.
 - a missing configured executable is a failed step whose `message` starts
   with `<name> failed to start` and includes the spawn error.
+- when a log root is configured, every executed step writes both output streams
+  to `<log-root>/steps/<sanitized-step-name>.log`; unsafe bytes become `_`,
+  and sanitized-name collisions receive `-2`, `-3` and later suffixes in
+  declaration order. Failed-step errors include stdout and stderr even when
+  both are non-empty.
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
@@ -547,11 +560,51 @@ If the delegated binary:
 
 ### Rust analyzer backend reports
 
-The Rust analyzer backends emit `FindingsReport` JSON. The top-level CLI
-validates each report against the published
-[`analyzer-report-v1` JSON Schema](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
-before normalization. A shape mismatch fails as `backend_protocol` with code
-`backend_payload_drift` and the failing instance path in `key_path`.
+The Rust analyzer backends emit `FindingsReport` JSON. Before normalization,
+the top-level CLI selects the published schema by `schema_version`:
+
+- `0.1.0` is validated against
+  [`analyzer-report-v1`](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json).
+- `0.2.0` is validated against
+  [`analyzer-report-v2`](../../crates/sc-lint-schema/schema/analyzer-report-v2.schema.json).
+- Any other version fails as `backend_protocol` with code
+  `backend_payload_drift` and `key_path` `/schema_version`.
+
+Both versions are shared by all Rust analyzers. In particular, the boundary
+analyzer's `0.2.0` report is validated by v2; the optional `allowed` property
+is emitted when a portability allowance suppresses a finding. A shape mismatch
+also fails as `backend_payload_drift`, with the failing instance path in
+`key_path`.
+
+### Portability site allowances
+
+Portability site allowances use `#[sc_lint(allow(PORT-010), reason = "...")]`.
+They apply only to a matching finding on the annotated item. A suppressed
+finding is reported in schema `0.2.0` as an `allowed` entry containing
+`rule_id`, `reason`, the crate-relative qualified `item`, `source_path`, and
+one-based `line`.
+
+Malformed directives return `PORTABILITY.INVALID_SITE_ALLOW` with the source
+path, line, stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
+Directive codes and recoveries are:
+
+| Code | Cause | Recovery |
+| --- | --- | --- |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
+| `DIRECTIVE.SITE_ALLOW.MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
+| `DIRECTIVE.SITE_ALLOW.QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
+| `DIRECTIVE.SITE_ALLOW.REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
+| `DIRECTIVE.SITE_ALLOW.MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
+| `DIRECTIVE.SITE_ALLOW.DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
+| `DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
+| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
+
+`PORTABILITY.UNKNOWN_RULE` identifies an unsupported portability rule id and
+provides the source path, line, cause, and recovery. Site allowances currently
+support only `PORT-010`; use that id or remove the allowance.
 
 ### Python adapter backend
 

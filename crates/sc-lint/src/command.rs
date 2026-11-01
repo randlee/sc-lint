@@ -329,6 +329,7 @@ pub struct CommandContext {
     summary: &'static str,
     requires_repo_root: bool,
     compatibility_binary: Option<std::path::PathBuf>,
+    backend_search_path: Option<std::ffi::OsString>,
     request: Option<CommandRequest>,
 }
 
@@ -343,6 +344,19 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
+        Self::from_cli_with_backend_search_path(cli, std::env::var_os("PATH"))
+    }
+
+    /// Constructs a command context with an explicit backend search path.
+    /// Production captures PATH in `from_cli`; tests inject a controlled path.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
+    )]
+    pub(crate) fn from_cli_with_backend_search_path(
+        cli: &Cli,
+        backend_search_path: Option<std::ffi::OsString>,
+    ) -> Result<Self, CliError> {
         let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
             (Some(command), false) => {
                 validate_command_flags(cli, command)?;
@@ -384,8 +398,13 @@ impl CommandContext {
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
             compatibility_binary,
+            backend_search_path,
             request,
         })
+    }
+
+    pub(crate) fn backend_search_path(&self) -> Option<&std::ffi::OsStr> {
+        self.backend_search_path.as_deref()
     }
 
     pub fn command_id(&self) -> &str {
@@ -641,15 +660,12 @@ pub(crate) fn execute(
         CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
             context.docs_request(),
         )?)),
-        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
+        CommandId::Setup | CommandId::Upgrade => execute_installer_with_version_probe(
+            context,
             loaded_config,
-            context.setup_dry_run(),
-        )?)),
-        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_upgrade(
-            loaded_config,
-            context.upgrade_check(),
-            context.upgrade_dry_run(),
-        )?)),
+            |binary| installer::probe_version(binary).ok(),
+            installer::managed_payload_complete,
+        ),
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
             context.consumer_init_request(),
         )?)),
@@ -698,6 +714,49 @@ pub(crate) fn execute(
         CommandId::ClippyXwin => workflow::run_clippy(loaded_config, crate::ClippyTarget::Xwin),
         CommandId::Ci => workflow::run_ci(loaded_config),
     }
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Installer dispatch tests preserve the product's top-level CliError contract."
+)]
+fn execute_installer_with_version_probe(
+    context: &CommandContext,
+    loaded_config: &LoadedConfig,
+    version_probe: impl Fn(&std::path::Path) -> Option<semver::Version>,
+    payload_complete: impl Fn(&std::path::Path) -> bool,
+) -> Result<CommandSuccess, CliError> {
+    match context.id() {
+        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_with_probes(
+            loaded_config,
+            false,
+            context.setup_dry_run(),
+            version_probe,
+            payload_complete,
+        )?)),
+        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_with_probes(
+            loaded_config,
+            context.upgrade_check(),
+            context.upgrade_dry_run(),
+            version_probe,
+            payload_complete,
+        )?)),
+        _ => panic!("version-probe dispatch is only for installer commands"),
+    }
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::result_large_err,
+    reason = "Installer dispatch tests preserve the product's top-level CliError contract."
+)]
+pub(crate) fn execute_installer_with_test_probes(
+    context: &CommandContext,
+    loaded_config: &LoadedConfig,
+    version_probe: impl Fn(&std::path::Path) -> Option<semver::Version>,
+    payload_complete: impl Fn(&std::path::Path) -> bool,
+) -> Result<CommandSuccess, CliError> {
+    execute_installer_with_version_probe(context, loaded_config, version_probe, payload_complete)
 }
 
 #[expect(

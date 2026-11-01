@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "yes",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B5",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-010\", \"statement\": \"PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \\\"...\\\")] is not reported by PORT-010.\", \"scope\": \"The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.\"}, \"item\": {\"id\": \"fix1t-ANC-010/P-RULE-SPECIFIC\", \"title\": \"Sprint M2: rule-specific site allowance\", \"text\": \"In crates/sc-lint-portability, make only allow(PORT-010) suppress PORT-010: an item carrying #[sc_lint(allow(PORT-010), reason = \\\"...\\\")] is not reported by PORT-010, while an item carrying only #[sc_lint(allow(PORT-003), reason = \\\"...\\\")] is still reported by PORT-010.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item does not state that outcome as its own commitment.\", \"unclear\": \"The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.\", \"yes\": \"The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason.\"}, \"instructions\": \"Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.\", \"unclear\": \"The item says something about PORT-010 allowances that might or might not leave an annotated item reported.\", \"yes\": \"The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided.\"}, \"instructions\": \"Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item does not: it works on other PORT-010 shapes, other rules or other subjects, and any mention of the allowance is context, another item's work, or docs wording.\", \"unclear\": \"The item text is too vague to tell whether it sets PORT-010 site-allowance handling.\", \"yes\": \"The item itself sets or changes PORT-010's handling of a per-site allow(PORT-010) attribute, or states whether an annotated item is reported.\"}, \"instructions\": \"Does `item.text` itself set, add, change or remove whether or how PORT-010 honours a per-site `#[sc_lint(allow(...))]` attribute, including stating that an annotated item is or is not reported, parsing allow(PORT-010), or replacing per-item PORT-010 allowances with another mechanism? An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. PORT-010 work that only recognises companion shapes or keeps real gaps reported, and allowances for other rules, are also different subjects. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "24f4b6dd22c913b85c1bf072f586a19761df7c1380e51d7f6608e3a2849191d6",
+ "case_id": "P-RULE-SPECIFIC",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}}},\"usage\":{\"input_tokens\":1385,\"output_tokens\":117}}",
+ "raw_response_sha256": "311e84a12d0cc7f3b3f8a43045337b69a787aa0209862c6a1ecd99dc890943f7",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-010/B5/P-RULE-SPECIFIC/r1",
+ "semantic_verdict": "satisfied",
+ "spec": {
+  "addressed": "A2",
+  "contradicted": "K0",
+  "relevant": "R5"
+ }
+}

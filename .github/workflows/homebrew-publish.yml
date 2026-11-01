@@ -120,9 +120,9 @@ jobs:
                   "sha256": hashlib.file_digest(path.open("rb"), "sha256").hexdigest(),
               }
           required_asset_keys = {"macos_arm", "macos_intel", "linux"}
-          if set(assets) != required_asset_keys:
+          if not required_asset_keys <= set(assets) or set(assets) - required_asset_keys - {"linux_arm"}:
               raise SystemExit(
-                  "Homebrew assets must contain exactly: macos_arm, macos_intel, linux"
+                  "Homebrew assets must contain macos_arm, macos_intel, linux and optionally linux_arm"
               )
           Path("homebrew-release-assets.json").write_text(json.dumps(assets), encoding="utf-8")
           PY
@@ -170,6 +170,9 @@ jobs:
                   "macos_intel_sha256": assets["macos_intel"]["sha256"],
                   "linux_url": assets["linux"]["url"],
                   "linux_sha256": assets["linux"]["sha256"],
+                  "linux_arm_url": assets.get("linux_arm", {}).get("url", ""),
+                  "linux_arm_sha256": assets.get("linux_arm", {}).get("sha256", ""),
+                  "has_linux_arm": "linux_arm" in assets,
                   "test_binary": formula["test_binary"],
                   "test_command": formula["test_command"],
                   "test_output": formula["test_output"],

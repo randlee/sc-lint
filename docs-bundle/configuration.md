@@ -31,6 +31,28 @@ concurrently (cargo steps serialized in declaration order) and every failed
 entry is reported. Keep commands explicit and reproducible; do not hide
 required work behind an advisory alias.
 
+Lint steps also accept `env` and `cwd`, with the same meaning as these fields
+on test command selectors. Values are passed literally to the child process;
+sc-lint does not expand variables or resolve environment values as paths.
+`cwd` is relative to the repository root.
+
+```toml
+[[tool.sc-lint.lint]]
+name = "atm-core-clippy"
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+cwd = "crates/atm-core"
+```
+
+Here `PYO3_PYTHON` is passed verbatim; the child tool decides how to interpret
+it. `[tool.sc-lint].setup` and `[tool.sc-lint].runner` are not supported keys.
+When a log root is configured (`--log-root` or the configuration file's
+`logging.root`), each executed profile step writes both output streams
+to `<log-root>/steps/<sanitized-step-name>.log`. ASCII letters, digits, `_` and
+`-` are preserved; other bytes become `_`, and sanitized-name collisions get
+`-2`, `-3` and later suffixes in declaration order. Failed steps also show
+stdout and stderr in the command error.
+
 Instead of rows, `[tool.sc-lint.test]` may be a table of named selectors with
 an optional `default`:
 
@@ -67,12 +89,12 @@ Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
 - `exclude_paths` (globs relative to the workspace root; `**` spans
   directories) drops findings in matching files. In Boundary, only
   `SCB-MANIFEST-001` through `SCB-MANIFEST-006` carry a finding path;
-  `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
+  `SCB-CYCLE-001`, `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
   their nodes, and are excluded when any such file matches.
 - `exclude_paths_by_rule` maps exact rule ids to arrays of workspace-relative
   globs. It drops only findings from that rule at matching paths; other rules
   in the same file still run. Boundary supports `SCB-MANIFEST-001` through
-  `SCB-MANIFEST-006`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
+  `SCB-MANIFEST-006`, `SCB-CYCLE-001`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
   other Boundary rules are configuration errors naming the rule because their
   findings have no source path; configuration loading rejects them before
   analysis. Remove the entry or choose a rule with source paths.

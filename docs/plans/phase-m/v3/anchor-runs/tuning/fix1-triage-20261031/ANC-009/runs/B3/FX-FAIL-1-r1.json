@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "yes",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B3",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-009\", \"statement\": \"sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.\", \"scope\": \"The item changes when PORT-010 reports or stops reporting a #[cfg(unix)] item.\"}, \"item\": {\"id\": \"fix1t-ANC-009/FX-FAIL-1\", \"title\": \"ANC-009 fail fixture\", \"text\": \"PORT-010 now skips every #[cfg(unix)] item in a file once any Windows code exists anywhere in that file.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"No such commitment is written, or the item skips such items broadly.\", \"unclear\": \"A sentence touches this but cannot be read as the commitment or not.\", \"yes\": \"Such a commitment is written, for example as a still-reported negative or an unannotated sibling that is still reported.\"}, \"instructions\": \"Is there a sentence in `item.text` committing that PORT-010 still reports a #[cfg(unix)] item that has no companion, no portable fallback and no allowance of its own? Plans that skip such items by file, path, name or switch contain no such commitment. Judge only whether the commitment is written.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"No: only annotated items or recognised companion shapes stop being reported, or the item is silent or unrelated.\", \"unclear\": \"It cannot be told whether such an item would stop being reported.\", \"yes\": \"Yes: the plan stops reporting such an unannotated, unpaired item, for example by file, path, name or switch.\"}, \"instructions\": \"Would some production #[cfg(unix)] item that has no #[cfg(windows)] companion, no portable fallback and no per-site allowance of its own stop being reported under the plan in `item.text`? A reasoned per-site allowance that covers only the one annotated item (for example #[sc_lint(allow(PORT-010), reason = \\\"...\\\")]) and recognising a specific companion shape are not blanket suppression. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.\", \"unclear\": \"The item text is too vague to tell what part of the system it touches.\", \"yes\": \"The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.\"}, \"instructions\": \"The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "bd9d4901acfec3234b0868fa177f21e0809faad3efe0336be34e179278887eaf",
+ "case_id": "FX-FAIL-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}}},\"usage\":{\"input_tokens\":1044,\"output_tokens\":117}}",
+ "raw_response_sha256": "05efe708819b166c849929ad897ecf1d6da8e6654f704eb7d95422564e18e7dd",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-009/B3/FX-FAIL-1/r1",
+ "semantic_verdict": "contradicted",
+ "spec": {
+  "addressed": "A3",
+  "contradicted": "K3",
+  "relevant": "R0"
+ }
+}

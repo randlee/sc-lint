@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "yes",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 0.98
+  }
+ },
+ "bundle": "B2",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-012\", \"statement\": \"sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.\", \"scope\": \"The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.\"}, \"item\": {\"id\": \"fix1t-ANC-012/P-BOUNDARY-1\", \"title\": \"Lint-step env passes PYO3_PYTHON verbatim\", \"text\": \"A [[tool.sc-lint.lint]] step accepts env = { PYO3_PYTHON = \\\".venv/bin/python\\\" }; sc-lint passes the value to the child verbatim and does not resolve or select an interpreter. No setup or runner key is added; both stay rejected.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item says no such thing, or it adds a setup, hook or interpreter key.\", \"unclear\": \"The item touches such keys in wording that cannot be read either way.\", \"yes\": \"The item explicitly says no setup-hook or interpreter-selection key is added, or that keys such as setup or runner stay rejected.\"}, \"instructions\": \"`anchor.statement` forbids a setup-hook or interpreter-selection configuration key. Does `item.text` explicitly keep that prohibition, by saying such keys are not added or stay rejected? An item that adds such a key does not keep it. Judge presence of the explicit commitment only.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"No such key is added.\", \"unclear\": \"It cannot be told whether a planned key runs setup or hook commands or selects an interpreter.\", \"yes\": \"Yes, such a key is added or kept.\"}, \"instructions\": \"Would `item.text`, as planned, add a key to sc-lint.toml through which sc-lint runs setup or hook commands, or picks the interpreter or runner for a step? Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item touches no such key: it is about analyzer rules, report or log output, or other work.\", \"unclear\": \"The item text is too vague to tell.\", \"yes\": \"The item adds, changes, removes or keeps out such a key.\"}, \"instructions\": \"Does the work in `item.text` touch how consumers configure the setup or execution of sc-lint steps through keys in sc-lint.toml, such as a lint step's env or cwd, a setup or hook table, or an interpreter or runner key? Judge subject overlap only, not whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "10d7fc77cf96f7216d3ec13f9a3d79988f87e036c71c1707b0f754d960790f0a",
+ "case_id": "P-BOUNDARY-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.98,\"probabilities\":{\"no\":0.01,\"unclear\":0.0,\"yes\":0.99}}},\"usage\":{\"input_tokens\":1028,\"output_tokens\":117}}",
+ "raw_response_sha256": "007d3d09a0a434b32cd28d0f0f28325a4e63453cf984703851f137f8a34fd826",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-012/B2/P-BOUNDARY-1/r1",
+ "semantic_verdict": "satisfied",
+ "spec": {
+  "addressed": "A2",
+  "contradicted": "K2",
+  "relevant": "R2"
+ }
+}

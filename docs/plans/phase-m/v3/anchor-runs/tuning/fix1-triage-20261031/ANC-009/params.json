@@ -1,0 +1,37 @@
+{
+ "tool_calls": 40,
+ "rounds": {
+  "1": [
+   "B0",
+   "B1",
+   "B2",
+   "B3"
+  ],
+  "2": [
+   "B4",
+   "B5",
+   "B6"
+  ]
+ },
+ "scope": "first override for ANC-009: addressed and contradicted tuned, relevant held at the default plan.json v1 question (question_defect, fix1 lint-m-4 triage)",
+ "oracle_predecessor": null,
+ "citations": [
+  "ANC-009 v2 (locked) statement: PORT-010 changes 'must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.'",
+  "ANC-009 v2 scope: 'The item changes when PORT-010 reports or stops reporting a #[cfg(unix)] item.'; fixtures pass (real gap still reported) and fail (skip every unix item once Windows code exists in the file)",
+  "phase-m-intent-v3 (intent.md be7bdec8..., cut 2026-10-31): 'Other shapes use reasoned site allowances; unallowed real parity gaps still report'; out of scope: 'Blanket suppression: disabling a rule, a repository-wide exclusion'",
+  "ANC-010 v3 (locked): an item carrying #[sc_lint(allow(PORT-010), reason = \"...\")] is not reported by PORT-010, so a reasoned single-item allowance is not the blanket suppression ANC-009 forbids"
+ ],
+ "explanation": "Accepted. ANC-009 had no override. A new oracle, c1776be2... (11 cases: both fixtures, explicit and silent site-allowance and shape probes, file/path/name blanket-suppression conflicts, two irrelevant), was frozen before any Jev call. On it, the generic conflict question is unstable on P-ALLOW-SILENT (yes 0.22, then no 0.28; expected no), at 0.35-0.44 on P-SHAPE-SILENT, and at 0.25-0.37 on the m-4 diagnostic, which reproduces the fix1 0.34. It has no ANC-010 context, so it cannot tell a reasoned single-item allowance from blanket suppression. B6 (default relevant, A2, K6) is exact: 66/66 cells, 22/22 verdicts, 11/11 stable, zero regressions, 66/66 cells >= 0.8, minimum 0.86, and no production mismatch on either fixture or any probe. The m-4 diagnostic is satisfied 4/4 at >= 0.98.",
+ "planner_action": "lint-m-4 needs no ANC-009 edit. After review, add the ANC-009 entry to overrides-plan.json from the sealed question set (proposed file overrides-plan.proposed.json), store tuning_history_after, then re-run check-fixtures and the planning gate at 0.6.",
+ "authority_recommendations": [
+  {
+   "anchor": "ANC-009",
+   "version": 2,
+   "ambiguity": "The statement's second clause ('a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported') read alone also covers an item carrying a reasoned per-site allowance, which ANC-010 v3 and INTENT require to go unreported.",
+   "proposed_text": "... must still be reported unless that item carries its own reasoned #[sc_lint(allow(PORT-010), reason = \"...\")] (ANC-010).",
+   "meaning_unchanged_because": "INTENT (cut 2026-10-31) already says 'unallowed real parity gaps still report' and ANC-010 is locked; the clause only states the existing exception. Not applied; needs Rand's approval and versions ANC-009.",
+   "applied": false
+  }
+ ],
+ "reasons": {}
+}

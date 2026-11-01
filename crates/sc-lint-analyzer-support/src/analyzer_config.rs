@@ -511,6 +511,13 @@ impl AnalyzerSettings {
             .any(|pattern| glob_match(pattern, relative))
     }
 
+    /// Whether a rule entry and its optional source path survive analyzer selection.
+    pub fn includes(&self, rule: CatalogRuleId, path: Option<&RepoRelativePath>) -> bool {
+        rule_is_included(self, rule)
+            && !path.is_some_and(|path| self.path_excluded(path.as_str()))
+            && !path.is_some_and(|path| self.path_excluded_by_rule(rule, path))
+    }
+
     /// Apply rule and path exclusions to findings with their optional source paths.
     pub fn apply<R: Serialize>(
         &self,
@@ -521,13 +528,7 @@ impl AnalyzerSettings {
             .into_iter()
             .filter(|(finding, path)| {
                 let rule_id = id(&finding.rule_id);
-                rule_is_included(self, rule_id)
-                    && !path
-                        .as_ref()
-                        .is_some_and(|path| self.path_excluded(path.as_str()))
-                    && !path
-                        .as_ref()
-                        .is_some_and(|path| self.path_excluded_by_rule(rule_id, path))
+                self.includes(rule_id, path.as_ref())
             })
             .map(|(finding, _)| finding)
             .collect();

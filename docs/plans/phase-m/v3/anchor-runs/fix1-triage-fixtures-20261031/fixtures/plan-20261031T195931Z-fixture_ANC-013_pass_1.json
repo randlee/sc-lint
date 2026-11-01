@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195931Z-fixture_ANC-013_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:31+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-013:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 222,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's SCB-MANIFEST-004 check must not report a self::X, crate::X or super::X path, in a use declaration or anywhere else in the code, as a use of the owned crate X, nor a bare X:: path in a module that declares its own mod X.",
+      "quote": "Issue #136 (atm-core, 2026-10-30): \"`mod.rs:11` is `pub mod cron;` (file `commands/cron.rs`), and `crates/atm/Cargo.toml` has no `cron` dependency, so nothing imports the cron crate: it is **not a true violation and should not be reported**. [...] in a scratch file with no external dependency, 0.8.2 flags `use self::cron::X;`, `use crate::cron::X;` and `use super::cron::X;`, i.e. it matches the first path segment textually and does not distinguish a local module from the extern crate.\"\n\nREQ-SCB-019 (docs/sc-lint-boundary/requirements.md): \"Manifest findings use `SCB-MANIFEST-003` for a disallowed configured dependency, `-004` for a configured ownership violation, [...]\"",
+      "stated_by": "REQ-SCB-019 + #136 atm-core answer 5",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P13f",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "63af50ace17903d96073d6af7e658175ff215e5db8d24fa3f9c58c0d8b93e477",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item is about a different rule or activity, for example PORT-010, SCB-MANIFEST-003 or other Cargo.toml dependency-table handling, lint step configuration, or release work, and does not touch how SCB-MANIFEST-004 classifies source paths.",
+            "unclear": "The item mentions sc-lint-boundary or manifest rules, but it is not possible to tell whether it touches how SCB-MANIFEST-004 classifies source paths.",
+            "yes": "The item changes, keeps, or depends on SCB-MANIFEST-004's decision about whether a source path (use statements, self::, crate:: or super:: paths, extern crate, ::name or bare crate paths) is a use of an owned dependency, including any plan to resolve atm-core #136 for that check, whether by code, configuration or documentation."
+          },
+          "instructions": "Does `item.text` plan, change, or depend on how the SCB-MANIFEST-004 check (also called global_dependency_ownership or the dependency-ownership rule, in crates/sc-lint-boundary) decides that a path in Rust source is a use of an owned dependency? Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does not state that outcome: it is silent about these paths, covers only one or two of the three prefixes, only names issue #136 or improving path handling without saying these paths stop being reported, says they keep being reported, or is about another rule.",
+            "unclear": "The item talks about how self::, crate:: or super:: paths are treated, but it cannot be determined whether local-module paths with all three prefixes stop being reported.",
+            "yes": "The item states that self::, crate:: and super:: paths whose next segment is a local module (or all such qualified paths) are not reported by SCB-MANIFEST-004, using words such as skips, no finding, not reported, not counted as a use of the crate, or resolved to the local module instead of the owned crate."
+          },
+          "instructions": "Does `item.text` state that SCB-MANIFEST-004 will not report a path beginning with self::, crate:: or super:: as a use of an owned crate when the segment after the prefix is a local module of the crate? All three prefixes must be covered, either named or by a rule that applies to all qualified paths. Judge presence of this outcome only; do not judge conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "The item does not make or keep such paths reported; it fixes them, is silent, or concerns something else.",
+            "unclear": "It is not possible to tell from the item whether such paths would stay reported.",
+            "yes": "The item says such paths are or stay reported, or explicitly keeps the current matching unchanged."
+          },
+          "instructions": "Would carrying out `item.text` leave SCB-MANIFEST-004 reporting a self::X, crate::X or super::X path as a use of owned crate X when X is a local module, because the item says so or explicitly keeps the current matching unchanged? Silence is not a conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1302,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 222,
+      "item_shortened": false,
+      "request_bytes": 3816
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

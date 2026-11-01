@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 0.49
+  },
+  "contradicted": {
+   "choice": "yes",
+   "confidence": 0.86
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B0",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-009\", \"statement\": \"sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.\", \"scope\": \"The item changes when PORT-010 reports or stops reporting a #[cfg(unix)] item.\"}, \"item\": {\"id\": \"fix1t-ANC-009/P-CONFLICT-FILE\", \"title\": \"PORT-010 file-level allowance\", \"text\": \"One #![sc_lint(allow(PORT-010))] at the top of a file stops PORT-010 reporting every #[cfg(unix)] item in that file.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item text is silent about the directive: it neither includes the directive's specific content nor references it.\", \"unclear\": \"The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.\", \"yes\": \"The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point.\"}, \"instructions\": \"Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.\", \"unclear\": \"The item text is ambiguous enough that it might or might not conflict with the directive.\", \"yes\": \"The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement.\"}, \"instructions\": \"Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.\", \"unclear\": \"The item text is too vague to tell what part of the system it touches.\", \"yes\": \"The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.\"}, \"instructions\": \"The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "ace7aad48ada442f869699f1f03ba6d456c1d8c33c8e1e12f10c7180cdc92374",
+ "case_id": "P-CONFLICT-FILE",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.49,\"probabilities\":{\"no\":0.66,\"unclear\":0.29,\"yes\":0.05}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.86,\"probabilities\":{\"no\":0.08,\"unclear\":0.01,\"yes\":0.91}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}}},\"usage\":{\"input_tokens\":1101,\"output_tokens\":117}}",
+ "raw_response_sha256": "8a041ad376db2a5b899881581fdc7f2f5f56116452647037bad1a6ed919a220c",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-009/B0/P-CONFLICT-FILE/r2",
+ "semantic_verdict": "contradicted",
+ "spec": {
+  "addressed": "A0",
+  "contradicted": "K0",
+  "relevant": "R0"
+ }
+}

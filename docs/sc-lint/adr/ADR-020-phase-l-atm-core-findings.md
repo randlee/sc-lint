@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025.
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Amendment 2026-10-31 to decision 5 (SCB-CYCLE-001 path-less exclusions): Accepted — Rand, 2026-10-31.
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
@@ -42,6 +42,12 @@ make mid-sprint. Approval of this record gates dispatch only.
    files of the finding's `node_ids`; the finding is excluded when any such
    file matches an exclusion. The shared `Finding` schema in `sc-lint-schema`
    is unchanged.
+   **Amendment 2026-10-31 — Status: Accepted (Rand 2026-10-31).** Extend decision 5's
+   path-less exclusion behavior to `SCB-CYCLE-001`, alongside 002/003. Use
+   the source-file set of `node_ids` and exclude a finding when any such file
+   matches `exclude_paths_by_rule`. No shared Finding schema change and no
+   change to cycle detection. Phase M m-2 implemented the extension after
+   acceptance; REQ-PRODUCT-023 governs reasoned exclusions.
 6. **Tokio sleep rule (#82, REQ-PRODUCT-004C as amended).** The rule is
    `SCB-RUNTIME-003` in `sc-lint-runtime`, reached by the existing
    `sc-lint lint sc-runtime`, and fails by default like `SCB-RUNTIME-001/002`;
@@ -182,7 +188,7 @@ ADR-020 decision 6 clarifications (sprint l-7):
 
 ### Sprint l-8
 Clarifications for decision 10 (`backend_payload_drift`) and REQ-PRODUCT-002DA (l-8):
-1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published. Rust analyzer reports are validated against the published `analyzer-report-v1.schema.json` before normalization.
+1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published for the Python adapter. Rust analyzer reports select the published `analyzer-report-v1` schema for `schema_version` `0.1.0` and `analyzer-report-v2` for `0.2.0` before normalization. See the [ADR-011 compatibility assessment (2026-10-31)](ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances).
 2. The validator lives in `sc-lint-schema` (which gains `serde_json` as a normal dependency, already a workspace dependency; Cargo.lock unchanged). It requires `adapter_schema`, `ok`, `diagnostics` (array of strings); on success `data` (object) and `summary` (string) and no `error`; on failure `error{kind,message}` (strings), optional `error.details` (object) and `error.suggested_action` (string), optional `summary`, and no `data`. Unknown extra keys are allowed. The first drift in that fixed order is reported.
 3. In `parse_adapter_output` the check runs after the existing unknown-`adapter_schema` check (not drift) and before the exit-code and verdict checks, so a drifted payload fails as `backend_payload_drift` even when the process exit code is non-zero.
 4. Column mapping for the decision 10 row: Code -> `CliError::code()` (`backend_payload_drift`, typed constant in `python_adapter.rs`); Kind -> `backend_protocol`; Cause names -> `CliError::cause` (key path text) plus `details.key_path`; Recovery -> `CliError::suggested_action`.

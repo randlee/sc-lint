@@ -93,3 +93,42 @@ Absent pairs preserve existing findings; malformed declarations are configuratio
 errors. This is narrow, explicit adapter configuration, not a general
 repo-configured suppression of production portability leaf rules. See
 [ADR-017, change 1](./ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).
+
+## Amendment 2026-10-30 — PORT-010 companion shapes
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand 2026-10-31) |
+| Source | #720, #786 ([shape table](https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641)); ADR-022 |
+
+This amendment extends Decision 6. PORT-010 recognises the two shapes below
+and does not report the `#[cfg(unix)]` item. Matching is syntactic; there is
+no rustc or cargo subprocess, no Boolean cfg equivalence and no name
+heuristic.
+
+1. **S3, same-name sibling.** A non-test item of the same kind and name gated
+   `#[cfg(not(unix))]` in the same lexical scope: crate root, inline module,
+   file module or the same inherent `impl` block. Trait impls keep their
+   existing treatment.
+2. **S6, unix-only module.** The declaration `#[cfg(unix)] mod x;` and the
+   items inside that module's files, which are never compiled on Windows.
+   Out-of-line resolution follows `x.rs`, `x/mod.rs` and `#[path]`. An item in
+   a module that is compiled on Windows is not covered.
+
+**Fail closed.** A missing or ambiguous module file gives no Unix-only
+proof for items in that file; their findings stay. The exact
+`#[cfg(unix)] mod x;` declaration is exempt independently of file resolution.
+A production `#[cfg(unix)]` item outside S3/S6 with no companion and no
+portable fallback is still reported.
+
+**Everything else uses a site allowance.** The other #786 shapes (helpers of
+paired callers, helpers inside cfg blocks, renamed companions, portable
+siblings, rejected configuration) and deliberate POSIX-only items use
+`#[sc_lint(allow(PORT-010), reason = "...")]` (ADR-022 decision 4). These
+shapes depend on call-graph analysis that would grow PORT-010's heuristics
+and could hide real gaps; a reasoned allowance at the site is cheaper and
+explicit.
+
+**Accepted public scope.** S6 covers `pub` modules and `pub` items inside
+`#[cfg(unix)] mod x;`, as accepted by Rand on 2026-10-31. Visibility does not
+make a Unix-only module compile on Windows.
