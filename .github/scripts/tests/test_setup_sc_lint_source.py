@@ -246,7 +246,8 @@ class SourceSetupTests(unittest.TestCase):
             self.assertEqual(record['source_revision'], revision)
             self.assertEqual(record['version'], version)
             self.assertEqual(record['wheel_sha256'], setup.digest(Path(record['wheel'])))
-            self.assertEqual(set(record['binaries']), set(setup.BINARIES))
+            suffix = '.exe' if setup.os.name == 'nt' else ''
+            self.assertEqual(set(record['binaries']), {name + suffix for name in setup.BINARIES})
             for name, checksum in record['binaries'].items():
                 self.assertEqual(checksum, setup.digest(Path(record['binary_directory']) / name))
 

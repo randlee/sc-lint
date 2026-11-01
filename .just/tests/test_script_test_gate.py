@@ -26,3 +26,17 @@ def test_a_new_file_cannot_fall_outside_a_hand_curated_gate(tmp_path):
     (directory / 'test_new.py').write_text('')
     assert uncovered_tests(tmp_path, ['.github/scripts/tests/test_old.py']) == {'.github/scripts/tests/test_new.py'}
     assert uncovered_tests(tmp_path, ['.github/scripts/tests']) == set()
+
+
+def test_renderer_test_dependencies_match_the_shipped_kit_pin():
+    import ast
+    import runpy
+    import tomllib
+    pin = runpy.run_path(str(ROOT / '.github/scripts/bootstrap_sc_compose.py'))['SC_COMPOSE_VERSION']
+    expected = 'sc-compose==' + pin
+    project = tomllib.loads((ROOT / 'bindings/sc-lint-py/pyproject.toml').read_text())
+    requirements = project['project']['optional-dependencies']['test']
+    assert [item for item in requirements if item.startswith('sc-compose')] == [expected]
+    source = (ROOT / 'bindings/sc-lint-py/python/sc_lint/source_venv.py').read_text()
+    requirements = [node.value for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith('sc-compose==')]
+    assert requirements == [expected]

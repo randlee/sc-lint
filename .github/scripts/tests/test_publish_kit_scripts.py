@@ -333,11 +333,12 @@ class ReleaseScriptTests(unittest.TestCase):
     def test_write_cli_wrapper_emits_render_compatible_script(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             venv = Path(temporary)
-            python = venv / "bin" / "python"
+            python = BOOTSTRAP.python_path(venv)
             wrapper = BOOTSTRAP.write_cli_wrapper(venv, python)
             text = wrapper.read_text(encoding="utf-8")
-            self.assertEqual(wrapper, venv / "bin" / "renderer")
-            self.assertTrue(wrapper.stat().st_mode & 0o111)
+            self.assertEqual(wrapper, BOOTSTRAP.renderer_cli_path(venv))
+            if os.name != "nt":  # Windows does not expose POSIX executable mode bits.
+                self.assertTrue(wrapper.stat().st_mode & 0o111)
             self.assertIn("sc_compose.ComposeMode.file", text)
             self.assertIn("--var-file", text)
             self.assertIn('choices=["render"]', text)
