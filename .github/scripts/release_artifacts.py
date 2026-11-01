@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, explicit_asset_patterns
+from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, asset_rules
 
 import re
 import shutil
@@ -467,14 +467,10 @@ def cmd_build_plan(args: argparse.Namespace) -> int:
 def cmd_release_asset_patterns(args: argparse.Namespace) -> int:
     """Print one required-asset regex per manifest release target."""
     manifest = load_manifest(Path(args.manifest))
-    project = _require_project(manifest)
-    if manifest["release_binaries"]:
-        for target in _release_targets_by_name(manifest).values():
-            print(_release_asset_pattern(project, target))
-    for pattern in explicit_asset_patterns(manifest):
+    _require_project(manifest)
+    _release_targets_by_name(manifest)
+    for pattern, _ in asset_rules(manifest):
         print(pattern)
-    for package in manifest.get("npm_packages", []):
-        print("^" + re.escape(package["name"].replace("@", "").replace("/", "-")) + r"-[0-9].*\.tgz$")
     return 0
 
 

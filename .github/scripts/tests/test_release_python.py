@@ -81,7 +81,7 @@ def test_prerelease_builds_and_publishes_declared_wheels():
     assert any("verify_release_arch.py" in step.get("run", "") for step in job["steps"])
     release = workflow["jobs"]["release"]
     assert "build-wheels" in release["needs"]
-    publication = next(step for step in release["steps"] if step.get("name") == "Generate checksums and publish GitHub prerelease assets")
+    publication = next(step for step in release["steps"] if step.get("name") == "Publish GitHub prerelease assets")
     assert "-name '*.whl'" in publication["run"]
 
 

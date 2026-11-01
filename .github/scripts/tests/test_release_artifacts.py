@@ -1006,7 +1006,9 @@ def test_github_release_leg_is_detect_and_skip(tmp_path: Path) -> None:
     result = run_fixture_command(tmp_path, "release-asset-patterns", manifest=manifest)
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
-        r"^fixture_.*_x86_64\-unknown\-linux\-gnu\.tar\.gz$"
+        r"^fixture_.*_x86_64\-unknown\-linux\-gnu\.tar\.gz$",
+        r"^sc_compose-.*-.*\.whl$",
+        r"^sc[-_]compose-.*\.tar\.gz$",
     ]
 
 
@@ -3646,7 +3648,7 @@ def test_package_only_release_has_no_binary_asset_expectations(tmp_path):
     assert json.loads(result.stdout)['has_python_wheels'] is True
     result = run_fixture_command(tmp_path, 'release-asset-patterns', manifest=manifest)
     assert result.returncode == 0
-    assert result.stdout == ''
+    assert result.stdout.splitlines() == [r"^sc_compose-.*-.*\.whl$", r"^sc[-_]compose-.*\.tar\.gz$"]
 
 
 @pytest.mark.parametrize("helper", ["artifact_cli", "artifact_git", "script_git"])

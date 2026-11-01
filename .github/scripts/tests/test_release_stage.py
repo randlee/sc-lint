@@ -1,5 +1,6 @@
 """Release upload sets come from the manifest, never checked-in release files."""
 import hashlib
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -62,16 +63,21 @@ def test_workflow_uploads_exact_manifest_assets_and_checksums(tmp_path, prerelea
     if prerelease:
         upload = next(step for step in job["steps"] if 'gh release create "$tag"' in step.get("run", ""))
         assert upload["working-directory"] == "${{ env.RELEASE_ASSET_DIR }}"
-        assert 'find . -maxdepth 1 -type f' in upload["run"]
+        selection = next(line.strip() for line in upload["run"].splitlines() if line.strip().startswith("mapfile -t archives "))
         create = [line.strip() for line in upload["run"].splitlines() if line.strip().startswith("if gh release create")]
         assert create == ['if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt; then']
-        uploaded = {path.name for pattern in ("*.tar.gz", "*.zip", "*.whl", "checksums.txt") for path in destination.glob(pattern)}
+        script = "set -euo pipefail\n" + selection + "\n" + r'''printf '%s\0' "${archives[@]}" checksums.txt'''
+        selected = subprocess.run(["bash", "-c", script], cwd=destination, capture_output=True)
+        assert selected.returncode == 0, selected.stderr.decode()
+        uploaded = set(selected.stdout.decode().rstrip("\0").split("\0"))
     else:
         upload = next(step for step in job["steps"] if step.get("uses", "").startswith("softprops/action-gh-release@"))
         assert upload["with"]["files"].strip() == "${{ env.RELEASE_ASSET_DIR }}/*"
         uploaded = {path.name for path in destination.glob("*")}
         verify = next(step for step in job["steps"] if step.get("name") == "Verify collected Python distributions")
         assert '--asset-dir "$RELEASE_ASSET_DIR"' in verify["run"]
+    patterns = subprocess.check_output([sys.executable, str(ROOT / ".github/scripts/release_artifacts.py"), "release-asset-patterns", "--manifest", str(manifest_path)], text=True).splitlines()
+    assert all(any(re.fullmatch(pattern, name) for pattern in patterns) for name in uploaded - {"checksums.txt"})
     assert uploaded == expected | {"checksums.txt"}
     assert {path.name for path in destination.iterdir()} == uploaded
     checksums = dict(line.split("  ", 1)[::-1] for line in (destination / "checksums.txt").read_text().splitlines())
@@ -80,7 +86,7 @@ def test_workflow_uploads_exact_manifest_assets_and_checksums(tmp_path, prerelea
 
 
 def small_manifest():
-    return {"project": {"archive_prefix": "tool"}, "release_targets": [{"target": "x86_64-pc-windows-msvc", "archive": "zip"}]}
+    return {"release_binaries": [{"name": "tool"}], "project": {"archive_prefix": "tool"}, "release_targets": [{"target": "x86_64-pc-windows-msvc", "archive": "zip"}]}
 
 
 @pytest.mark.parametrize("problem", ["missing", "duplicate", "stale_destination"])
@@ -99,3 +105,29 @@ def test_staging_fails_before_upload_on_incomplete_or_ambiguous_inputs(tmp_path,
         (destination / "stray.md").write_text("stale")
     with pytest.raises((ValueError, FileExistsError)):
         release_stage.stage(small_manifest(), VERSION, source, destination)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_wheels_only_manifest_uses_shared_release_contract(tmp_path, legacy, monkeypatch, capsys):
+    import release_artifacts
+    from types import SimpleNamespace
+    manifest = tomllib.loads((ROOT / "release/publish-artifacts.toml").read_text())
+    manifest["release_binaries"] = []
+    package = manifest["python_distributions"][0]
+    package["sdist"] = False
+    if legacy:
+        package["wheels"] = ["ubuntu-latest", "windows-latest"]
+        names = {"sc_lint-1.2.3-cp39-abi3-manylinux_2_28_x86_64.whl", "sc_lint-1.2.3-cp39-abi3-win_amd64.whl"}
+    else:
+        names = {name for name in manifest_assets(manifest, False) if name.endswith(".whl")}
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in names:
+        (source / name).write_bytes(name.encode())
+    destination = tmp_path / "stage"
+    release_stage.stage(manifest, VERSION, source, destination)
+    assert {path.name for path in destination.iterdir()} == names | {"checksums.txt"}
+    monkeypatch.setattr(release_artifacts, "load_manifest", lambda path: manifest)
+    assert release_artifacts.cmd_release_asset_patterns(SimpleNamespace(manifest="controlled.toml")) == 0
+    patterns = capsys.readouterr().out.splitlines()
+    assert all(any(re.fullmatch(pattern, name) for pattern in patterns) for name in names)

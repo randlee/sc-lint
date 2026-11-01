@@ -3,49 +3,27 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from pathlib import Path
 import re
+from pathlib import Path
 import shutil
 import tomllib
 
-from npm_release import filename as npm_filename
-from release_manifest import release_archive_name
-from release_python import wheel_asset_pattern, wheel_targets
-
-
-def asset_patterns(manifest: dict, version: str, *, prerelease: bool = False) -> list[str]:
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("release version must be MAJOR.MINOR.PATCH")
-    patterns = [
-        re.escape(release_archive_name(manifest["project"], target, version))
-        for target in manifest.get("release_targets", [])
-    ]
-    for distribution in manifest.get("python_distributions", []):
-        for wheel in wheel_targets(distribution):
-            if not wheel["platform"]:
-                raise ValueError("release staging requires explicit manifest wheel platforms")
-            patterns.append(wheel_asset_pattern(distribution["name"], wheel["platform"], version))
-        if distribution.get("sdist") and not prerelease:
-            name = re.escape(distribution["name"]).replace(r"\-", "[-_]")
-            patterns.append(name + "-" + re.escape(version) + r"\.tar\.gz")
-    if not prerelease:
-        patterns.extend(re.escape(npm_filename(package["name"], version)) for package in manifest.get("npm_packages", []))
-    if not patterns:
-        raise ValueError("manifest declares no release assets")
-    return patterns
+from release_python import asset_rules
 
 
 def stage(manifest: dict, version: str, source: Path, destination: Path, *, prerelease: bool = False) -> None:
     files = sorted(path for path in source.rglob("*") if path.is_file())
     selected = {}
-    for pattern in asset_patterns(manifest, version, prerelease=prerelease):
+    for pattern, count in asset_rules(manifest, version, prerelease=prerelease):
         matches = [path for path in files if re.fullmatch(pattern, path.name)]
-        if len(matches) != 1:
-            raise ValueError(f"expected exactly one asset matching {pattern!r}; found {len(matches)}")
-        path = matches[0]
-        if path.name in selected or path.is_symlink():
-            raise ValueError(f"duplicate or symlink release asset: {path}")
-        selected[path.name] = path
+        if len(matches) != count:
+            raise ValueError(f"expected {count} asset(s) matching {pattern!r}; found {len(matches)}")
+        for path in matches:
+            if path.name in selected or path.is_symlink():
+                raise ValueError(f"duplicate or symlink release asset: {path}")
+            selected[path.name] = path
+    if not selected:
+        raise ValueError("manifest declares no release assets")
     # A fresh directory prevents stale files from being uploaded on a reused runner.
     destination.mkdir(parents=True, exist_ok=False)
     checksums = []
