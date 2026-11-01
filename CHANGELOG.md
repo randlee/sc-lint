@@ -4,6 +4,35 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-11-01
+
+### Added
+
+- Release-time native verification runs the published archive binaries and
+  pip-installed wheel on each manifest-declared host, checking SHA256 digests,
+  architecture and versions. It inspects completed release runs and can also
+  verify an explicitly selected tag (#820).
+
+### Changed
+
+- Upgrade Rust dependencies, including syn 3, toml 1.x, cargo_metadata 0.23,
+  PyO3 0.30 and jsonschema 0.60. The dependency license allowlist now includes
+  MIT-0 (#191, #818).
+- Rust library consumers that exchange syn syntax nodes or toml tables with
+  sc-lint helpers must align their direct dependencies with syn 3 and toml
+  1.x. Consumers with a dependency license allowlist may need to admit MIT-0.
+  CLI and Python users need no configuration migration for these upgrades.
+
+### Fixed
+
+- Future stable releases and prereleases upload only manifest-declared
+  payloads and their checksums from dedicated staging directories. Checked-in
+  release notes, templates, manifests and pin files are no longer uploaded as
+  release assets; published immutable 0.8.3 assets are unchanged (#821).
+- Release preflight templates declare an empty default for
+  `already_published_channels`, so rendering succeeds when no previously
+  published channels need to be preserved (#819).
+
 ## [0.8.3] — 2026-11-01
 
 Phase M ships the atm-core P1 tool fixes (#786, #720, #136, #385, #198,
