@@ -58,7 +58,8 @@ consumer friction arises.
 
 3. **Parallel keys.** A lint step and a test command selector accept the same
    execution keys: `command`, `env`, `env_paths` (proposed by amendment
-   decision 4), `cwd`, platform restriction and `after_all`.
+   decision 4), `cwd`, `platform` on lint steps, `platforms` on test
+   selectors, and `after_all`.
 
 4. **PORT-010 site allowance.** PORT-010 can be allowed at a single site with
    `#[sc_lint(allow(PORT-010), reason = "...")]`. This is the exception path

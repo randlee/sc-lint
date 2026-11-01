@@ -501,19 +501,37 @@ specialized backend tools and mixed Rust/Python implementations.
 
   `env` remains a literal string table: sc-lint passes each value unchanged
   and does not interpret it as a path. Optional `env_paths` is a table of
-  environment keys to path strings accepted by lint rows and test selectors.
-  Relative values are joined to the absolute directory containing the loaded
-  config file and passed as absolute paths; absolute values pass through
-  unchanged. Do not canonicalize paths, resolve symlinks, or check existence.
-  This is the way to pass config-root-relative paths to child processes.
-  `env_paths` does not compose or prepend `PATH`; `PATH` composition is out of
-  scope.
+  environment keys to path strings accepted by lint rows and test command
+  selectors. A value is absolute exactly when `std::path::Path::is_absolute`
+  returns true on the actual host; absolute values pass through unchanged.
+  Every other value, including a Windows rooted-but-not-absolute path such as
+  `\x` or drive-relative `C:x`, is joined verbatim to the config root, without
+  separator or `..` normalization. `env_paths` always uses the config root,
+  independent of the step's `cwd`.
+
+  The config root is the directory containing the loaded config file
+  (`config.rs:395-398`). If the config path is relative, make it absolute
+  against the process cwd without canonicalizing; preserve any `..` in that
+  path. This differs from step `cwd`, which is repo-root-relative
+  (`step_exec.rs:74`). Do not canonicalize resolved `env_paths` values, resolve
+  symlinks, or check path existence. `env_paths` is the way to pass
+  config-root-relative paths to child processes. It does not compose or prepend
+  `PATH`; `PATH` composition is out of scope.
 
   `env_paths` keys follow the `env` key rules: non-empty, with no `=` or NUL.
   Values must be non-empty strings without NUL. Validate both tables at config
   load for every declared lint row and test selector, including rows outside
-  the selected lint profile. A key declared in both `env` and `env_paths` is
-  invalid and fails config loading with `PROFILE.DUPLICATE_STEP_ENV_KEY`.
+  the selected lint profile. On lint rows, `StepExecError` key/value errors
+  mirror `env` under `PROFILE.INVALID_STEP_ENV` and identify `env_paths.<key>`;
+  table-shape errors identify `env_paths`. Test-selector load errors use the
+  existing `CLI.SC_LINT_CONFIG_MALFORMED` code. A key declared in both `env` and
+  `env_paths` is invalid: lint rows fail with
+  `PROFILE.DUPLICATE_STEP_ENV_KEY`; test selectors fail with
+  `CLI.SC_LINT_CONFIG_MALFORMED`.
+
+  `env_paths` is command-selector-only for test profiles. Group selectors may
+  not declare `env_paths`, just as they may not declare `env`, `cwd`, or
+  `platforms`; add `env_paths` to `GROUP_FORBIDDEN_KEYS`.
 
   In `data.steps[]`, `host` always means the actual host. For a row that
   declares a host selector, add `host_selector` to its Run row and to every
@@ -539,6 +557,10 @@ specialized backend tools and mixed Rust/Python implementations.
   execution scheduling; the `after_all` barrier covers only runnable rows
   that pass both filters. Output stays in
   selected declaration/profile order, independent of execution timing.
+
+  Lint-step reports and test-selector listings include both `env_keys` and a
+  separate `env_path_keys` field. The latter contains only the keys from
+  `env_paths`; never report the resolved absolute values.
 
   **Bare-run default.** Optional `default_lint_profile = "<name>"` at
   `[tool.sc-lint]` applies only to consumer lint. It is a sibling of
@@ -698,27 +720,44 @@ specialized backend tools and mixed Rust/Python implementations.
      `host_platform_mismatch_without_target_is_invalid`, and
      `host_without_platform_filters_by_host_only`, and
      `invalid_host_on_unselected_profile_fails_at_config_load`.
-  7. Verify `env_paths` is accepted by lint rows and test selectors; malformed
-     tables, invalid keys, empty values, and NUL values fail at config load.
-     Verify relative values resolve from an injected config root on Linux,
-     macOS and Windows, including Windows separator handling; absolute values
-     pass through unchanged, and nonexistent paths are not rejected. Verify a
-     key in both `env` and `env_paths` fails at config load with
-     `PROFILE.DUPLICATE_STEP_ENV_KEY`. Verify a path through a symlink retains
-     the symlink path rather than resolving its target.
+  7. Verify `env_paths` is accepted by lint rows and test command selectors,
+     and that test group selectors reject it through `GROUP_FORBIDDEN_KEYS`.
+     Malformed tables, invalid keys, empty values and NUL values fail at config
+     load; lint errors use `PROFILE.INVALID_STEP_ENV` and identify
+     `env_paths.<key>` for key/value errors, while test-selector errors use
+     `CLI.SC_LINT_CONFIG_MALFORMED`. Duplicate keys in `env` and `env_paths`
+     fail with `PROFILE.DUPLICATE_STEP_ENV_KEY` on lint rows and
+     `CLI.SC_LINT_CONFIG_MALFORMED` on test selectors.
+  8. Verify `env_paths_uses_config_file_parent_not_step_cwd` with
+     `--config consumer/sc-lint.toml`: the config file's subdirectory is the
+     config root even when a step has `cwd = "crates/pkg"`;
+     `env_paths` ignores that step cwd. For a relative config path, resolve
+     against process cwd without canonicalizing and preserve `..` components.
+     Verify relative env paths resolve from that root on Linux, macOS and
+     Windows: forward slashes work in a relative value such as
+     `venv/Scripts/python.exe`; drive-letter absolute `C:\tools\python.exe`
+     and UNC `\\server\share\python.exe` pass through; rooted-but-not-absolute
+     `\x` and drive-relative `C:x` join to the root. Preserve separators and `..`
+     verbatim when joining, do not reject nonexistent paths, and retain a
+     symlink path without resolving its target.
+  9. Verify lint reports and test-selector listings carry `env_keys` and a
+     separate `env_path_keys` containing only names, never resolved values.
 
   **Compatibility.** Existing configurations without these keys are
   unchanged. Before this change, `host` and `env_paths` fail as unknown
   lint-row fields, and `env_paths` is unsupported on test selectors;
   `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting
   `default_lint_profile` changes that consumer's bare lint run to the
-  named profile; explicit selectors are unaffected. `host` and
-  `default_lint_profile` require sc-lint 0.8.4 or newer, once accepted and
-  implemented; older versions reject them during configuration validation.
-  `env_paths` is also proposed for implementation on lint rows and test
-  selectors. When implemented, the adoption kit schema at
-  `packages/sc-lint-adoption/schema.d/profiles.json` must add `env_paths`; this
-  PR does not change that schema.
+  named profile; explicit selectors are unaffected. `host`,
+  `default_lint_profile`, and `env_paths` require sc-lint 0.8.4 or newer, once
+  accepted and implemented; older versions reject them during configuration
+  validation. When implemented, the adoption kit schema at
+  `packages/sc-lint-adoption/schema.d/profiles.json` gains `host` and
+  `env_paths` for lint step objects and follows the parity rule from #825:
+  the schema accepts exactly what the binary accepts, including existing
+  `env`, `cwd`, and `after_all` fields. Test selectors are not declared in
+  `install.json` per REQ-CLI-023, so this schema change does not cover them.
+  This PR does not change the schema.
 
   (Source: #822 and #784, Phase 0.8.4. Proposed amendment to [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md); status remains Pending until Rand accepts in his own words.)
 
