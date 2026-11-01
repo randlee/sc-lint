@@ -25,6 +25,12 @@
                 "propertyNames": { "type": "string", "minLength": 1, "pattern": "^[^=\\u0000]+$" },
                 "additionalProperties": { "type": "string" }
               },
+              "host": { "type": "string", "enum": ["linux", "macos", "windows"] },
+              "env_paths": {
+                "type": "object",
+                "propertyNames": { "type": "string", "minLength": 1, "pattern": "^[^=\\u0000]+$" },
+                "additionalProperties": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000]+$" }
+              },
               "cwd": { "type": "string", "pattern": "^(?![/\\\\])(?![A-Za-z]:)(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" }
             }
           }

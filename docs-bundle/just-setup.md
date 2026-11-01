@@ -32,8 +32,8 @@ default: lint
 setup:
     {{python}} .sc-lint/bootstrap.py setup --config sc-lint.toml
 
-lint *profile:
-    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{profile}}
+lint selector='' *scope:
+    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml "{{selector}}" {{scope}}
 
 test *layer:
     {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}

@@ -10,12 +10,14 @@ mod docs;
 mod entry;
 mod error;
 mod installer;
+mod profile_host;
 mod profile_plan;
 pub(crate) mod python_adapter;
 mod render;
 mod scheduler;
 mod step_exec;
 mod step_logs;
+mod step_paths;
 mod test_selectors;
 mod workflow;
 

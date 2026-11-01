@@ -72,12 +72,21 @@ def test_profile_schema_enforces_rust_step_value_constraints() -> None:
         "after_all": True,
         "env": {"PYO3_PYTHON": ".bootstrap-venv/bin/python"},
         "cwd": "crates/atm-core",
+        "host": "linux",
+        "env_paths": {"PYTHON": "venv/bin/python"},
     }
     validate(valid, lint_step, "profiles.clippy")
 
     invalid_values = [
         ("name", "  "),
         ("platform", "freebsd"),
+        ("host", "freebsd"),
+        ("host", 7),
+        ("env_paths", {"A=B": "x"}),
+        ("env_paths", {"": "x"}),
+        ("env_paths", {"A": ""}),
+        ("env_paths", {"A": "x\0y"}),
+        ("env_paths", {"A": 7}),
         ("target", 7),
         ("after_all", "true"),
         ("env", {"A=B": "x"}),
@@ -107,6 +116,8 @@ def test_install_accepts_and_renders_schema_valid_profile_fields() -> None:
             "name": "clippy",
             "command": ["cargo", "clippy"],
             "env": {"PYO3_PYTHON": ".bootstrap-venv/bin/python"},
+            "host": "linux",
+            "env_paths": {"PYTHON": "venv//../bin/python"},
             "cwd": "crates/atm-core",
         }
     }
@@ -124,6 +135,8 @@ def test_install_accepts_and_renders_schema_valid_profile_fields() -> None:
             "name": "clippy",
             "command": ["cargo", "clippy"],
             "env": {"PYO3_PYTHON": ".bootstrap-venv/bin/python"},
+            "host": "linux",
+            "env_paths": {"PYTHON": "venv//../bin/python"},
             "cwd": "crates/atm-core",
         }
     ]

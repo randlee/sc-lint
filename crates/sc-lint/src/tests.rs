@@ -121,6 +121,14 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
         ("test", Some("layer")),
         ("upgrade", None),
     ] {
+        if recipe == "lint" {
+            assert!(canonical.contains("lint selector='' *scope:"));
+            assert!(
+                canonical
+                    .contains("bootstrap.py lint --config sc-lint.toml \"{{selector}}\" {{scope}}")
+            );
+            continue;
+        }
         let expected = match selector {
             Some(selector) => format!(
                 "{recipe} *{selector}:\n    {{{{python}}}} .sc-lint/bootstrap.py {recipe} --config sc-lint.toml {{{{{selector}}}}}"
@@ -6336,3 +6344,5 @@ fn every_command_id() -> Vec<crate::command::CommandId> {
     }
     ids
 }
+
+mod host_rows;

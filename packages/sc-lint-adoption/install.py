@@ -176,7 +176,7 @@ def lint_step(name: str, step: object) -> str:
     """Render one lint row; cross-target and command semantics belong to sc-lint."""
     command, tags = (step, {}) if isinstance(step, list) else (step["command"], step)
     lines = [f"name = {json.dumps(tags.get('name', name))}", f"command = {toml_value(command)}"]
-    lines += [f"{key} = {toml_value(tags[key])}" for key in ("platform", "target", "after_all", "env", "cwd") if key in tags]
+    lines += [f"{key} = {toml_value(tags[key])}" for key in ("platform", "target", "host", "after_all", "env", "env_paths", "cwd") if key in tags]
     return "[[tool.sc-lint.lint]]\n" + "\n".join(lines)
 
 

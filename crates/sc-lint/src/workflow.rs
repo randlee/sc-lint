@@ -12,7 +12,6 @@ use crate::CliError;
 use crate::ClippyTarget;
 use crate::cli::LintProfile;
 use crate::command::CommandSuccess;
-use crate::config::CONSUMER_SELECTOR_ALL;
 use crate::config::ConsumerProfile;
 use crate::config::LoadedConfig;
 use crate::consts;
@@ -185,6 +184,7 @@ pub(crate) struct StepReport {
     command: String,
     platform: Option<Platform>,
     target: Option<String>,
+    context: crate::profile_host::RowContext,
 }
 
 impl StepReport {
@@ -195,11 +195,13 @@ impl StepReport {
             command: step.display_command(),
             platform: None,
             target: None,
+            context: Default::default(),
         }
     }
 
     /// Records the declared platform and target of a planned step on its report.
     pub(crate) fn for_planned(mut self, step: &PlannedStep) -> Self {
+        self.context = step.context.clone();
         self.platform = step.platform();
         self.target = step.target().map(|target| target.as_str().to_string());
         self
@@ -217,20 +219,23 @@ impl StepReport {
             fields.insert("platform".to_string(), json!(platform.as_str()));
             fields.insert("target".to_string(), json!(self.target));
         }
+        self.context.add_to(&mut row);
         row
     }
 }
 
 /// JSON row for a selected step that was skipped on this host.
 fn skipped_row(record: &SkipRecord) -> Value {
-    json!({
+    let mut row = json!({
         "name": record.name,
         "status": "skipped",
         "host": record.host.as_str(),
-        "platform": record.platform.as_str(),
+        "platform": record.platform.map(Platform::as_str),
         "target": record.target.as_ref().map(|target| target.as_str()),
         "reason": record.reason.as_str(),
-    })
+    });
+    record.context.add_to(&mut row);
+    row
 }
 
 /// Seam for injecting step execution in tests and alternate runtimes.
@@ -508,15 +513,16 @@ pub(crate) fn run_consumer_lint_with(
         .iter()
         .map(|decision| match decision {
             PlanDecision::Skip(record) => skipped_row(record),
-            PlanDecision::Run(_) => reports
+            PlanDecision::Run(step) => reports
                 .next()
                 .expect("the scheduler reports every run decision")
+                .for_planned(step)
                 .to_json(),
         })
         .collect::<Vec<_>>();
     Ok(consumer_success(
         ConsumerProfile::Lint,
-        selector.unwrap_or(CONSUMER_SELECTOR_ALL),
+        &input.report_selector,
         rows,
     ))
 }
