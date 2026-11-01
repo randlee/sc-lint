@@ -29,9 +29,10 @@ All notable changes to sc-lint are documented here.
   payloads and their checksums from dedicated staging directories. Checked-in
   release notes, templates, manifests and pin files are no longer uploaded as
   release assets; published immutable 0.8.3 assets are unchanged (#821).
-- Release preflight templates declare an empty default for
-  `already_published_channels`, so rendering succeeds when no previously
-  published channels need to be preserved (#819).
+- The adoption kit's `profiles.json` schema accepts the Rust consumer
+  lint-step fields, including `env`, `cwd`, and `after_all`, and validates
+  test-layer entries against the supported test-step shape (#822).
+  Environment-variable names must be non-empty and contain neither `=` nor NUL.
 
 ## [0.8.3] — 2026-11-01
 
