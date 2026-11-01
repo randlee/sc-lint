@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-022 |
-| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Proposed, Pending Rand acceptance |
+| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Accepted — 2026-11-01. Receipts: Rand 2026-11-01: "I approve conditionally on atm-core acceptance."; team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core." |
 | Deciders | Rand |
-| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Proposed, Pending); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
+| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Accepted — 2026-11-01); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
 
 ## Context
 
@@ -57,7 +57,7 @@ consumer friction arises.
    A new consumer setting goes on one of these surfaces.
 
 3. **Parallel keys.** A lint step and a test command selector accept the same
-   execution keys: `command`, `env`, `env_paths` (proposed by amendment
+   execution keys: `command`, `env`, `env_paths` (added by amendment
    decision 4), `cwd`, `platform` on lint steps, `platforms` on test
    selectors, and `after_all`.
 
@@ -106,12 +106,18 @@ consumer friction arises.
 - #786 shapes PORT-010 does not recognise, including S8, have a defined
   exception path.
 
-## Proposed Amendment — Pending Rand Acceptance (#822, #784)
+## Accepted Amendment — 2026-11-01 (#822, #784)
 
-This amendment is a proposal only. The base ADR remains Accepted at its
-existing scope; the following amendment remains Pending until Rand accepts it
-in his own words. The proposed requirement and full worked example are in
-[REQ-CLI-028](../cli-requirements.md#req-cli-028--proposed-pending-rand-acceptance).
+This amendment was accepted on 2026-11-01. Acceptance receipts (verbatim):
+
+Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+
+team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
+
+REQ-CLI-028 was delivered in 0.8.4 by the implementation layer stacked above
+PR #826. Revisions fe9ab8de and 62caf3d9 were clarifications sent to atm-dev;
+there was no objection. The full requirement and worked example are in
+[REQ-CLI-028](../cli-requirements.md#req-cli-028--accepted-2026-11-01).
 
 1. **Decision: host selection applies to consumer lint rows only.** Add an
    optional host selector, independent of target platform, so a consumer can

@@ -449,7 +449,11 @@ specialized backend tools and mixed Rust/Python implementations.
   ("approve"); ADR-022 provides context for the consumer configuration
   surface.)
 
-- `REQ-CLI-028` — **Proposed; Pending Rand acceptance**
+- `REQ-CLI-028` — **Accepted (2026-11-01)**
+  Acceptance receipts (verbatim):
+  Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+  team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
+  Delivered in 0.8.4 by the implementation layer stacked above this PR.
   Consumer lint rows only may declare `host = "linux" | "macos" | "windows"` to
   select the operating-system host on which that row's command and declared
   environment apply. `host` is independent of `platform`: `platform` continues
@@ -596,7 +600,7 @@ specialized backend tools and mixed Rust/Python implementations.
   `sc-lint test` and consumer lint with an explicit `--profile` do not resolve
   or fail on an unknown default string.
 
-  Add proposed `ProfilePlanDetailCode::InvalidHost`
+  The profile-plan detail codes are `ProfilePlanDetailCode::InvalidHost`
   (`PROFILE.INVALID_HOST`) and `ProfilePlanDetailCode::UnknownDefaultLintProfile`
   (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). A host value that is non-string or
   unsupported fails with `PROFILE.INVALID_HOST` at config load for every
@@ -605,11 +609,11 @@ specialized backend tools and mixed Rust/Python implementations.
   `PROFILE.INVALID_HOST` during selected-member validation, before platform
   scope filtering; this relationship check applies only to selected rows. A
   host without `platform` filters by host alone. With a `target`, host and
-  target platform may differ, enabling cross-host rows. The config key also
-  needs to be admitted in `SC_LINT_KEYS` and represented in
-  `ScLintConfigFile` when implemented.
+  target platform may differ, enabling cross-host rows.
+  `default_lint_profile` is admitted in `SC_LINT_KEYS` and represented in
+  `ScLintConfigFile`.
 
-  Add proposed `ProfilePlanDetailCode::DuplicateStepEnvKey`
+  The duplicate-key detail code is `ProfilePlanDetailCode::DuplicateStepEnvKey`
   (`PROFILE.DUPLICATE_STEP_ENV_KEY`) for a key declared in both `env` and
   `env_paths` on the same lint row or test selector.
 
@@ -755,17 +759,16 @@ specialized backend tools and mixed Rust/Python implementations.
   `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting
   `default_lint_profile` changes that consumer's bare lint run to the
   named profile; explicit selectors are unaffected. `host`,
-  `default_lint_profile`, and `env_paths` require sc-lint 0.8.4 or newer, once
-  accepted and implemented; older versions reject them during configuration
-  validation. When implemented, the adoption kit schema at
-  `packages/sc-lint-adoption/schema.d/profiles.json` gains `host` and
-  `env_paths` for lint step objects and follows the parity rule from #825:
-  the schema accepts exactly what the binary accepts, including existing
+  `default_lint_profile`, and `env_paths` require sc-lint 0.8.4 or newer;
+  older versions reject them during configuration validation. The adoption
+  kit schema contract for `packages/sc-lint-adoption/schema.d/profiles.json`
+  requires `host` and `env_paths` on lint step objects and follows the parity
+  rule from #825: it accepts exactly what the binary accepts, including existing
   `env`, `cwd`, and `after_all` fields. Test selectors are not declared in
   `install.json` per REQ-CLI-023, so this schema change does not cover them.
   This PR does not change the schema.
 
-  (Source: #822 and #784, Phase 0.8.4. Proposed amendment to [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md); status remains Pending until Rand accepts in his own words.)
+  (Source: #822 and #784, Phase 0.8.4. Accepted 2026-11-01; delivered in 0.8.4 by the implementation layer stacked above this PR. See [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md).)
 
 ## Contract References
 

@@ -33,16 +33,19 @@ current planning surface.
   - standard repo-tools adoption kit and rejection of Phase F's consumer-specific engine
 - [`ADR-016-python-wheel-runtime-and-no-rust-configuration.md`](./ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
   - version-matched Python wheel runtime and no-Rust configuration boundary
+- [`ADR-022-tools-and-consumer-configuration.md`](./ADR-022-tools-and-consumer-configuration.md)
+  - accepted #822/#784 amendment for host-selected lint rows, `env_paths`,
+    and default lint profiles on 2026-11-01; delivered in 0.8.4 by the
+    implementation layer stacked above PR #826
+  - Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+  - team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
 
 ## Draft ADRs
 
 - [`ADR-019-boundary-prefix-patterns-and-feature-independence.md`](./ADR-019-boundary-prefix-patterns-and-feature-independence.md)
-- [`ADR-020-phase-l-atm-core-findings.md`](./ADR-020-phase-l-atm-core-findings.md)
-- [`ADR-022-tools-and-consumer-configuration.md`](./ADR-022-tools-and-consumer-configuration.md)
-  - Accepted base: sc-lint provides tools and consumer configuration surfaces; consumers own orchestration
-  - Pending #822/#784 amendment: host-selected lint rows and a lint-only bare-run profile default
   - prefix patterns in boundary dependency allow-lists and opt-in
     `SCB-FEATURE-001` feature independence (Accepted)
+- [`ADR-020-phase-l-atm-core-findings.md`](./ADR-020-phase-l-atm-core-findings.md)
 
 ## Withdrawn ADRs
 
