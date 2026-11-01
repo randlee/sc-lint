@@ -45,7 +45,6 @@ mod tests;
 
 use rule_catalog::rule;
 
-const SC_LINT_SCHEMA_VERSION: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const SC_LINT_BOUNDARY_TOOL: &str = "sc-lint-boundary";
 const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -160,7 +159,7 @@ fn disabled_report() -> FindingsReport {
     FindingsReport {
         tool: SC_LINT_BOUNDARY_TOOL,
         version: SC_LINT_BOUNDARY_VERSION,
-        schema_version: SC_LINT_SCHEMA_VERSION,
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         status: ReportStatus::Pass,
         scanned_crates: 0,
         allowed: Vec::new(),
@@ -414,7 +413,7 @@ impl GraphBuilder {
         GraphExport {
             tool: SC_LINT_BOUNDARY_TOOL,
             version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
+            schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
             nodes: self.nodes,
             edges: self.edges,
         }
@@ -428,7 +427,7 @@ pub fn analyze_workspace(
 }
 
 /// Source file of every graph node, keyed by node id. Path-less findings
-/// (SCB-CYCLE-002/003) resolve their files from it for path exclusions.
+/// (SCB-CYCLE-001/002/003) resolve their files from it for path exclusions.
 type NodeSourcePaths = BTreeMap<NodeId, PathBuf>;
 
 /// `analyze_workspace` plus the source file of every graph node. The
@@ -580,7 +579,7 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
     FindingsReport {
         tool: SC_LINT_BOUNDARY_TOOL,
         version: SC_LINT_BOUNDARY_VERSION,
-        schema_version: SC_LINT_SCHEMA_VERSION,
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         status,
         scanned_crates,
         findings,

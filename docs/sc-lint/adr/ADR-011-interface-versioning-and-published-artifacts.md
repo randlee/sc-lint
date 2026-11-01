@@ -137,3 +137,10 @@ the shared v2 schema, where `allowed` remains optional. Unsupported versions
 fail with `backend_payload_drift` at `/schema_version`. Consumers using a
 strict v1 validator must upgrade before using a report containing `allowed`;
 the v2 property is not wire-compatible with those validators.
+
+The public schema API also changes with this report versioning: the existing
+`analyzer_report_schema()` function now returns the v2 artifact, and the new
+`analyzer_report_v1_schema()` function exposes the v1 artifact. The Rust
+function signatures remain unchanged, but callers that relied on
+`analyzer_report_schema()` returning v1 must select the explicit v1 function
+or update their validation expectations.
