@@ -28,8 +28,8 @@ serde.workspace = true
 serde_json.workspace = true
 rayon.workspace = true
 toml.workspace = true
-syn = { version = "2", features = ["full", "parsing", "visit"] }
-thiserror = "1"
+syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }
+thiserror = "2.0.21"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.27.0"

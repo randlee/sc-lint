@@ -283,6 +283,7 @@ mod owner_tests {
         let path: Type = syn::parse_quote!(Owner);
         let parenthesized: Type = syn::parse_quote!((Owner));
         let grouped = Type::Group(syn::TypeGroup {
+            attrs: Vec::new(),
             group_token: Default::default(),
             elem: Box::new(parenthesized),
         });
