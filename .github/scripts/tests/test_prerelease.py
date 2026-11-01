@@ -198,7 +198,7 @@ class PrereleaseTests(unittest.TestCase):
         self.assertIn('gh release create "$tag" --prerelease', workflow)
         self.assertIn('gh release view "$tag" --json isDraft,isPrerelease,assets', workflow)
         self.assertIn('release_stage.py --manifest', workflow)
-        self.assertIn('gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt', workflow)
+        self.assertIn('gh release create "$tag" --prerelease --title "$tag" --generate-notes "${assets[@]}"', workflow)
         self.assertIn('cmp checksums.txt existing-release/checksums.txt', workflow)
         self.assertIn("concurrent run converged", workflow)
         self.assertLess(

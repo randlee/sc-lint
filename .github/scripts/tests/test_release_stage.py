@@ -63,13 +63,14 @@ def test_workflow_uploads_exact_manifest_assets_and_checksums(tmp_path, prerelea
     if prerelease:
         upload = next(step for step in job["steps"] if 'gh release create "$tag"' in step.get("run", ""))
         assert upload["working-directory"] == "${{ env.RELEASE_ASSET_DIR }}"
-        selection = next(line.strip() for line in upload["run"].splitlines() if line.strip().startswith("mapfile -t archives "))
+        assert "mapfile" not in upload["run"] and "find ." not in upload["run"]
+        selection = next(line.strip() for line in upload["run"].splitlines() if " upload-list " in line)
+        assert selection == 'upload_list="$(python3 "$GITHUB_WORKSPACE/.github/scripts/release_stage.py" upload-list .)"'
         create = [line.strip() for line in upload["run"].splitlines() if line.strip().startswith("if gh release create")]
-        assert create == ['if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt; then']
-        script = "set -euo pipefail\n" + selection + "\n" + r'''printf '%s\0' "${archives[@]}" checksums.txt'''
-        selected = subprocess.run(["bash", "-c", script], cwd=destination, capture_output=True)
-        assert selected.returncode == 0, selected.stderr.decode()
-        uploaded = set(selected.stdout.decode().rstrip("\0").split("\0"))
+        assert create == ['if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${assets[@]}"; then']
+        selected = subprocess.run([sys.executable, str(ROOT / ".github/scripts/release_stage.py"), "upload-list", "."], cwd=destination, capture_output=True, text=True)
+        assert selected.returncode == 0, selected.stderr
+        uploaded = set(selected.stdout.splitlines())
     else:
         upload = next(step for step in job["steps"] if step.get("uses", "").startswith("softprops/action-gh-release@"))
         assert upload["with"]["files"].strip() == "${{ env.RELEASE_ASSET_DIR }}/*"
@@ -131,3 +132,11 @@ def test_wheels_only_manifest_uses_shared_release_contract(tmp_path, legacy, mon
     assert release_artifacts.cmd_release_asset_patterns(SimpleNamespace(manifest="controlled.toml")) == 0
     patterns = capsys.readouterr().out.splitlines()
     assert all(any(re.fullmatch(pattern, name) for pattern in patterns) for name in names)
+
+
+@pytest.mark.parametrize("names", [[], ["checksums.txt"], ["payload.zip"]])
+def test_upload_list_rejects_incomplete_stage(tmp_path, names):
+    for name in names:
+        (tmp_path / name).write_bytes(b"fixture")
+    with pytest.raises(ValueError, match="requires payloads and checksums"):
+        release_stage.upload_list(tmp_path)

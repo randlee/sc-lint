@@ -82,7 +82,7 @@ def test_prerelease_builds_and_publishes_declared_wheels():
     release = workflow["jobs"]["release"]
     assert "build-wheels" in release["needs"]
     publication = next(step for step in release["steps"] if step.get("name") == "Publish GitHub prerelease assets")
-    assert "-name '*.whl'" in publication["run"]
+    assert "release_stage.py\" upload-list ." in publication["run"]
 
 
 def pr_triggered_workflows(workflows):

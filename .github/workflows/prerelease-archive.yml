@@ -243,10 +243,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -print | sed 's#^./##' | sort)
-          ((${#archives[@]} > 0)) || { echo "no prerelease archives were downloaded" >&2; exit 1; }
+          upload_list="$(python3 "$GITHUB_WORKSPACE/.github/scripts/release_stage.py" upload-list .)"
+          assets=()
+          while IFS= read -r asset; do assets+=("$asset"); done <<< "$upload_list"
           tag="${GITHUB_REF_NAME}"
-          if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt; then
+          if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${assets[@]}"; then
             exit 0
           fi
 
@@ -254,7 +255,7 @@ jobs:
           metadata="$(gh release view "$tag" --json isDraft,isPrerelease,assets)"
           [[ "$(jq -r .isPrerelease <<<"$metadata")" == "true" ]] || { echo "$tag is not a prerelease" >&2; exit 1; }
           [[ "$(jq -r .isDraft <<<"$metadata")" == "false" ]] || { echo "$tag is still a draft" >&2; exit 1; }
-          expected_assets="$(printf '%s\n' "${archives[@]}" checksums.txt | sort)"
+          expected_assets="$(printf '%s\n' "${assets[@]}" | sort)"
           actual_assets="$(jq -r '.assets[].name' <<<"$metadata" | sort)"
           [[ "$actual_assets" == "$expected_assets" ]] || { echo "$tag has a different asset set" >&2; exit 1; }
           mkdir existing-release

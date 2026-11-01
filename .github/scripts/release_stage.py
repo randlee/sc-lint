@@ -6,6 +6,7 @@ import hashlib
 import re
 from pathlib import Path
 import shutil
+import sys
 import tomllib
 
 from release_python import asset_rules
@@ -34,7 +35,28 @@ def stage(manifest: dict, version: str, source: Path, destination: Path, *, prer
     (destination / "checksums.txt").write_text("".join(checksums), encoding="utf-8")
 
 
+def upload_list(directory: Path) -> list[str]:
+    files = sorted(directory.iterdir())
+    if any(not path.is_file() or path.is_symlink() for path in files):
+        raise ValueError("upload directory must contain only staged regular files")
+    names = [path.name for path in files]
+    if "checksums.txt" not in names or len(names) < 2:
+        raise ValueError("upload directory requires payloads and checksums.txt")
+    return names
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["upload-list"]:
+        parser = argparse.ArgumentParser(description="List the exact staged files to upload.")
+        parser.add_argument("command", choices=["upload-list"])
+        parser.add_argument("directory", type=Path)
+        args = parser.parse_args(argv)
+        try:
+            print("\n".join(upload_list(args.directory)))
+        except (ValueError, OSError) as error:
+            parser.exit(1, f"release-stage: {error}\n")
+        return 0
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--version", required=True)
