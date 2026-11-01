@@ -197,7 +197,7 @@ class PrereleaseTests(unittest.TestCase):
         workflow = (SCRIPT.parents[4] / ".github" / "workflows" / "prerelease-archive.yml").read_text(encoding="utf-8")
         self.assertIn('gh release create "$tag" --prerelease', workflow)
         self.assertIn('gh release view "$tag" --json isDraft,isPrerelease,assets', workflow)
-        self.assertIn('shasum -a 256 "${archives[@]}" > checksums.txt', workflow)
+        self.assertIn('release_stage.py --manifest', workflow)
         self.assertIn('gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt', workflow)
         self.assertIn('cmp checksums.txt existing-release/checksums.txt', workflow)
         self.assertIn("concurrent run converged", workflow)

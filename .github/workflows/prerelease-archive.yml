@@ -50,18 +50,22 @@ jobs:
           python3 .github/scripts/release_artifacts.py validate-manifest --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace"
           python3 .github/scripts/release_artifacts.py verify-version --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace" --version "$version"
           python3 .github/scripts/release_artifacts.py verify-version-lockstep --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace"
-          echo "value=$version" >> "$GITHUB_OUTPUT"
-          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "rust_toolchain=$rust_toolchain" >> "$GITHUB_OUTPUT"
-          echo "workspace_toml=$workspace" >> "$GITHUB_OUTPUT"
-          echo "has_python_wheels=$(jq -r .has_python_wheels <<<"$plan")" >> "$GITHUB_OUTPUT"
+          {
+            echo "value=$version"
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "rust_toolchain=$rust_toolchain"
+            echo "workspace_toml=$workspace"
+            echo "has_python_wheels=$(jq -r .has_python_wheels <<<"$plan")"
+          } >> "$GITHUB_OUTPUT"
       - id: matrix
         shell: bash
         run: |
           set -euo pipefail
           matrix="$(python3 .github/scripts/release_artifacts.py release-target-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")"
-          echo "value=$matrix" >> "$GITHUB_OUTPUT"
-          echo "wheels=$(python3 .github/scripts/release_artifacts.py python-wheel-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")" >> "$GITHUB_OUTPUT"
+          {
+            echo "value=$matrix"
+            echo "wheels=$(python3 .github/scripts/release_artifacts.py python-wheel-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")"
+          } >> "$GITHUB_OUTPUT"
   build:
     needs: plan
     strategy:
@@ -219,6 +223,8 @@ jobs:
     if: ${{ !failure() && !cancelled() && needs.build.result == 'success' && (needs.build-wheels.result == 'success' || needs.build-wheels.result == 'skipped') }}
     needs: [plan, build, build-wheels]
     runs-on: ubuntu-latest
+    env:
+      RELEASE_ASSET_DIR: prerelease-assets
     timeout-minutes: 10
     permissions:
       contents: write
@@ -226,16 +232,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { path: assets }
-      - name: Generate checksums and publish GitHub prerelease assets
+      - name: Stage manifest-declared prerelease assets and checksums
+        env:
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+        run: python3 .github/scripts/release_stage.py --manifest "$RELEASE_ARTIFACT_MANIFEST" --version "$RELEASE_VERSION" --source assets --destination "$RELEASE_ASSET_DIR" --prerelease
+      - name: Publish GitHub prerelease assets
+        working-directory: ${{ env.RELEASE_ASSET_DIR }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          find assets -type f -exec cp {} . \;
           mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -print | sed 's#^./##' | sort)
           ((${#archives[@]} > 0)) || { echo "no prerelease archives were downloaded" >&2; exit 1; }
-          shasum -a 256 "${archives[@]}" > checksums.txt
           tag="${GITHUB_REF_NAME}"
           if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt; then
             exit 0

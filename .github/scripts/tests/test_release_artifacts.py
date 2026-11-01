@@ -991,7 +991,7 @@ def test_github_release_leg_is_detect_and_skip(tmp_path: Path) -> None:
         text.count(
             "if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}"
         )
-        == 5
+        == 4
     )
     assert (
         "if: ${{ steps.published_release_probe.outputs.release_state == 'complete' && inputs.replace_release_assets != true }}"
@@ -2215,7 +2215,7 @@ def test_release_workflow_enforces_python_release_invariants() -> None:
     assert "TEST_PYPI_API_TOKEN" in text
     assert "secrets.TEST_PYPI_TOKEN" not in text
     assert "--repository testpypi" in text
-    assert "for pattern in *.tar.gz *.zip *.whl *.tgz; do" in text
+    assert "release_stage.py --manifest" in text
     assert "uses: ./.github/actions/setup-python-release-build" in text
     assert "update-homebrew:" not in text
     assert "publish-winget:" not in text
@@ -3061,15 +3061,11 @@ def test_release_preflight_collects_independent_failures_before_denial() -> None
     assert "REGISTRY_STATE" in preflight_text
 
 
-def test_release_workflow_collects_wheels_without_redundant_zip_sweep() -> None:
+def test_release_workflow_uploads_only_the_dedicated_staging_directory() -> None:
     text = release_workflow_text()
-
-    assert (
-        "find artifacts -type f \\( -name '*.tar.gz' -o -name '*.zip' -o -name '*.tgz' \\) -exec mv {} release/ \\;"
-        in text
-    )
-    assert "find artifacts -type f -name '*.whl' -exec mv {} release/ \\;" in text
-    assert "find artifacts -type f \\( -name '*.zip' -o -name '*.whl' \\)" not in text
+    assert '--source artifacts --destination "$RELEASE_ASSET_DIR"' in text
+    assert "${{ env.RELEASE_ASSET_DIR }}/*" in text
+    assert "release/*" not in text
 
 
 def test_release_workflow_rehearsal_mode_avoids_production_side_effects() -> None:
