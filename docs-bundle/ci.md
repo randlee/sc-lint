@@ -16,7 +16,7 @@ the consumer commands after the preflight.
 - uses: randlee/sc-lint@v1
   with:
     operation: lint
-    version: 0.8.2
+    version: 0.8.3
 ```
 
 `version` is required. It is the exact released product SemVer, without a
@@ -30,7 +30,7 @@ commit SHA and keep `version` explicit:
 - uses: randlee/sc-lint@<full-commit-sha>
   with:
     operation: test
-    version: 0.8.2
+    version: 0.8.3
 ```
 
 The `v1` tag identifies the Action interface and is a movable tag, refreshed

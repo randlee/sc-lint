@@ -33,8 +33,8 @@ Python wheels cover the same six platforms and require Python 3.9 or newer;
 Windows ARM64 requires Python 3.11 or newer.
 
 ```sh
-tar -xzf sc-lint_0.8.2_x86_64-unknown-linux-gnu.tar.gz
-cd sc-lint_0.8.2_x86_64-unknown-linux-gnu
+tar -xzf sc-lint_0.8.3_x86_64-unknown-linux-gnu.tar.gz
+cd sc-lint_0.8.3_x86_64-unknown-linux-gnu
 install -d /usr/local/bin /usr/local/share/sc-lint
 install -m 0755 bin/sc-lint bin/sc-lint-boundary bin/sc-lint-portability bin/sc-lint-runtime /usr/local/bin/
 cp -R share/sc-lint/sc-lint-docs /usr/local/share/sc-lint/

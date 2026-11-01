@@ -4,90 +4,47 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-11-01
+
+Phase M ships the atm-core P1 tool fixes (#786, #720, #136, #385, #198,
+#195; phase PR #815), and release artifacts now cover six platforms (#777,
+#778; PR #780).
+
 ### Added
 
-- Release archives and Python wheels cover Linux, macOS and Windows on both x86_64 and ARM64. Managed setup and upgrade select the new Linux and Windows ARM64 archives.
-- Prereleases now include Python wheels for every declared wheel target, including the three platforms previously published only in stable releases.
-- l-1: Portability checks now account for additional platform `cfg` forms, avoid
-  reporting a `USER` read when the same function reads `USERNAME`, ignore
-  Windows namespace path prefixes, and exempt private helpers in paired
-  platform-adapter files.
-- l-2: Boundary external composition-root checks authorize dependents using
-  each record's `allowed_dependents` policy only. Consumers that listed an
-  external composition root only in `allowed_dependencies` must move it to
-  `allowed_dependents`.
-- l-3: Cycle analysis recognizes `self` method-call edges and delegation between
-  distinct methods; path exclusions also apply to path-less cycle findings.
-- l-4: Repository-root discovery recognizes workspace manifests, and Python lint
-  tables resolve independently across the supported config files. The
-  `line-counts` and `identity-literals` checks now fail with
-  `config.table_missing` when no supported config file defines their
-  `line_counts` or `identities` table. Consumers running either check must add
-  its table to
-  `sc-lint.toml` or `.just/lint-config.toml`.
-- l-5: Adoption template files rendered by the installer use `.tmpl`; upgrades
-  retire unmodified legacy `.j2` files and report modified files as conflicts.
-- l-7: Tokio-dependent packages are checked for blocking `std::thread::sleep` calls
-  in production targets by `SCB-RUNTIME-003`.
-- l-8: CLI contract checks now document unsupported interface checks, pin the
-  command-family JSON envelope, and reject malformed Python adapter payloads
-  with `backend_payload_drift`.
-- l-8: The CLI rejects unknown `[tool.sc-lint]` configuration keys with
-  `config.unknown_table`; supported keys are documented in the CLI contract.
-- l-9: Version-sync checks support Python manifests and configurable Winget and
-  release-wiring checks. Repositories without a `[version_sync]` table now fail
-  with `config.table_missing`; consumers using version sync must add the table
-  and configure the checks they need.
-- l-10: Cargo-shear no longer reports Rust fixtures consumed by trybuild
-  `.pass()` or `.compile_fail()` harnesses as unlinked files.
-- Consumer test selectors: `[tool.sc-lint.test]` may be a table of named
-  `command` or `group` selectors with `default`, `env`, `cwd`, `platforms` and
-  `after_all`; `sc-lint test [<selector> [args...]]` forwards arguments to the
-  selected command and `sc-lint test --list` lists the declared selectors
-  ([using sc-lint](docs-bundle/using-sc-lint.md#test-selectors)).
-- `--fail-fast` for `sc-lint test` and `sc-lint lint ci --consumer` (and the
-  bootstrap's `lint`/`test` operations) stops starting cargo-lane and
-  `after_all` steps after the first failure.
-- `after_all = true` on lint rows, test rows and command selectors runs that
-  step after every other step.
-- Stable codes `profile.invalid_after_all`, `test.unknown_selector`,
-  `test.group_cycle` and `profile.steps_failed`
-  ([CLI contract](docs/sc-lint/cli-contract.md#stable-codes)).
-- Phase M m-1: PORT-010 now recognizes S3 same-name `cfg(not(unix))` siblings
-  and S6 Unix-only out-of-line modules, including their public items.
-- Phase M m-4: PORT-010 can be allowed for one item with a required reason;
-  suppressed findings appear in schema `0.2.0` reports as `allowed` entries.
-- Phase M m-2: SCB-MANIFEST-004 resolves local module paths, and SCB-CYCLE-001
-  findings honor `exclude_paths_by_rule`.
-- Phase M m-3: lint steps accept `env` and `cwd`; failed-step output includes
-  both stdout and stderr, and every executed step writes both streams under
-  `<log-root>/steps/`, including passing steps.
+- Release archives and Python wheels cover Linux, macOS and Windows on both
+  x86_64 and ARM64, with ARM64 entries in the Homebrew, winget and Scoop
+  manifests. Managed setup, upgrade and the bootstrap select the new Linux and
+  Windows ARM64 archives (#777, #778).
+- Prereleases include Python wheels for every declared wheel target, including
+  the three platforms previously published only in stable releases.
+- PORT-010 recognizes same-name `cfg(not(unix))` siblings and Unix-only
+  out-of-line modules, including their public items (#720, #786).
+- PORT-010 can be allowed for one item with a required reason; suppressed
+  findings appear in schema `0.2.0` reports as `allowed` entries, filtered by
+  the same rule filter and exclusions as findings (#786).
+- SCB-MANIFEST-004 resolves local module paths (#136), and SCB-CYCLE-001
+  findings honor `exclude_paths_by_rule` (#385).
+- Lint steps accept `env` and `cwd` (#198). Failed-step output includes both
+  stdout and stderr, and when a log root is configured every executed step,
+  passing steps included, writes both streams to its own file under
+  `<log-root>/steps/`, named from the step name (#195).
 
 ### Changed
 
-- Consumer lint and test profiles run independent steps in parallel (steps
-  whose `argv[0]` is `cargo` stay serialized in declaration order) and fail
-  slow: every step runs and every failed step is reported. This supersedes the
-  0.8.0 statement that consumer profiles remain sequential and fail-fast.
-- The built-in plan and consumer profiles now fail with code
-  `profile.steps_failed` and `error.details.failed_steps[]` of
-  `{index, name, exit_code, message}` (zero-based `index`) instead of
-  `{index, step, message}`. A consumer failure no longer returns the first
-  step's own error, and a missing consumer backend now reports
-  `profile.steps_failed` with the spawn error in `message`. Optional
-  `step_log_destination` and `step_log_error` identify the destination and
-  cause when that step's configured log could not be written. A log-write
-  failure makes the step failed whether its child passed or failed; it
-  preserves the child's exit code (null only if there was none) and keeps
-  stdout and stderr in the report.
+- `error.details.failed_steps[]` entries carry optional
+  `step_log_destination` and `step_log_error` when that step's configured log
+  could not be written. A log-write failure makes the step failed whether its
+  child passed or failed; it preserves the child's exit code (null only if
+  there was none) and keeps stdout and stderr in the report (#195).
 
 ### Breaking Changes
 
-- Phase M changes the public Rust report API: `analyzer_report_schema()` now
-  returns schema v2, and `analyzer_report_v1_schema()` exposes v1. Site
-  allowances add public directive and error variants and an optional
-  `FindingsReport.allowed` field. Downstream exhaustive enum matches and
-  `FindingsReport` struct literals may require source changes; see the
+- The public Rust report API changes: `analyzer_report_schema()` now returns
+  schema v2, and `analyzer_report_v1_schema()` exposes v1. Site allowances add
+  public directive and error variants and an optional `FindingsReport.allowed`
+  field. Downstream exhaustive enum matches and `FindingsReport` struct
+  literals may require source changes; see the
   [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances).
 
 ## [0.8.2] — 2026-10-29
@@ -141,6 +98,21 @@ and review fixes are carried by the phase integration PR #716.
 - The reviewed `Clone` default is preserved in cycle analysis, and
   timing-sensitive CI tests use controlled synchronization (follow-up PRs
   #728, #729, and #731).
+
+### Consumer Action Required
+
+- The `line-counts` and `identity-literals` checks fail with
+  `config.table_missing` when no supported config file defines their
+  `line_counts` or `identities` table; add it to `sc-lint.toml` or
+  `.just/lint-config.toml`.
+- Repositories without a `[version_sync]` table fail version sync with
+  `config.table_missing`; add the table and configure the checks you need.
+- Unknown `[tool.sc-lint]` keys are rejected with `config.unknown_table`.
+- External composition roots listed only in `allowed_dependencies` must move
+  to `allowed_dependents`.
+- Consumer profile failures report `profile.steps_failed` with
+  `error.details.failed_steps[]` of `{index, name, exit_code, message}`
+  instead of `{index, step, message}`.
 
 ## [0.8.0] — 2026-10-19
 

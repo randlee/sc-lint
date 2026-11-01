@@ -19,7 +19,7 @@ script:
 
 ```toml
 [dependencies]
-sc-lint-directives = "0.8.2"
+sc-lint-directives = "0.8.3"
 ```
 
 ## Output and CI
