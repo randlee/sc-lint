@@ -46,9 +46,12 @@ cwd = "crates/atm-core"
 
 Here `PYO3_PYTHON` is passed verbatim; the child tool decides how to interpret
 it. `[tool.sc-lint].setup` and `[tool.sc-lint].runner` are not supported keys.
-When `--log-root` is set, each executed profile step writes both output streams
-to `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`. Failed steps also
-show stdout and stderr in the command error.
+When a log root is configured (`--log-root` or the configuration file's
+`logging.root`), each executed profile step writes both output streams
+to `<log-root>/steps/<sanitized-step-name>.log`. ASCII letters, digits, `_` and
+`-` are preserved; other bytes become `_`, and sanitized-name collisions get
+`-2`, `-3` and later suffixes in declaration order. Failed steps also show
+stdout and stderr in the command error.
 
 Instead of rows, `[tool.sc-lint.test]` may be a table of named selectors with
 an optional `default`:

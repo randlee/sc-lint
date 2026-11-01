@@ -27,9 +27,9 @@ changing the meaning of an existing field.
 
 Rust analyzer reports are checked against the schema selected by
 `schema_version` before the CLI normalizes them: [`analyzer-report-v1` for
-`0.1.0`](https://github.com/randlee/sc-lint/blob/integrate/phase-m/crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
+`0.1.0`](https://github.com/randlee/sc-lint/blob/develop/crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
 or [`analyzer-report-v2` for
-`0.2.0`](https://github.com/randlee/sc-lint/blob/integrate/phase-m/crates/sc-lint-schema/schema/analyzer-report-v2.schema.json).
+`0.2.0`](https://github.com/randlee/sc-lint/blob/develop/crates/sc-lint-schema/schema/analyzer-report-v2.schema.json).
 The `validate_analyzer_report` API returns the first schema mismatch as a
 path and problem. The schema crate also validates the stable
 `sc-lint-python-v1` adapter envelope; unknown keys remain allowed so the

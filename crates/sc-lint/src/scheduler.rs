@@ -124,6 +124,10 @@ struct FailedStep {
     name: String,
     exit_code: Option<i32>,
     message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    step_log_destination: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    step_log_error: Option<String>,
 }
 
 /// One `error.details.skipped_steps[]` entry.
@@ -352,6 +356,16 @@ pub(crate) fn aggregate_outcomes(
                 name: step.name().to_string(),
                 exit_code: step_exit_code(&error),
                 message: failure_message(&error),
+                step_log_destination: error
+                    .details
+                    .get("step_log_destination")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                step_log_error: error
+                    .details
+                    .get("step_log_error")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
             }),
             StepOutcome::Skipped => skipped.push(SkippedStep {
                 index: step.index,

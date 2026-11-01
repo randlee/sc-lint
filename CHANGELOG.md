@@ -74,7 +74,12 @@ All notable changes to sc-lint are documented here.
   `{index, name, exit_code, message}` (zero-based `index`) instead of
   `{index, step, message}`. A consumer failure no longer returns the first
   step's own error, and a missing consumer backend now reports
-  `profile.steps_failed` with the spawn error in `message`.
+  `profile.steps_failed` with the spawn error in `message`. Optional
+  `step_log_destination` and `step_log_error` identify the destination and
+  cause when that step's configured log could not be written. A log-write
+  failure makes the step failed whether its child passed or failed; it
+  preserves the child's exit code (null only if there was none) and keeps
+  stdout and stderr in the report.
 
 ### Breaking Changes
 

@@ -22,6 +22,9 @@ mod workflow;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(crate) mod test_support;
+
 pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;

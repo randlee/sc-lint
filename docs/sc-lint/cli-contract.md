@@ -299,7 +299,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
-| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
+| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order; optional step_log_destination and step_log_error when a step log write fails (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
 | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
 Codes are typed constants in their owning module (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`; adapter payload drift in `python_adapter.rs`) and cause text interpolates names.
@@ -367,17 +367,24 @@ Cargo manifest, or analyzer package:
   `after_all` steps last) and fail slow: every step runs, and any failure
   fails the aggregate command with one `profile.steps_failed` error.
 - `profile.steps_failed` (exit 5) carries `details.failed_steps[]`, one
-  `{"index", "name", "exit_code", "message"}` per failed step in declaration
-  order; `index` is the zero-based position in `data.steps[]` (platform-skipped
-  rows included), `exit_code` is `null` when the process did not start or the
-  step panicked, and `message` is the step error and its cause. Under
+  `{index, name, exit_code, message}` per failed step in declaration order;
+  `index` is the zero-based position in `data.steps[]` (platform-skipped rows
+  included), `exit_code` is `null` when the process did not start or the step
+  panicked, and `message` is the step error and its cause. When that step's
+  configured log cannot be written, its entry also has optional
+  `step_log_destination` (the intended log path) and `step_log_error` (the
+  write error). A log-write failure makes the step failed whether its child
+  passed or failed; the entry keeps the child's real `exit_code` (`null` only
+  if it had none), and stdout and stderr remain in the report. Under
   `--fail-fast` it also carries `details.skipped_steps[]`, one
   `{"index", "name", "reason": "fail-fast"}` per step that never started.
 - a missing configured executable is a failed step whose `message` starts
   with `<name> failed to start` and includes the spawn error.
 - when a log root is configured, every executed step writes both output streams
-  to `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`; failed-step
-  errors include stdout and stderr even when both are non-empty.
+  to `<log-root>/steps/<sanitized-step-name>.log`; unsafe bytes become `_`,
+  and sanitized-name collisions receive `-2`, `-3` and later suffixes in
+  declaration order. Failed-step errors include stdout and stderr even when
+  both are non-empty.
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
