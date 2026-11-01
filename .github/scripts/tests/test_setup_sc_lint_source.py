@@ -137,6 +137,8 @@ class SourceSetupTests(unittest.TestCase):
         action = SCRIPT.parents[1] / 'actions/setup-sc-lint/action.yml'
         steps = yaml.safe_load(action.read_text())['runs']['steps']
         for label, shell in (('Unix', 'bash'), ('Windows', sys.executable)):
+            if label == 'Unix' and os.name == 'nt':
+                continue  # POSIX fixture; Windows resolution is exercised below.
             if not shutil.which(shell):
                 continue
             with self.subTest(platform=label), tempfile.TemporaryDirectory() as directory:
@@ -168,11 +170,14 @@ class SourceSetupTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual((root/'env').read_text().strip(), 'SC_LINT_SOURCE_REVISION=')
 
-    def test_real_subprocess_timeout_fails_with_command_context(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(RuntimeError, 'timed out.*sleep') as caught:
-                setup.run([sys.executable, '-c', 'import time; time.sleep(5)'], Path(directory), timeout=0.05)
-            self.assertIsInstance(caught.exception.__cause__, subprocess.TimeoutExpired)
+    def test_subprocess_timeout_fails_with_command_context(self):
+        command = ["controlled-build", "--version"]
+        expired = subprocess.TimeoutExpired(command, setup.PROBE_TIMEOUT_SECONDS)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(setup.subprocess, "run", side_effect=expired) as run:
+            with self.assertRaisesRegex(RuntimeError, "timed out.*controlled-build") as caught:
+                setup.run(command, Path(directory), timeout=setup.PROBE_TIMEOUT_SECONDS)
+            self.assertIs(caught.exception.__cause__, expired)
+            self.assertEqual(run.call_args.kwargs["timeout"], setup.PROBE_TIMEOUT_SECONDS)
         self.assertEqual(setup.BUILD_TIMEOUT_SECONDS, 1800)
         self.assertLess(setup.PROBE_TIMEOUT_SECONDS, setup.SETUP_TIMEOUT_SECONDS)
 

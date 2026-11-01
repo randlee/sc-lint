@@ -1,6 +1,7 @@
 """Unit tests for the repository-neutral publish-kit installer."""
 
 from __future__ import annotations
+import pytest
 
 import importlib.util
 import json
@@ -338,6 +339,7 @@ class InstallValuesTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "must not set both"):
                 INSTALL.load_install_values(path)
 
+    @pytest.mark.usefixtures("posix_shell")
     def test_install_places_executable_release_helpers_at_every_workflow_path(self) -> None:
         """The byte-exact overlay keeps helpers under .github/scripts/.
 

@@ -81,6 +81,7 @@ def test_credential_redirects_and_unknown_checks_fail_closed():
         credentials.probe("crates_io", "synthetic", "https://example.invalid")
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize("kind,exit_code", [("crates_io", 0), ("crates_io", 1), ("unsupported", 1)])
 def test_liveness_workflow_records_every_channel_outcome(tmp_path, kind, exit_code):
     script = tmp_path / ".github/scripts/release_credentials.py"
@@ -101,6 +102,7 @@ def cargo_run(root, env, *args):
     return subprocess.run(["cargo", *args], cwd=root, env=env, text=True, capture_output=True, timeout=30)
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize("broken", [None, "compile", "manifest", "plan"])
 def test_package_workflow_checks_unpublished_and_standalone_dependencies(tmp_path, broken):
     if shutil.which("cargo") is None:

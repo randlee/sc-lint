@@ -1,6 +1,7 @@
 """Package-native unit tests for the vendored GitHub scripts."""
 
 from __future__ import annotations
+import pytest
 
 import importlib.util
 import os
@@ -114,6 +115,7 @@ class RegistryVersionStateTests(unittest.TestCase):
 
 
 class ReleaseScriptTests(unittest.TestCase):
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_has_valid_bash_syntax(self) -> None:
         result = subprocess.run(
             ["bash", "-n", str(SCRIPTS / "release_gate.sh")],
@@ -124,6 +126,7 @@ class ReleaseScriptTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_accepts_main_with_post_cut_develop_drift(self) -> None:
         """A release stays valid when new work lands on develop after the RC cut."""
         with tempfile.TemporaryDirectory() as directory:
@@ -199,6 +202,7 @@ class ReleaseScriptTests(unittest.TestCase):
         self.assertIn("PASS - release gate checks satisfied", result.stdout)
         self.assertEqual(emitted_output, f"release_sha={release_sha}\n")
 
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_rejects_candidate_outside_release_history(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
