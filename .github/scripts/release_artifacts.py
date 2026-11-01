@@ -33,6 +33,7 @@ from release_manifest import (
     _require_project,
     load_channel_contracts,
     load_manifest,
+    release_archive_pattern,
     manifest_python_upload_tool,
     manifest_rust_toolchain,
     manifest_workspace_toml,
@@ -233,10 +234,7 @@ def _channel_renderer_target(manifest: dict, channel_name: str) -> dict | None:
 
 
 def _release_asset_pattern(project: dict, target: dict) -> str:
-    return (
-        rf"^{re.escape(project['archive_prefix'])}_.*_"
-        rf"{re.escape(target['target'])}\.{re.escape(target['archive'])}$"
-    )
+    return release_archive_pattern(project, target)
 
 
 def _release_binaries(manifest: dict) -> list[dict]:

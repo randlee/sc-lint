@@ -74,6 +74,21 @@ def load_manifest(path: Path, *, with_channel_contracts: bool = False) -> dict:
     return manifest
 
 
+def _release_archive_parts(project: dict, target: dict) -> tuple[str, str]:
+    return project["archive_prefix"] + "_", "_" + target["target"] + "." + target["archive"]
+
+
+def release_archive_name(project: dict, target: dict, version: str) -> str:
+    """The filename produced for one manifest release target."""
+    prefix, suffix = _release_archive_parts(project, target)
+    return prefix + version + suffix
+
+
+def release_archive_pattern(project: dict, target: dict, version_pattern: str = ".*") -> str:
+    prefix, suffix = _release_archive_parts(project, target)
+    return "^" + re.escape(prefix) + version_pattern + re.escape(suffix) + "$"
+
+
 def manifest_workspace_toml(manifest: dict) -> str:
     """Return the manifest-declared Cargo workspace manifest path."""
     value = manifest["project"].get("workspace_toml", "Cargo.toml")
