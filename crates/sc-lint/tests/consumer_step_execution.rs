@@ -134,6 +134,40 @@ fn consumer_failed_step_reports_log_write_failure_with_step_output() {
 }
 
 #[test]
+fn consumer_passing_step_reports_log_write_failure_with_step_output() {
+    let fixture = TempDir::new().expect("fixture");
+    write_config(fixture.path(), &[("env-cwd", "", false)]);
+    let logs = fixture.path().join("logs");
+    std::fs::create_dir_all(&logs).expect("log root");
+    std::fs::write(logs.join("steps"), b"block directory creation").expect("blocking file");
+
+    let output = run_lint(fixture.path(), &logs);
+    assert_eq!(
+        output.status.code(),
+        Some(i32::from(sc_lint::consts::EXIT_BACKEND_FAILURE))
+    );
+    let envelope: serde_json::Value =
+        serde_json::from_slice(&output.stderr).expect("step failure error envelope");
+    let failed_steps = envelope["error"]["details"]["failed_steps"]
+        .as_array()
+        .expect("failed steps");
+    assert_eq!(failed_steps.len(), 1);
+    let failed_step = &failed_steps[0];
+    assert_eq!(failed_step["exit_code"], 0);
+    let message = failed_step["message"].as_str().expect("failure message");
+    assert!(message.contains("controlled stdout"), "{message}");
+    assert!(message.contains("controlled stderr"), "{message}");
+    assert!(failed_step["step_log_error"].is_string());
+    let destination = failed_step["step_log_destination"]
+        .as_str()
+        .expect("step log destination");
+    assert!(
+        Path::new(destination).ends_with(Path::new("steps").join("env-cwd.log")),
+        "unexpected step log destination: {destination}"
+    );
+}
+
+#[test]
 fn consumer_log_root_writes_every_step() {
     let fixture = TempDir::new().expect("fixture");
     write_config(

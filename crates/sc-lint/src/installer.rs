@@ -97,6 +97,11 @@ struct ReleaseTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResolvedReleaseVersion(Version);
 
+struct ReleaseUrls<'a> {
+    archive: &'a str,
+    checksums: &'a str,
+}
+
 impl ResolvedReleaseVersion {
     fn for_minimum(minimum: &MinimumVersion) -> Self {
         Self(minimum.as_semver().clone())
@@ -382,7 +387,32 @@ fn install_verified_release(
     archive_url: &str,
     checksums_url: &str,
 ) -> Result<Version, CliError> {
-    fs::create_dir_all(install_dir).map_err(|error| permission_error(install_dir, error))?;
+    install_verified_release_with_file_ops(
+        release_version,
+        minimum_version,
+        target,
+        install_dir,
+        managed_binary,
+        &ReleaseUrls {
+            archive: archive_url,
+            checksums: checksums_url,
+        },
+        &SystemFileOps,
+    )
+}
+
+fn install_verified_release_with_file_ops<F: InstallerFileOps>(
+    release_version: &ResolvedReleaseVersion,
+    minimum_version: &MinimumVersion,
+    target: ReleaseTarget,
+    install_dir: &Path,
+    managed_binary: &Path,
+    release_urls: &ReleaseUrls<'_>,
+    file_ops: &F,
+) -> Result<Version, CliError> {
+    file_ops
+        .create_dir_all(install_dir)
+        .map_err(|error| permission_error(install_dir, error))?;
     let staging = install_dir.join(format!(
         ".sc-lint-stage-{}",
         SystemTime::now()
@@ -396,28 +426,28 @@ fn install_verified_release(
         minimum_version,
         target,
         managed_binary,
-        archive_url,
-        checksums_url,
+        release_urls,
         &staging,
+        file_ops,
     );
     let _ = fs::remove_dir_all(&staging);
     result
 }
 
-fn install_into_staging(
+fn install_into_staging<F: InstallerFileOps>(
     release_version: &ResolvedReleaseVersion,
     minimum_version: &MinimumVersion,
     target: ReleaseTarget,
     managed_binary: &Path,
-    archive_url: &str,
-    checksums_url: &str,
+    release_urls: &ReleaseUrls<'_>,
     staging: &Path,
+    file_ops: &F,
 ) -> Result<Version, CliError> {
     let archive_name = target.archive_name(release_version);
     let checksum_file = staging.join("checksums.txt");
     let archive = staging.join(&archive_name);
-    download(checksums_url, &checksum_file)?;
-    download(archive_url, &archive)?;
+    download(release_urls.checksums, &checksum_file)?;
+    download(release_urls.archive, &archive)?;
     verify_checksum(&archive, &checksum_file, &archive_name)?;
 
     let extract_dir = staging.join("extracted");
@@ -440,7 +470,7 @@ fn install_into_staging(
             json!(extract_dir.display().to_string()),
         ));
     }
-    activate_payload(&payload, managed_binary, minimum_version)
+    activate_payload_with(&payload, managed_binary, minimum_version, file_ops)
 }
 
 #[derive(Debug, Clone)]
@@ -994,58 +1024,71 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
-    #[test]
-    #[serial]
-    fn unwritable_managed_install_dir_is_a_permission_denied_installer_failure() {
-        use std::os::unix::fs::PermissionsExt;
+    struct DenyManagedDirectoryCreation {
+        denied_path: PathBuf,
+    }
 
-        let fixture = TempDir::new().expect("fixture");
-        let config_path = fixture.path().join("sc-lint.toml");
-        write_consumer_config(&config_path, &Version::new(0, 4, 1));
-        let locked = fixture.path().join("locked");
-        fs::create_dir(&locked).expect("locked directory");
-        let install_dir = locked.join("managed");
-        // The release source is a local path holding no release, so a host that
-        // ignores directory permissions fails locally instead of reaching the
-        // network.
-        let release_base: OsString =
-            format!("file://{}", fixture.path().join("no-release").display()).into();
-        let _environment = InstallerEnvironment::set(&[
-            (INSTALL_DIR_ENV, install_dir.as_os_str()),
-            (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
-        ]);
-        fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).expect("read-only parent");
-
-        for command in ["setup", "upgrade"] {
-            let error = execute_command(&config_path, &[command]).expect_err(command);
-            assert_eq!(
-                error.code(),
-                "CLI.SC_LINT_INSTALL_PERMISSION_DENIED",
-                "{command}: {error:?}"
-            );
-            assert_eq!(
-                error.exit_code(),
-                crate::consts::EXIT_BACKEND_FAILURE,
-                "{command}"
-            );
-            assert_eq!(
-                error.details.get("managed_path"),
-                Some(&json!(install_dir.display().to_string())),
-                "{command}"
-            );
-            assert_eq!(
-                error.details.get("io_error_kind"),
-                Some(&json!("PermissionDenied")),
-                "{command}"
-            );
-            assert_installer_failure_is_recoverable(&error, "SC_LINT_INSTALL_DIR");
-            assert!(
-                !install_dir.exists(),
-                "{command} must not create the managed directory"
-            );
+    impl InstallerFileOps for DenyManagedDirectoryCreation {
+        fn remove_file(&self, path: &Path) -> io::Result<()> {
+            fs::remove_file(path)
         }
-        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).expect("restore parent");
+
+        fn rename(&self, source: &Path, destination: &Path) -> io::Result<()> {
+            fs::rename(source, destination)
+        }
+
+        fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+            if path == self.denied_path {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "controlled installer filesystem denial",
+                ));
+            }
+            fs::create_dir_all(path)
+        }
+    }
+
+    #[test]
+    fn installer_file_ops_permission_denied_is_a_recoverable_install_failure() {
+        let fixture = TempDir::new().expect("fixture");
+        let install_dir = fixture.path().join("managed");
+        let managed_binary = install_dir.join(ReleaseTarget::binary_name());
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum version");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("supported test target");
+        let file_ops = DenyManagedDirectoryCreation {
+            denied_path: install_dir.clone(),
+        };
+
+        let error = install_verified_release_with_file_ops(
+            &release_version,
+            &minimum,
+            target,
+            &install_dir,
+            &managed_binary,
+            &ReleaseUrls {
+                archive: "file:///unused/archive",
+                checksums: "file:///unused/checksums",
+            },
+            &file_ops,
+        )
+        .expect_err("injected filesystem denial");
+
+        assert_eq!(error.code(), "CLI.SC_LINT_INSTALL_PERMISSION_DENIED");
+        assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
+        assert_eq!(
+            error.details.get("managed_path"),
+            Some(&json!(install_dir.display().to_string()))
+        );
+        assert_eq!(
+            error.details.get("io_error_kind"),
+            Some(&json!("PermissionDenied"))
+        );
+        assert_installer_failure_is_recoverable(&error, "SC_LINT_INSTALL_DIR");
+        assert!(
+            !install_dir.exists(),
+            "denied directory must not be created"
+        );
     }
 
     /// REQ-CLI-020: every installer failure names a cause, a recovery action,
@@ -1364,13 +1407,14 @@ mod tests {
         write_probe(&candidate, "0.3.0");
         let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
 
-        let error = activate_payload(
+        let error = activate_payload_with(
             &[PayloadEntry {
                 source: candidate,
                 target: target.clone(),
             }],
             &target,
             &minimum,
+            &SystemFileOps,
         )
         .expect_err("old candidate rolls back");
         assert_eq!(error.code(), "CLI.SC_LINT_POST_INSTALL_VERSION_FAILED");
@@ -1423,7 +1467,7 @@ mod tests {
         });
 
         let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
-        let error = activate_payload(&entries, &managed_binary, &minimum)
+        let error = activate_payload_with(&entries, &managed_binary, &minimum, &SystemFileOps)
             .expect_err("candidate below floor must roll back entire bundle");
         assert_eq!(error.code(), "CLI.SC_LINT_POST_INSTALL_VERSION_FAILED");
         assert_eq!(
@@ -1492,7 +1536,7 @@ mod tests {
     #[test]
     fn swapped_real_backend_is_rejected_from_staged_and_installed_bundles() {
         let fixture = TempDir::new().expect("fixture");
-        let built_binaries = build_release_binaries(&fixture.path().join("cargo-target"));
+        let built_binaries = crate::test_support::release_binaries();
         let staged_root = fixture.path().join("staged");
         let staged_bin = staged_root.join("bin");
         let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
@@ -1887,7 +1931,7 @@ mod tests {
         let bin_dir = archive_root.join("bin");
         fs::create_dir_all(&release_dir).expect("release directory");
         fs::create_dir_all(&bin_dir).expect("archive bin directory");
-        let built_binaries = build_release_binaries(&fixture.path().join("cargo-target"));
+        let built_binaries = crate::test_support::release_binaries();
         for name in
             std::iter::once(ReleaseTarget::binary_name()).chain(MANAGED_BACKENDS.iter().copied())
         {
@@ -2121,97 +2165,6 @@ mod tests {
             format!("[tool.sc-lint]\nminimum_version = \"{minimum}\"\n"),
         )
         .expect("consumer config");
-    }
-
-    #[cfg(unix)]
-    fn build_release_binaries(target_dir: &Path) -> std::collections::HashMap<String, PathBuf> {
-        // Build the archive payload into this test's private target directory.
-        // Reusing target/debug lets another test's build state determine which
-        // companion binaries exist when this fixture copies its archive.
-        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let mut build = Command::new("cargo");
-        build
-            .arg("build")
-            .arg("--quiet")
-            .arg("--target-dir")
-            .arg(target_dir)
-            .arg("--message-format=json-render-diagnostics")
-            .args([
-                "-p",
-                "sc-lint",
-                "-p",
-                "sc-lint-boundary",
-                "-p",
-                "sc-lint-portability",
-                "-p",
-                "sc-lint-runtime",
-            ])
-            .current_dir(&workspace_root);
-        build.process_group(0);
-        build.stdout(Stdio::piped()).stderr(Stdio::piped());
-        let mut child = build.spawn().expect("build release backend binaries");
-        let stdout = child.stdout.take().expect("Cargo stdout");
-        let stderr = child.stderr.take().expect("Cargo stderr");
-        let stdout_reader = thread::spawn(move || {
-            let mut output = Vec::new();
-            std::io::Read::read_to_end(&mut std::io::BufReader::new(stdout), &mut output)
-                .map(|_| output)
-        });
-        let stderr_reader = thread::spawn(move || {
-            let mut output = Vec::new();
-            std::io::Read::read_to_end(&mut std::io::BufReader::new(stderr), &mut output)
-                .map(|_| output)
-        });
-        let build_status = wait_for_backend_probe(
-            &mut child,
-            Path::new("cargo build"),
-            "cargo",
-            "release fixture build",
-            Duration::from_secs(300),
-        )
-        .expect("release fixture build completes before its deadline");
-        let stdout = stdout_reader
-            .join()
-            .expect("Cargo stdout reader")
-            .expect("read Cargo stdout");
-        let stderr = stderr_reader
-            .join()
-            .expect("Cargo stderr reader")
-            .expect("read Cargo stderr");
-        assert!(
-            build_status.success(),
-            "release fixture binaries build: {}",
-            String::from_utf8_lossy(&stderr)
-        );
-
-        let mut binaries = std::collections::HashMap::new();
-        for line in String::from_utf8_lossy(&stdout).lines() {
-            let Ok(message) = serde_json::from_str::<Value>(line) else {
-                continue;
-            };
-            if message["reason"] != "compiler-artifact"
-                || !message["target"]["kind"]
-                    .as_array()
-                    .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
-            {
-                continue;
-            }
-            if let (Some(name), Some(executable)) = (
-                message["target"]["name"].as_str(),
-                message["executable"].as_str(),
-            ) {
-                binaries.insert(name.to_owned(), PathBuf::from(executable));
-            }
-        }
-        for name in
-            std::iter::once(ReleaseTarget::binary_name()).chain(MANAGED_BACKENDS.iter().copied())
-        {
-            assert!(
-                binaries.get(name).is_some_and(|path| path.is_file()),
-                "Cargo did not produce binary `{name}` in its isolated target directory"
-            );
-        }
-        binaries
     }
 
     #[cfg(unix)]

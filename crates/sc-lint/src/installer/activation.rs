@@ -6,6 +6,10 @@ pub(super) trait InstallerFileOps {
     fn remove_file(&self, path: &Path) -> io::Result<()>;
     fn rename(&self, source: &Path, destination: &Path) -> io::Result<()>;
 
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+        fs::create_dir_all(path)
+    }
+
     fn remove_path(&self, path: &Path) -> io::Result<()> {
         if path.is_dir() {
             fs::remove_dir_all(path)
@@ -35,14 +39,6 @@ impl InstallerFileOps for SystemFileOps {
     }
 }
 
-pub(super) fn activate_payload(
-    entries: &[PayloadEntry],
-    managed_binary: &Path,
-    minimum: &MinimumVersion,
-) -> Result<Version, CliError> {
-    activate_payload_with(entries, managed_binary, minimum, &SystemFileOps)
-}
-
 pub(super) fn activate_payload_with<F: InstallerFileOps>(
     entries: &[PayloadEntry],
     managed_binary: &Path,
@@ -50,7 +46,7 @@ pub(super) fn activate_payload_with<F: InstallerFileOps>(
     file_ops: &F,
 ) -> Result<Version, CliError> {
     reject_running_managed_binary(managed_binary)?;
-    let backups = prepare_payload_activation(entries, managed_binary)?;
+    let backups = prepare_payload_activation(entries, managed_binary, file_ops)?;
     let changes = activate_payload_entries(entries, &backups, managed_binary, file_ops)?;
     match verify_activated_payload(managed_binary, minimum) {
         Ok(version) => {
@@ -80,9 +76,10 @@ pub(super) fn activate_payload_with<F: InstallerFileOps>(
     }
 }
 
-pub(super) fn prepare_payload_activation(
+pub(super) fn prepare_payload_activation<F: InstallerFileOps>(
     entries: &[PayloadEntry],
     managed_binary: &Path,
+    file_ops: &F,
 ) -> Result<Vec<PathBuf>, CliError> {
     let mut backups = Vec::with_capacity(entries.len());
     for entry in entries {
@@ -92,7 +89,9 @@ pub(super) fn prepare_payload_activation(
                 io::Error::other("target has no parent directory"),
             )
         })?;
-        fs::create_dir_all(parent).map_err(|error| permission_error(parent, error))?;
+        file_ops
+            .create_dir_all(parent)
+            .map_err(|error| permission_error(parent, error))?;
         let file_name = entry
             .target
             .file_name()

@@ -2015,12 +2015,7 @@ fn run_lint_with_real_path_backend(
 
     let launcher_dir = TempDir::new().expect("isolated launcher directory");
     let backend_dir = TempDir::new().expect("isolated backend directory");
-    let test_executable = std::env::current_exe().expect("test executable path");
-    let target_dir = test_executable
-        .parent()
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .expect("target debug directory");
+    let built_binaries = crate::test_support::release_binaries();
     let binary_name = |name: &str| {
         if cfg!(windows) {
             format!("{name}.exe")
@@ -2030,7 +2025,9 @@ fn run_lint_with_real_path_backend(
     };
     let launcher_name = binary_name(crate::consts::SERVICE_NAME);
     fs::copy(
-        target_dir.join(&launcher_name),
+        built_binaries
+            .get(crate::consts::SERVICE_NAME)
+            .expect("shared sc-lint launcher"),
         launcher_dir.path().join(&launcher_name),
     )
     .expect("copy isolated sc-lint launcher");
@@ -2040,8 +2037,11 @@ fn run_lint_with_real_path_backend(
         crate::consts::TOOL_RUNTIME,
     ] {
         let name = binary_name(backend);
-        fs::copy(target_dir.join(&name), backend_dir.path().join(&name))
-            .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
+        fs::copy(
+            built_binaries.get(backend).expect("shared backend binary"),
+            backend_dir.path().join(&name),
+        )
+        .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
     }
     let path = std::env::var_os("PATH").unwrap_or_default();
     let path = std::env::join_paths(

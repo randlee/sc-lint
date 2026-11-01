@@ -337,7 +337,7 @@ impl SystemAdapter for HostSystemAdapter {
                 .map(|error| (crate::step_logs::step_log_path(root, file_name), error))
         });
 
-        if !output.status.success() {
+        if !output.status.success() || log_write_error.is_some() {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
             let cause = format!("stdout:\n{stdout}\nstderr:\n{stderr}");
@@ -358,15 +358,6 @@ impl SystemAdapter for HostSystemAdapter {
             }
             error = error.with_cause(cause);
             return Err(error);
-        }
-
-        if let Some((destination, log_error)) = log_write_error {
-            return Err(CliError::internal(format!(
-                "failed to write output for step `{}`",
-                step.name()
-            ))
-            .with_source(log_error)
-            .with_detail("destination", json!(destination.display().to_string())));
         }
 
         Ok(StepReport::success(step))
