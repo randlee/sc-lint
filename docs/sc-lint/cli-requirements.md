@@ -547,8 +547,8 @@ specialized backend tools and mixed Rust/Python implementations.
   {"name":"clippy-windows-linux","status":"skipped","host":"macos","host_selector":"linux","platform":"windows","target":"x86_64-pc-windows-msvc","reason":"host_mismatch"}
   ```
 
-  `host_selector` is the only new selector-specific report key and appears
-  only on rows declaring `host`; do not rename or repurpose `host` or add an
+  `host_selector` appears only on rows declaring `host`; do not rename or
+  repurpose `host` or add an
   `actual_host` key. Rows excluded by scope are never reported. A
   host-mismatch skip is neither a failure nor a scheduler input: it does not
   fail `--fail-fast`, stop scheduling, block an `after_all` row, or delay its
@@ -558,9 +558,12 @@ specialized backend tools and mixed Rust/Python implementations.
   that pass both filters. Output stays in
   selected declaration/profile order, independent of execution timing.
 
-  Lint-step reports and test-selector listings include both `env_keys` and a
-  separate `env_path_keys` field. The latter contains only the keys from
-  `env_paths`; never report the resolved absolute values.
+  Lint Run and skip rows add `env_path_keys` only when the step declares
+  `env_paths`; lint rows never add `env_keys`. Rows without `env_paths` keep
+  their existing report shape. `env_path_keys` contains only the configured
+  key names, never resolved absolute values. Test-selector listings retain
+  `env_keys` and add a separate `env_path_keys` containing only names from
+  `env_paths`, never the resolved values.
 
   **Bare-run default.** Optional `default_lint_profile = "<name>"` at
   `[tool.sc-lint]` applies only to consumer lint. It is a sibling of
@@ -740,8 +743,11 @@ specialized backend tools and mixed Rust/Python implementations.
      `\x` and drive-relative `C:x` join to the root. Preserve separators and `..`
      verbatim when joining, do not reject nonexistent paths, and retain a
      symlink path without resolving its target.
-  9. Verify lint reports and test-selector listings carry `env_keys` and a
-     separate `env_path_keys` containing only names, never resolved values.
+  9. Verify lint Run and skip rows add `env_path_keys` only when the step
+     declares `env_paths`, never add `env_keys`, and keep their existing shape
+     otherwise. Verify test-selector listings retain `env_keys` and add a
+     separate `env_path_keys`. Both fields contain only configured key names;
+     resolved absolute values never appear in reports.
 
   **Compatibility.** Existing configurations without these keys are
   unchanged. Before this change, `host` and `env_paths` fail as unknown
