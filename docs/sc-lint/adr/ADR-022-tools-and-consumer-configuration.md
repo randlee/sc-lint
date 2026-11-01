@@ -109,60 +109,54 @@ consumer friction arises.
 
 This amendment is a proposal only. The ADR remains Accepted at its existing
 scope; the following changes are not adopted until Rand accepts them in his
-own words.
+own words. The proposed requirement and full worked example are in
+[REQ-CLI-028](../cli-requirements.md#req-cli-028--proposed-pending-rand-acceptance).
 
-1. **Host-selected lint rows.** Add optional `host = "linux" | "macos" |
-   "windows"` to consumer lint rows. It identifies the OS running the
-   command, independently of `platform`, which continues to identify the
-   target OS. `target` must still name a triple for that `platform`. The
-   command's `env` is literal and belongs to that host-specific row; sc-lint
-   does not interpolate values or interpret virtual-environment paths.
-2. **Selection and ordering.** `host`, named profile membership, and platform
-   scope compose as filters. A declared host must match the actual host even
-   for a direct step selector or `--platform-scope all`. `all` means every
-   declared row, still subject to those filters. A selected row rejected by
-   its host selector is a non-failing `host_mismatch` skip with declared and
-   actual host, platform and target in plan/report output. `after_all` waits
-   for all other host-eligible and platform-selected execution rows; filtered
-   rows do not hold its barrier.
-3. **Validation and compatibility.** Invalid host values fail configuration
-   with stable detail code `PROFILE.INVALID_HOST` and identify the accepted
-   values. Existing rows without `host` keep their current behavior and
-   output. `default_lint_profile`, when present, must name a declared lint profile;
-   invalid or reserved values fail configuration with
-   `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE` and identify available names.
-4. **Bare-run profile default.** An optional `default_lint_profile = "<name>"` at
-   `[tool.sc-lint]` selects the named profile for a bare lint invocation. If
-   absent, complete-profile behavior is unchanged. Explicit named profiles
-   still select their declared membership, and explicit `all` always selects
-   all declared rows, subject to the host and platform filters. Per-step
-   `default = false` is rejected as the recommendation because it adds a
-   second inclusion rule to each row and complicates the meaning of `all`;
-   the consumer-level profile default keeps row selection in named profiles.
-   The proposed key is `default_lint_profile`, a sibling of `lint_profiles`
-   under `[tool.sc-lint]`. Its name scopes the default to lint and leaves room
-   for a future test-profile default. Since `[[tool.sc-lint.lint]]` already
-   occupies the `lint` name as an array-of-tables, TOML cannot also define
-   `[tool.sc-lint.lint]` as a table.
-5. **atm-core example.** Use one native clippy row per host, each tagged with
-   its host and target platform. Use host-specific Windows-target clippy rows
-   with `platform = "windows"` and
-   `target = "x86_64-pc-windows-msvc"`: Linux and macOS rows use cargo xwin,
-   and the Windows row uses native cargo. Set `PYO3_PYTHON` to
-   `.bootstrap-venv/bin/python` on Unix and
-   `.bootstrap-venv/Scripts/python.exe` on Windows. The `ci` profile contains
-   the Windows-target rows; the consumer's `default_lint_profile = "local"` keeps
-   them out of developer bare `just lint`, while `just lint ci all` selects
-   them on all CI operating systems.
+1. **Decision: add host eligibility to consumer lint rows.** Add optional
+   `host = "linux" | "macos" | "windows"`, independently of target `platform`
+   and `target`. Selection expands profile membership, applies platform scope,
+   applies the host eligibility gate, then chooses native cargo/cargo xwin
+   from the actual host. A host mismatch produces non-failing
+   `SkipReason::HostMismatch` / `host_mismatch`; it takes precedence over
+   cross-command and cross-target skips. Scope-filtered rows are omitted
+   silently. Rows without `host` keep the existing report schema; only
+   host-tagged rows gain configured `host` and `actual_host` fields. The
+   selector does not choose cargo xwin; the actual host continues to do so.
+2. **Decision: add a lint-only bare-run profile default.** Add optional
+   `default_lint_profile = "<name>"` under `[tool.sc-lint]`. It selects a
+   declared named lint profile only when no direct `--profile` or Just
+   positional selector was provided; a platform scope without a selector
+   still uses the configured default. It does not affect `sc-lint test`.
+   Explicit `all` remains all rows and still composes with scope and host
+   filters. The name does not match a step or an empty/unknown profile; empty
+   membership retains `PROFILE.EMPTY_MEMBERS`, and the existing profile-name
+   rule already rejects a declared profile called `all` with
+   `PROFILE.AMBIGUOUS_NAME`. Proposed error variants are
+   `ProfilePlanDetailCode::InvalidHost` and
+   `ProfilePlanDetailCode::UnknownDefaultLintProfile`. Implementation must add
+   the config field to `ScLintConfigFile` and allow the key in `SC_LINT_KEYS`.
+3. **Rationale for #784.** Default `host` scope already silently removes
+   `platform = "windows"` xwin rows on Linux and macOS. It does not remove a
+   Windows-host Windows-platform CI row from a Windows developer's bare run.
+   `default_lint_profile` allows CI to select that row while bare lint selects
+   the local profile. The example keeps native Windows clippy in `local` and
+   uses a distinct CI-only explicit-target `--all-targets` row, so the latter
+   adds target-wide CI coverage rather than duplicating default-target clippy.
 
-Alternatives considered for host-specific interpreter values:
+Alternatives considered:
 
-- `env_by_host`: rejected because it adds a nested host-branching language
-  instead of keeping each command and literal environment together in one
-  selectable row.
-- Venv placeholder: rejected because it makes sc-lint understand a
+- `env_by_host`: rejected because it adds host branching inside environment
+  configuration instead of keeping each command and its literal environment
+  together in a selectable row.
+- Venv placeholder: rejected because it makes sc-lint interpret a
   consumer-specific filesystem convention.
-- Unix alias: rejected because Linux and macOS remain distinct host values
-  with distinct environment paths and command support.
+- Unix alias: rejected because Linux and macOS are distinct host values with
+  different interpreter paths and execution support.
+- Per-step `default = false`: rejected because it adds a second inclusion
+  rule to each row and complicates the meaning of explicit `all`; the
+  consumer-level named profile default keeps inclusion in profile membership.
 
-The detailed proposed contract is [REQ-CLI-028](../cli-requirements.md#req-cli-028--proposed-pending-rand-acceptance).
+The default key is `default_lint_profile`, a sibling of `lint_profiles` under
+`[tool.sc-lint]`. TOML cannot define both `[[tool.sc-lint.lint]]` and
+`[tool.sc-lint.lint]`; the name also scopes the setting to lint and leaves
+room for a future test-profile default.

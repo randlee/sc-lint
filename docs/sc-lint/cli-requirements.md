@@ -454,74 +454,192 @@ specialized backend tools and mixed Rust/Python implementations.
   select the operating-system host on which that row's command and literal
   `env` values apply. `host` is independent of `platform`: `platform` continues
   to identify the target OS and, when `target` is present, must match that
-  target triple. A row without `host` keeps its existing host-selection
-  behavior. A row with `host` is eligible only on that host, even when an
-  explicit step selector or `--platform-scope all` selects its name. A
-  host-mismatched selected row is a non-failing skip, reported with its
-  declared host, actual host, platform, target and stable reason
-  `host_mismatch`. Invalid or non-string host values fail configuration with
-  `PROFILE.INVALID_HOST`, naming the row and field and listing the accepted
-  values.
+  target triple. A row without `host` keeps its existing behavior. A host
+  mismatch is an eligibility skip only; it does not choose the command path.
+  Once a row passes the host filter, `decide` selects native cargo or cargo
+  xwin from the actual host, platform and target.
 
-  `host` and `platform` filters compose conjunctively: the host filter chooses
-  where the command and its environment run; the platform scope chooses rows
-  by their target OS. `--platform-scope all` bypasses platform-scope filtering
-  only; it never overrides a declared host. Named profiles preserve their
-  declared order and membership, and `all` includes every declared row, but
-  both remain subject to host selection. A direct row selector also cannot
-  bypass `host`. The planner reports the row's host selector and actual host
-  for every planned or skipped row. `after_all` is a barrier among the
-  host-eligible, platform-selected execution rows: it starts after all other
-  such rows finish; rows excluded by the host or platform filters do not hold
-  the barrier. Existing rows without `host` preserve their current selection,
-  skip, and report behavior.
+  Selection order is: (1) expand the selected step/profile membership, (2)
+  apply the platform-scope filter, (3) apply the optional host filter, and (4)
+  call `decide` for remaining rows. The scope filter matches existing
+  `scope_selects`: default `host` includes untagged rows and rows whose
+  `platform` matches the actual host; `all` includes every platform row; a
+  named scope includes untagged rows and rows tagged for either the actual host
+  or named platform. Scope-filtered rows are omitted silently and never appear
+  in the plan or report. Therefore `platform = "windows"` rows are dropped
+  silently by default host scope on Linux and macOS; the Windows-target xwin
+  rows require `--platform-scope all` (or a scope that selects Windows).
+  Host selection occurs only after scope: `host_mismatch` can appear only for
+  a selected row that survives the scope filter and declares a host different
+  from the actual host. The host check runs before `decide`, replacing either
+  `unsupported_cross_command` or `unsupported_cross_target` when the host does
+  not match. Add `SkipReason::HostMismatch` with stable JSON reason
+  `host_mismatch`.
 
-  The consumer may also set optional `default_lint_profile = "<name>"` directly in
-  `[tool.sc-lint]`. With the key absent, a bare lint invocation retains today's
-  complete-profile behavior. When present, a lint invocation without an
-  explicit selector uses that named profile. The name must resolve to a
-  declared named lint profile; an empty, unknown, or reserved `all` value is a
-  configuration error (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`) that identifies
-  `default_lint_profile` and the available names. Explicit named-profile selection
-  remains unchanged. Explicit `all` always requests every declared row and is
-  still subject to host and platform filtering. Thus a CI-only row can be
-  excluded from bare `just lint` by setting the default to a local profile,
-  while `just lint ci all` explicitly selects the CI profile and all platform
-  rows. The `default_lint_profile` key is at `[tool.sc-lint]`: TOML cannot define
-  `[tool.sc-lint.lint]` as a table because `[[tool.sc-lint.lint]]` is already
-  the lint-row array-of-tables.
+  Host is needed to split rows that share a `platform`/`target` across
+  different execution hosts, such as Windows-target clippy on Linux versus
+  macOS. For a row without `target`, `platform` already fixes its eligible
+  host; `host` is permitted but redundant. A Windows-target row tagged only
+  `platform = "windows"` is already omitted by default host scope on Linux and
+  macOS, while a row with `host = "linux"` or `"macos"` allows one shared
+  Windows target to use a different literal environment on each host when
+  scope all selects it. Scope host does not exclude a Windows-target row on a
+  Windows developer host. `default_lint_profile` adds the ability to omit a
+  CI-only Windows-host row from bare developer lint while the CI profile still
+  explicitly selects it; it does not change the Unix host-scope filtering of
+  the Linux/macOS xwin rows.
 
-  **Worked example (atm-core).** Declare native clippy rows for Linux, macOS
-  and Windows with matching `host` and `platform`. Each row uses
-  `.bootstrap-venv/bin/python` for `PYO3_PYTHON` on Linux/macOS and
-  `.bootstrap-venv/Scripts/python.exe` on Windows. Declare Windows-target
-  clippy rows for all three hosts with `platform = "windows"` and
-  `target = "x86_64-pc-windows-msvc"`; their host-specific environments use
-  the same Unix-versus-Windows interpreter paths. On Linux and macOS, the
-  Windows-target rows use `cargo xwin`; on Windows they use native cargo.
-  Include those rows in the explicit `ci` named profile but not the `local`
-  default profile. `just lint` therefore omits them on every developer host;
-  `just lint ci all` includes them, selects the matching host row, and runs a
-  Windows-target clippy check on every CI OS.
+  A host-mismatched row is reported as a non-failing skipped `data.steps[]`
+  row. For rows declaring `host`, `host` in the plan/report is the configured
+  host selector and `actual_host` is the detected execution host; a
+  `host_mismatch` row also carries `platform`, `target`, and `reason`:
 
-  | Row | `host` | `platform` / `target` | Command path | `PYO3_PYTHON` | Profile |
-  | --- | --- | --- | --- | --- | --- |
-  | native Linux | `linux` | `linux` / none | native cargo | `.bootstrap-venv/bin/python` | `local`, `ci` |
-  | native macOS | `macos` | `macos` / none | native cargo | `.bootstrap-venv/bin/python` | `local`, `ci` |
-  | native Windows | `windows` | `windows` / none | native cargo | `.bootstrap-venv/Scripts/python.exe` | `local`, `ci` |
-  | Windows target on Linux | `linux` | `windows` / `x86_64-pc-windows-msvc` | cargo xwin | `.bootstrap-venv/bin/python` | `ci` |
-  | Windows target on macOS | `macos` | `windows` / `x86_64-pc-windows-msvc` | cargo xwin | `.bootstrap-venv/bin/python` | `ci` |
-  | Windows target on Windows | `windows` | `windows` / `x86_64-pc-windows-msvc` | native cargo | `.bootstrap-venv/Scripts/python.exe` | `ci` |
+  ```json
+  {"name":"clippy-windows-linux","status":"skipped","host":"linux","actual_host":"macos","platform":"windows","target":"x86_64-pc-windows-msvc","reason":"host_mismatch"}
+  ```
 
-  Alternatives considered: `env_by_host` embeds host branching in environment
-  configuration instead of composing a row's environment with its execution
-  host; a venv placeholder makes sc-lint interpret consumer-specific
-  filesystem conventions; a Unix alias conflates Linux and macOS despite
-  distinct host identities and interpreter paths. For #784, per-step
-  `default = false` adds a second inclusion rule to every row and makes “all”
-  less direct; the consumer-level `default_lint_profile` keeps rows declarative
-  and gives bare invocation one named default while explicit `all` stays
-  complete.
+  These selector-specific `host` and `actual_host` fields are added only to
+  rows that declare `host`. Rows without `host` keep their existing report
+  shape, including the existing actual-host `host` field on current cross
+  skips. Rows excluded by scope are never reported. A host-mismatch skip is
+  neither a failure nor a scheduler input: it does not fail `--fail-fast`,
+  stop scheduling, block an `after_all` row, or delay its barrier. As today,
+  scope-filtered rows are omitted from the returned plan and report before
+  execution scheduling; the `after_all` barrier covers only runnable rows
+  that pass both filters. Output stays in
+  selected declaration/profile order, independent of execution timing.
+
+  **Bare-run default.** Optional `default_lint_profile = "<name>"` at
+  `[tool.sc-lint]` applies only to consumer lint. A direct `sc-lint lint ci
+  --consumer` invocation's `ci` is the required lint target; `--profile NAME`
+  is its explicit consumer selector. In the Just/bootstrap interface,
+  `just lint [selector [scope]]` uses the first positional argument as selector
+  and the second as scope: `just lint ci all` means selector `ci`, scope `all`.
+  If neither explicit selector form is supplied, the named default profile is
+  selected. Direct `--platform-scope all` without `--profile` still selects
+  `default_lint_profile` and applies that scope. In Just, the scope occupies
+  the second positional slot and therefore requires a first-slot selector;
+  `just lint ci all` supplies both. `--profile all` and Just's positional
+  `all` explicitly select every declared lint row; the scope and host filters
+  still apply. The Just recipe is documented in
+  [just-setup.md](../../docs-bundle/just-setup.md#select-lint-steps-and-run-managed-commands).
+
+  The default value must resolve by exact name in `[tool.sc-lint.lint_profiles]`;
+  lint step names are not profiles, so a default naming a step fails with
+  `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`. An empty or unknown default fails
+  with the same code and reports available lint profile names. The reserved
+  selector `all` is not a named profile and does not get a separate special
+  error; a profile declaration named `all` is already rejected with the
+  existing `PROFILE.AMBIGUOUS_NAME`. A declared but empty profile continues to
+  fail with the existing `PROFILE.EMPTY_MEMBERS`. Add proposed
+  `ProfilePlanDetailCode::InvalidHost` (`PROFILE.INVALID_HOST`) and
+  `ProfilePlanDetailCode::UnknownDefaultLintProfile`
+  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). Invalid/non-string host values
+  identify the row, field and accepted values. The config key also needs to be
+  admitted in `SC_LINT_KEYS` and represented in `ScLintConfigFile` when
+  implemented. The default does not affect `sc-lint test`.
+
+  **Worked example (atm-core).** Use this consumer configuration. It uses a
+  unique name for every row. The Windows-host Windows-target row is a distinct
+  CI-only `--all-targets --target` check; the native Windows row remains a
+  separate default-target check for local development.
+  `just lint ci all` is shorthand for selecting profile `ci` with scope `all`;
+  the direct equivalent is shown after the TOML.
+
+  ```toml
+  [tool.sc-lint]
+  default_lint_profile = "local"
+
+  [tool.sc-lint.lint_profiles]
+  local = ["atm-core-clippy-linux", "atm-core-clippy-macos", "atm-core-clippy-native-windows"]
+  ci = ["atm-core-clippy-linux", "atm-core-clippy-macos", "atm-core-clippy-native-windows", "atm-core-clippy-windows-linux", "atm-core-clippy-windows-macos", "atm-core-clippy-windows"]
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-linux"
+  command = ["cargo", "clippy"]
+  platform = "linux"
+  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-macos"
+  command = ["cargo", "clippy"]
+  platform = "macos"
+  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-native-windows"
+  command = ["cargo", "clippy"]
+  platform = "windows"
+  env = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows-linux"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "linux"
+  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows-macos"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "macos"
+  env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "windows"
+  env = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+  ```
+
+  `sc-lint lint ci --consumer --profile ci --platform-scope all` runs the two
+  Unix-host target rows through cargo xwin and the Windows-host row through
+  native cargo. The host filter selects only rows matching the runner. The
+  Windows-host row is CI-only, so `default_lint_profile = "local"` excludes it
+  from a Windows developer's bare `just lint`; on Linux/macOS, the default
+  scope already silently omits the `platform = "windows"` xwin rows. The
+  Windows-target check therefore runs in CI on all three operating systems and
+  not in a developer's bare lint invocation.
+
+  **Acceptance tests (deterministic).** Use injected host/platform values and
+  controlled planner/scheduler inputs; do not rely on sleeps, race timing or
+  event-loop ordering:
+
+  1. Verify filter order and reporting: default host scope on Linux/macOS omits
+     Windows-platform rows entirely; scope all admits them to host filtering;
+     mismatched declared hosts yield `host_mismatch`, never either cross skip;
+     matching Linux/macOS hosts choose xwin from actual host; existing untagged
+     cross skips retain their current reasons and report shape.
+  2. Verify host-tagged plan and JSON rows carry configured `host` and
+     `actual_host`, while untagged rows keep their current schema. A selected
+     step outside scope has no report row.
+  3. Verify host-mismatch skips remain non-failing and non-blocking: an
+     `after_all` runnable row is scheduled after all runnable rows, and a
+     host-mismatch skip neither blocks it nor trips `--fail-fast`.
+  4. Verify default selection for `sc-lint lint ci --consumer` without
+     `--profile` and bare `just lint`, explicit `--profile` and Just positional
+     selectors, and direct `--platform-scope all` without `--profile`. Verify
+     it does not affect `sc-lint test`.
+  5. Verify empty/unknown default values and a default naming a step produce
+     `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`; an empty named profile continues
+     to produce `PROFILE.EMPTY_MEMBERS`, and declaring profile `all` continues
+     to produce `PROFILE.AMBIGUOUS_NAME`.
+  6. Verify old configs without either new key remain unchanged; old binaries
+     reject `host` as an unknown lint-row field and reject
+     `default_lint_profile` as an unknown `[tool.sc-lint]` key.
+
+  **Compatibility.** Existing configurations without these keys are
+  unchanged. Before this change, `host` fails as an unknown lint-row field and
+  `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting a
+  non-local `default_lint_profile` changes that consumer's bare lint run to the
+  named profile; explicit selectors are unaffected. Both keys require
+  sc-lint 0.8.4 or newer, once accepted and implemented; older versions reject
+  them during configuration validation.
 
   (Source: #822 and #784, Phase 0.8.4. Proposed amendment to [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md); status remains Pending until Rand accepts in his own words.)
 
