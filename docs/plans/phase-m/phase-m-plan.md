@@ -13,7 +13,7 @@ relationships; the issue closure checks live on the closure beads.
 | [ADR-020 amendment 2026-10-31](../../sc-lint/adr/ADR-020-phase-l-atm-core-findings.md) | Accepted (Rand 2026-10-31) | m-2 implements it |
 | ADR-021 | Withdrawn | none |
 | REQ-PRODUCT-004AA, REQ-SCB-019, REQ-CLI-021 | Accepted | existing contracts remain effective |
-| [REQ-CLI-027](../../sc-lint/cli-requirements.md#req-cli-027) | Pending Rand acceptance (Phase M m-3, #195) | m-3 delivered both failed-step streams and per-step logs |
+| [REQ-CLI-027](../../sc-lint/cli-requirements.md#req-cli-027) | Accepted — Rand 2026-10-31 ("approve"; Phase M m-3, #195) | m-3 delivered both failed-step streams and per-step logs |
 | [v3 anchors](v3/anchors.json) | Eight kept locked anchors | sealed planning questions unchanged |
 
 ## Sprints

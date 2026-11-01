@@ -440,20 +440,13 @@ specialized backend tools and mixed Rust/Python implementations.
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 - `REQ-CLI-027`
-  Consumer profile failures show both child stdout and stderr, including when
-  both streams are non-empty. When a log root is configured, every executed
-  step writes both raw streams to
-  `<log-root>/steps/<sanitized-step-name>.log`, including passing steps. The
-  sanitizer preserves ASCII letters, digits, `_` and `-` and replaces every
-  other byte with `_`; an empty sanitized name becomes `step`. When sanitized
-  names collide, suffixes `-2`, `-3` and so on are assigned in declaration
-  order, with unique filenames. Each run overwrites the prior file for that
-  step. With no configured log root, no per-step log files or `steps/`
-  directory are created; failed-step stdout and stderr remain visible in the
-  command error. This does not change the logger root or step scheduling
-  semantics.
-  (Source: #195, Phase M m-3; Status: Pending Rand acceptance; ADR-022
-  decisions 3 and 6 provide related configuration context.)
+  Consumer profile failures show both child stdout and stderr. When a log
+  root is configured, every executed step writes its raw stdout and stderr to
+  its own file under `<log-root>/steps/`, named from the step name (made
+  filesystem-safe and unique), overwritten each run.
+  (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31
+  ("approve"); ADR-022 decisions 3 and 6 provide related configuration
+  context.)
 
 ## Contract References
 
