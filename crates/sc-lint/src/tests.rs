@@ -121,6 +121,14 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
         ("test", Some("layer")),
         ("upgrade", None),
     ] {
+        if recipe == "lint" {
+            assert!(canonical.contains("lint selector='' *scope:"));
+            assert!(
+                canonical
+                    .contains("bootstrap.py lint --config sc-lint.toml \"{{selector}}\" {{scope}}")
+            );
+            continue;
+        }
         let expected = match selector {
             Some(selector) => format!(
                 "{recipe} *{selector}:\n    {{{{python}}}} .sc-lint/bootstrap.py {recipe} --config sc-lint.toml {{{{{selector}}}}}"
@@ -4650,7 +4658,7 @@ fn test_profiles_exact_json_toml_roundtrip() {
 }
 
 #[test]
-fn test_installer_shape_only_rust_semantic_rejection() {
+fn rust_loader_rejects_semantic_invalid_profile_fixtures() {
     let dir = profile_fixture("semantic-invalid");
     let expected: Value =
         serde_json::from_str(&fs::read_to_string(dir.join("expected.json")).expect("expected"))
@@ -4658,11 +4666,12 @@ fn test_installer_shape_only_rust_semantic_rejection() {
     let cases = expected.as_object().expect("expected cases");
     assert_eq!(cases.len(), 6);
     for (case, detail_code) in cases {
-        // The installer fragment is shape-valid JSON; only the Rust loader rejects it.
+        // The Rust fixture pins loader semantics. The adoption schema may reject
+        // some values earlier, such as bad-platform, without replacing this check.
         let json: Value = serde_json::from_str(
             &fs::read_to_string(dir.join(format!("{case}.json"))).expect("case json"),
         )
-        .expect("shape-valid case json");
+        .expect("case json");
         assert!(json["profiles"].is_object(), "{case}");
         let toml_text = fs::read_to_string(dir.join(format!("{case}.toml"))).expect("case toml");
         let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&toml_text));
@@ -6335,3 +6344,5 @@ fn every_command_id() -> Vec<crate::command::CommandId> {
     }
     ids
 }
+
+mod host_rows;

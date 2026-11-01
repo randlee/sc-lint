@@ -28,8 +28,16 @@ use crate::workflow::StepPlan;
 
 const TEST_PROFILE: &str = "test";
 const TABLE_KEYS: [&str; 2] = ["default", "selectors"];
-const SELECTOR_KEYS: [&str; 6] = ["command", "group", "env", "cwd", "platforms", "after_all"];
-const GROUP_FORBIDDEN_KEYS: [&str; 3] = ["env", "cwd", "platforms"];
+const SELECTOR_KEYS: [&str; 7] = [
+    "command",
+    "group",
+    "env",
+    "env_paths",
+    "cwd",
+    "platforms",
+    "after_all",
+];
+const GROUP_FORBIDDEN_KEYS: [&str; 4] = ["env", "env_paths", "cwd", "platforms"];
 
 /// A non-blank selector name.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -61,6 +69,7 @@ pub(crate) struct TestSelector {
     name: SelectorName,
     body: SelectorBody,
     env: BTreeMap<String, String>,
+    env_path_keys: Vec<String>,
     cwd: Option<PathBuf>,
     platforms: Vec<Platform>,
     after_all: bool,
@@ -126,7 +135,8 @@ impl TestSelector {
             },
             "platforms": self.platform_names(),
             "cwd": self.cwd.as_ref().map(|cwd| cwd.display().to_string()),
-            "env_keys": self.env.keys().collect::<Vec<_>>(),
+            "env_keys": self.env.keys().filter(|key| !self.env_path_keys.contains(key)).collect::<Vec<_>>(),
+            "env_path_keys": self.env_path_keys,
             "after_all": self.after_all,
         });
         let (key, value) = match &self.body {
@@ -204,6 +214,7 @@ impl TestSelectors {
                 name: SelectorName(step.name().to_string()),
                 body: SelectorBody::Command(step.command().to_vec()),
                 env: BTreeMap::new(),
+                env_path_keys: Vec::new(),
                 cwd: None,
                 platforms: Vec::new(),
                 after_all: step.after_all(),
@@ -544,8 +555,9 @@ fn parse_selector(
         }
     };
     let subject = format!("selector `{name}`");
-    let env = crate::step_exec::parse_env(fields.get("env"))
-        .map_err(|error| malformed(error.message(&subject)))?;
+    let (env, env_path_keys) =
+        crate::step_paths::execution_env(fields.get("env"), fields.get("env_paths"), source)
+            .map_err(|error| malformed(error.message(&subject)))?;
     let cwd = crate::step_exec::parse_cwd(fields.get("cwd"))
         .map_err(|error| malformed(error.message(&subject)))?;
     let platforms = parse_platforms(name, fields.get("platforms"), malformed)?;
@@ -554,6 +566,7 @@ fn parse_selector(
         name: selector_name,
         body,
         env,
+        env_path_keys: env_path_keys.unwrap_or_default(),
         cwd,
         platforms,
         after_all,
@@ -610,7 +623,7 @@ fn parse_group(
         .find(|key| fields.contains_key(**key))
     {
         return Err(malformed(format!(
-            "group selector `{name}` declares `{key}`; only command selectors accept env, cwd and platforms"
+            "group selector `{name}` declares `{key}`; only command selectors accept env, env_paths, cwd and platforms"
         )));
     }
     members

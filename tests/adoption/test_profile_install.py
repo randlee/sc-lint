@@ -1,8 +1,9 @@
 """Platform-aware lint profiles through the adoption installer (ADR-017 change 4).
 
-The installer checks JSON shape only and renders the accepted values verbatim;
-the sc-lint binary owns every semantic rule (members, platform, target, command
-shape). These tests pin both halves of that contract.
+The installer checks the published schema, including field value constraints,
+and renders accepted values verbatim. The sc-lint binary owns remaining
+semantic rules such as profile membership and cross-target command support.
+These tests pin both halves of that contract.
 """
 from __future__ import annotations
 
@@ -81,9 +82,12 @@ def test_human_output_contract_keeps_consumer_and_test_step_statuses() -> None:
     assert "`<command>: <status> (<n> steps)`" in contract
 
 
-@pytest.mark.parametrize("case", sorted(json.loads((SEMANTIC_INVALID / "expected.json").read_text())))
-def test_installer_shape_only_rust_semantic_rejection(case: str) -> None:
-    """Semantically invalid but shape-valid input is accepted and rendered verbatim.
+@pytest.mark.parametrize(
+    "case",
+    sorted(set(json.loads((SEMANTIC_INVALID / "expected.json").read_text())) - {"bad-platform"}),
+)
+def test_installer_defers_remaining_rust_semantic_rejections(case: str) -> None:
+    """Semantics outside the installer schema are accepted for Rust validation.
 
     Rejection belongs to the Rust loader, which the sc-lint crate tests pin to
     the same fixtures and the PROFILE.* detail code in expected.json.
@@ -95,6 +99,15 @@ def test_installer_shape_only_rust_semantic_rejection(case: str) -> None:
     config = rendered_config(consumer)
     assert config["lint"] == expected["lint"], case
     assert config.get("lint_profiles") == expected.get("lint_profiles"), case
+
+
+def test_installer_rejects_unsupported_platform_enum() -> None:
+    """The installer schema rejects platform values outside the Rust enum."""
+    fragment = json.loads((SEMANTIC_INVALID / "bad-platform.json").read_text())
+    consumer, result = install_profiles(fragment["profiles"], fragment.get("lint_profiles"))
+    assert result.returncode != 0
+    assert "profiles.mac.platform must be one of ['linux', 'macos', 'windows']" in result.stderr
+    assert not (consumer / "sc-lint.toml").exists(), "a rejected input writes nothing"
 
 
 @pytest.mark.parametrize(
