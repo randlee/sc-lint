@@ -30,9 +30,14 @@ explicit without defining duplicate requirements:
   parsing, configuration, output, and exit-code ownership.
 - `REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA` define machine-mode and
   envelope stability.
-- `REQ-CLI-001` through `REQ-CLI-025` and `REQ-CLI-027` define
+- `REQ-CLI-001` through `REQ-CLI-025` and `REQ-CLI-027` define accepted
   command-specific CLI behavior. `REQ-CLI-026` is a retired historical id and
   is not reused.
+- `REQ-CLI-028` is Accepted (2026-11-01) and defines host-selected lint rows,
+  `env_paths`, and default lint-profile selection. It was delivered in 0.8.4
+  by the implementation layer stacked above PR #826. Acceptance receipts:
+  Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+  team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
 - `REQ-LOG-001` through `REQ-LOG-009` define the logging contract in
   [logging.md](./logging.md).
 

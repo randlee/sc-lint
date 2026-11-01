@@ -12,6 +12,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
 - [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
+- [docs/sc-lint/adr/ADR-022-tools-and-consumer-configuration.md](./sc-lint/adr/ADR-022-tools-and-consumer-configuration.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -532,6 +533,14 @@ The product should support both:
   The consumer repository owns `just test`; sc-lint provides a recommended
   `test` recipe, which the installer adds only when the consumer has none.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
+
+  Accepted CLI amendment (2026-11-01):
+  [REQ-CLI-028](./sc-lint/cli-requirements.md#req-cli-028--accepted-2026-11-01)
+  defines host-selected lint rows, config-root-relative `env_paths`, and
+  `default_lint_profile`. It was delivered in 0.8.4 by the implementation
+  layer stacked above PR #826. Acceptance receipts:
+  Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+  team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
 
   Supersession (Phase G, ADR-015 Decision 1–2 and 4): the consumer-facing
   installation mechanism is the adoption kit (`packages/sc-lint-adoption`

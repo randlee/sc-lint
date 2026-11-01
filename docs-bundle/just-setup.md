@@ -32,8 +32,8 @@ default: lint
 setup:
     {{python}} .sc-lint/bootstrap.py setup --config sc-lint.toml
 
-lint *profile:
-    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{profile}}
+lint selector='' *scope:
+    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml "{{selector}}" {{scope}}
 
 test *layer:
     {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
@@ -49,8 +49,9 @@ Every platform runs the same Python bootstrap; Python 3.11 or newer is required.
 `just lint` accepts a step name, named profile, or `all` as its first
 argument. An optional second argument selects platform scope. For example,
 `just lint ci windows` selects the `ci` profile's Windows steps. The supported
-scopes are `host` (the default), `all`, `linux`, `macos`, and `windows`; a scope
-needs a selector before it. The equivalent direct helper form is:
+scopes are `host` (the default), `all`, `linux`, `macos`, and `windows`. To use
+a scope with the configured default profile, leave the selector slot empty:
+`just lint "" all`. The equivalent direct helper form is:
 
 ```sh
 python .sc-lint/bootstrap.py lint ci windows --config sc-lint.toml

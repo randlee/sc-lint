@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +17,6 @@ from lib.orchestration_test_cli import require_dev_cli
 from lib.sc_compose_dependency import (
     MIN_SC_COMPOSE_TEXT,
     SC_COMPOSE_INSTALL,
-    SC_COMPOSE_WHEEL_PIN,
 )
 
 TEMPLATE = ".claude/skills/triaging-findings/triage-record.ttl.j2"
@@ -128,7 +128,8 @@ def test_pinned_python_binding_renders_canonical_template() -> None:
         import sc_compose
     except (ImportError, importlib.metadata.PackageNotFoundError) as exc:  # pragma: no cover - dependency preflight owns setup
         pytest.skip(f"sc-compose Python binding unavailable: {exc}")
-    assert importlib.metadata.version("sc-compose") == SC_COMPOSE_WHEEL_PIN
+    pin = runpy.run_path(str(REPO_ROOT / ".github/scripts/bootstrap_sc_compose.py"))["SC_COMPOSE_VERSION"]
+    assert importlib.metadata.version("sc-compose") == pin
     rendered = sc_compose.render_template(
         (REPO_ROOT / TEMPLATE).read_text(encoding="utf-8"), _vars()
     )

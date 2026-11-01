@@ -78,6 +78,7 @@ struct ConsumerRequirement {
     root: PathBuf,
     lint: Vec<ConsumerProfileStep>,
     lint_profiles: LintProfiles,
+    default_lint_profile: Option<String>,
     test: TestSelectors,
 }
 
@@ -290,11 +291,21 @@ impl LoadedConfig {
                 "consumer profile execution requires a consumer configuration",
             ));
         };
+        let selector = crate::profile_host::lint_selector(
+            selector,
+            requirement.default_lint_profile.as_deref(),
+            &requirement.lint_profiles.names(),
+            self.config_path
+                .as_deref()
+                .expect("consumer config has path"),
+        )?;
+        let report_selector = selector.unwrap_or(CONSUMER_SELECTOR_ALL).to_owned();
         let steps = &requirement.lint;
         let root = requirement.root.as_path();
         let Some(name) = selector.filter(|name| *name != CONSUMER_SELECTOR_ALL) else {
             return Ok(LintPlanInput {
                 root,
+                report_selector,
                 steps: steps.clone(),
                 selector: None,
             });
@@ -303,6 +314,7 @@ impl LoadedConfig {
             let selector = Some(ProfileName::parse(name.to_string())?);
             return Ok(LintPlanInput {
                 root,
+                report_selector,
                 steps: steps.clone(),
                 selector,
             });
@@ -310,6 +322,7 @@ impl LoadedConfig {
         if let Some(members) = requirement.lint_profiles.resolve(name, steps) {
             return Ok(LintPlanInput {
                 root,
+                report_selector,
                 steps: members,
                 selector: None,
             });
@@ -408,6 +421,7 @@ impl LoadedConfig {
                 root,
                 lint,
                 lint_profiles,
+                default_lint_profile: sc_lint.default_lint_profile.clone(),
                 test,
             }),
         })
@@ -499,6 +513,7 @@ pub(crate) struct ToolConfigFile {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(crate) struct ScLintConfigFile {
     pub(crate) minimum_version: Option<String>,
+    default_lint_profile: Option<String>,
     #[serde(default)]
     lint: Vec<ConsumerProfileStepFile>,
     /// Named lint profiles: an ordered list of declared lint step names.
@@ -516,9 +531,11 @@ struct ConsumerProfileStepFile {
     name: Option<String>,
     command: Option<Vec<String>>,
     platform: Option<toml::Value>,
+    host: Option<toml::Value>,
     target: Option<toml::Value>,
     after_all: Option<toml::Value>,
     env: Option<toml::Value>,
+    env_paths: Option<toml::Value>,
     cwd: Option<toml::Value>,
     #[serde(flatten)]
     extra: std::collections::BTreeMap<String, toml::Value>,
@@ -561,6 +578,7 @@ const SC_LINT_KEYS: &[&str] = &[
     "minimum_version",
     "lint",
     "lint_profiles",
+    "default_lint_profile",
     "test",
     "analyzers",
 ];
@@ -786,7 +804,15 @@ fn validate_consumer_profile(
         let (env, cwd) = profile_step_execution(profile, name, step, path)?;
         let declared = ConsumerProfileStep::new(name, command.clone(), platform, target)
             .with_after_all(after_all)
-            .with_execution(env, cwd);
+            .with_execution(env, cwd)
+            .with_context(
+                crate::profile_host::RowContext::declared(
+                    name,
+                    step.host.as_ref(),
+                    step.env_paths.as_ref(),
+                )
+                .map_err(|error| profile_plan_config_error(error, path))?,
+            );
         if profile == ConsumerProfile::Lint.as_str() {
             validate_lint_step(&declared)
                 .map_err(|error| profile_plan_config_error(error, path))?;
@@ -807,17 +833,37 @@ fn profile_step_execution(
     path: &Path,
 ) -> Result<(std::collections::BTreeMap<String, String>, Option<PathBuf>), CliError> {
     if profile != ConsumerProfile::Lint.as_str() {
-        if step.env.is_some() || step.cwd.is_some() {
+        if step.env.is_some()
+            || step.env_paths.is_some()
+            || step.cwd.is_some()
+            || step.host.is_some()
+        {
             return Err(profile_plan_config_error(
                 crate::profile_plan::ProfilePlanError::new(
                     crate::profile_plan::ProfilePlanDetailCode::UnknownStepField,
                     Some(name),
-                    Some(if step.env.is_some() { "env" } else { "cwd" }),
+                    Some(if step.host.is_some() {
+                        "host"
+                    } else if step.env_paths.is_some() {
+                        "env_paths"
+                    } else if step.env.is_some() {
+                        "env"
+                    } else {
+                        "cwd"
+                    }),
                     format!(
                         "test step `{name}` has unknown field `{}`",
-                        if step.env.is_some() { "env" } else { "cwd" }
+                        if step.host.is_some() {
+                            "host"
+                        } else if step.env_paths.is_some() {
+                            "env_paths"
+                        } else if step.env.is_some() {
+                            "env"
+                        } else {
+                            "cwd"
+                        }
                     ),
-                    "Test profile rows accept only `name` and `command`.",
+                    "Test profile rows accept only `name`, `command` and `after_all`.",
                 ),
                 path,
             ));
@@ -828,6 +874,9 @@ fn profile_step_execution(
         let detail_code = match error.kind {
             crate::step_exec::StepExecErrorKind::Env => {
                 crate::profile_plan::ProfilePlanDetailCode::InvalidStepEnv
+            }
+            crate::step_exec::StepExecErrorKind::DuplicateEnvKey => {
+                crate::profile_plan::ProfilePlanDetailCode::DuplicateStepEnvKey
             }
             crate::step_exec::StepExecErrorKind::Cwd => {
                 crate::profile_plan::ProfilePlanDetailCode::InvalidStepCwd
@@ -845,7 +894,9 @@ fn profile_step_execution(
             path,
         )
     };
-    let env = crate::step_exec::parse_env(step.env.as_ref()).map_err(parse_error)?;
+    let (env, _) =
+        crate::step_paths::execution_env(step.env.as_ref(), step.env_paths.as_ref(), path)
+            .map_err(parse_error)?;
     let cwd = crate::step_exec::parse_cwd(step.cwd.as_ref()).map_err(parse_error)?;
     Ok((env, cwd))
 }

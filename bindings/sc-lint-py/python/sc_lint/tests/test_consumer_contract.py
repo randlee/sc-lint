@@ -242,7 +242,7 @@ class PosixBootstrapConsumerStepEnvironmentTests(unittest.TestCase):
 
 class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
     """`lint [selector] [scope]`: one token is always the selector, two are
-    selector then scope; scope-only and three or more tokens are usage errors."""
+    selector then scope; an empty selector keeps the default; three or more tokens are usage errors."""
 
     USAGE_GRAMMAR = "lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml"
 
@@ -285,15 +285,16 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
             ("all",): "lint --consumer --config CONFIG ci --profile all",
             ("ci", "all"): "lint --consumer --config CONFIG ci --profile ci --platform-scope all",
             ("fmt", "windows"): "lint --consumer --config CONFIG ci --profile fmt --platform-scope windows",
+            ("", "all"): "lint --consumer --config CONFIG ci --platform-scope all",
         }
         for tokens, expected in accepted.items():
             with self.subTest(tokens=tokens):
                 result, calls = self._run_lint(list(tokens))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(calls[-1], expected)
-        # Scope-only (an empty selector before a scope) and extra tokens are usage errors
+        # An empty scope and extra tokens are usage errors
         # that never reach the product binary's lint.
-        for tokens in (["", "all"], ["a", ""], ["a", "b", "c"], ["a", "b", "c", "d"]):
+        for tokens in (["a", ""], ["a", "b", "c"], ["a", "b", "c", "d"]):
             with self.subTest(tokens=tokens):
                 result, calls = self._run_lint(tokens)
                 self.assertEqual(result.returncode, 2, result.stderr)
@@ -309,8 +310,9 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
             ("all",): "lint --consumer --config CONFIG ci --profile all",
             ("ci", "all"): "lint --consumer --config CONFIG ci --profile ci --platform-scope all",
             ("fmt", "windows"): "lint --consumer --config CONFIG ci --profile fmt --platform-scope windows",
+            ("", "all"): "lint --consumer --config CONFIG ci --platform-scope all",
         }
-        rejected = (("", "all"), ("a", ""), ("a", "b", "c"), ("a", "b", "c", "d"))
+        rejected = (("a", ""), ("a", "b", "c"), ("a", "b", "c", "d"))
         with tempfile.TemporaryDirectory(prefix="sc-lint-python-grammar-") as raw:
             tmp = Path(raw)
             consumer = tmp / "consumer"
@@ -417,6 +419,41 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
                 check=False,
                 timeout=30,
             )
+
+    def test_managed_just_preserves_empty_selector_slot(self) -> None:
+        import json
+
+        with tempfile.TemporaryDirectory(prefix="sc-lint-just-slot-") as raw:
+            consumer = Path(raw)
+            (consumer / ".sc-lint").mkdir()
+            (consumer / "Justfile").write_text(
+                (ROOT / "crates/sc-lint/assets/consumer-Justfile").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (consumer / ".sc-lint/bootstrap.py").write_text(
+                "import json, pathlib, sys\n"
+                "pathlib.Path('argv.json').write_text(json.dumps(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            # cmd /c strips a leading quoted executable when the line has
+            # additional quotes. @ keeps that path inside the command; the
+            # managed recipe normally starts with the unquoted `python` name.
+            python_command = f'@"{sys.executable}"' if os.name == "nt" else f'"{sys.executable}"'
+            for tokens in ([], ["", "all"], ["ci", "windows"]):
+                with self.subTest(tokens=tokens):
+                    result = subprocess.run(
+                        ["just", "--set", "python", python_command, "lint", *tokens],
+                        cwd=consumer,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                        timeout=30,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        json.loads((consumer / "argv.json").read_text(encoding="utf-8")),
+                        ["lint", "--config", "sc-lint.toml", *(tokens or [""])],
+                    )
 
     def test_shared_bootstrap_declares_the_grammar(self) -> None:
         source = (ROOT / "crates/sc-lint/assets/bootstrap.py").read_text(encoding="utf-8")
