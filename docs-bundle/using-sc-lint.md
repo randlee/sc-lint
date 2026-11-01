@@ -81,6 +81,11 @@ Do not put `--target` in the command when using the `target` key. Profiles are
 ordered lists of lint step names; they cannot contain other profiles, and a
 profile name cannot shadow a step name or `all`.
 
+Lint steps also accept `env` and `cwd`, with the same meaning as those keys on
+test command selectors. Environment values are passed verbatim to the child;
+`cwd` is a non-empty path relative to the repository root, without `..`
+components. Other undeclared lint-step keys remain configuration errors.
+
 ```toml
 [[tool.sc-lint.lint]]
 name = "format"

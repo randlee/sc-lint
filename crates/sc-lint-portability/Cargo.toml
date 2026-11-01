@@ -22,6 +22,7 @@ path = "src/lib.rs"
 anyhow.workspace = true
 clap.workspace = true
 sc-lint-schema.workspace = true
+sc-lint-directives.workspace = true
 sc-lint-analyzer-support.workspace = true
 serde.workspace = true
 serde_json.workspace = true

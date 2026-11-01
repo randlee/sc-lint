@@ -1928,6 +1928,7 @@ fn run_lint_with_path_backend_without_version() -> (std::process::Output, MockBa
     fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
 
     let output = ProcessCommand::new(cli_copy)
+        .env("PATH", backend.search_path())
         .args(["--json", "--root"])
         .arg(fixture.root())
         .args(["lint", "sc-portability"])
@@ -2014,12 +2015,7 @@ fn run_lint_with_real_path_backend(
 
     let launcher_dir = TempDir::new().expect("isolated launcher directory");
     let backend_dir = TempDir::new().expect("isolated backend directory");
-    let test_executable = std::env::current_exe().expect("test executable path");
-    let target_dir = test_executable
-        .parent()
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .expect("target debug directory");
+    let built_binaries = crate::test_support::release_binaries();
     let binary_name = |name: &str| {
         if cfg!(windows) {
             format!("{name}.exe")
@@ -2029,7 +2025,9 @@ fn run_lint_with_real_path_backend(
     };
     let launcher_name = binary_name(crate::consts::SERVICE_NAME);
     fs::copy(
-        target_dir.join(&launcher_name),
+        built_binaries
+            .get(crate::consts::SERVICE_NAME)
+            .expect("shared sc-lint launcher"),
         launcher_dir.path().join(&launcher_name),
     )
     .expect("copy isolated sc-lint launcher");
@@ -2039,8 +2037,11 @@ fn run_lint_with_real_path_backend(
         crate::consts::TOOL_RUNTIME,
     ] {
         let name = binary_name(backend);
-        fs::copy(target_dir.join(&name), backend_dir.path().join(&name))
-            .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
+        fs::copy(
+            built_binaries.get(backend).expect("shared backend binary"),
+            backend_dir.path().join(&name),
+        )
+        .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
     }
     let path = std::env::var_os("PATH").unwrap_or_default();
     let path = std::env::join_paths(
@@ -2106,7 +2107,11 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
         "lint",
         "sc-portability",
     ]);
-    let context = CommandContext::from_cli(&cli).expect("portability context");
+    let context = CommandContext::from_cli_with_backend_search_path(
+        &cli,
+        Some(_mock_backend.search_path().to_os_string()),
+    )
+    .expect("portability context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
     let expected_finding_count = success
@@ -2176,7 +2181,11 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
         "lint",
         "sc-runtime",
     ]);
-    let context = CommandContext::from_cli(&cli).expect("runtime context");
+    let context = CommandContext::from_cli_with_backend_search_path(
+        &cli,
+        Some(_mock_backend.search_path().to_os_string()),
+    )
+    .expect("runtime context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
     let expected_finding_count = success
@@ -2238,6 +2247,34 @@ fn analyzer_schema_drift_maps_to_structured_backend_protocol_error() {
         error.details["key_path"]
             .as_str()
             .is_some_and(|path| path.starts_with("/findings/0"))
+    );
+}
+
+#[test]
+fn analyzer_v2_allowed_report_normalizes_and_rejects_malformed_allowed_entries() {
+    let valid = include_str!("../../sc-lint-schema/tests/fixtures/findings-report-v2.json");
+    let expected: Value = serde_json::from_str(valid).expect("v2 fixture is JSON");
+    let normalized = crate::dispatch::normalize_backend_json("sc-lint-portability", valid)
+        .expect("valid v2 report normalizes");
+    assert_eq!(normalized["schema_version"], "0.2.0");
+    assert_eq!(normalized["allowed"], expected["allowed"]);
+
+    let mut malformed = expected;
+    malformed["allowed"][0]
+        .as_object_mut()
+        .expect("allowed entry object")
+        .remove("reason");
+    let error =
+        crate::dispatch::normalize_backend_json("sc-lint-portability", &malformed.to_string())
+            .expect_err("malformed allowed entries drift from the v2 schema");
+    assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+    assert_eq!(error.code(), "backend_payload_drift");
+    assert_eq!(error.details["key_path"], "/allowed/0");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("/allowed/0"))
     );
 }
 
@@ -3158,7 +3195,7 @@ homepage = "https://example.invalid/sc-lint"
 struct MockBackend {
     _tempdir: TempDir,
     executable: PathBuf,
-    original_path: Option<OsString>,
+    search_path: OsString,
 }
 
 impl MockBackend {
@@ -3171,10 +3208,15 @@ impl MockBackend {
         };
         let script_path = tempdir.path().join(script_name);
         let payload = payload.to_string();
+        let version = env!("CARGO_PKG_VERSION");
         let script = if cfg!(windows) {
-            format!("@echo off\r\necho {payload}\r\n")
+            format!(
+                "@echo off\r\nif \"%~1\"==\"--version\" (echo {tool} {version}) else (echo {payload})\r\n"
+            )
         } else {
-            format!("#!/usr/bin/env sh\nprintf '%s\\n' '{payload}'\n")
+            format!(
+                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' '{tool} {version}'; else printf '%s\\n' '{payload}'; fi\n"
+            )
         };
         std::fs::write(&script_path, script).expect("mock backend script");
         set_mock_backend_permissions(&script_path);
@@ -3259,7 +3301,7 @@ impl MockBackend {
 
     fn with_path(tempdir: TempDir, executable: PathBuf) -> Self {
         let original_path = std::env::var_os("PATH");
-        let updated_path = std::env::join_paths(
+        let search_path = std::env::join_paths(
             std::iter::once(tempdir.path().to_path_buf()).chain(
                 original_path
                     .as_ref()
@@ -3268,33 +3310,20 @@ impl MockBackend {
             ),
         )
         .expect("joined PATH");
-        // SAFETY: These tests are marked serial and this guard owns the full
-        // lifecycle of the PATH mutation, so no concurrent environment access
-        // occurs while the override is installed.
-        unsafe { std::env::set_var("PATH", updated_path) };
 
         Self {
             _tempdir: tempdir,
             executable,
-            original_path,
+            search_path,
         }
     }
 
     fn path(&self) -> &Path {
         &self.executable
     }
-}
 
-impl Drop for MockBackend {
-    fn drop(&mut self) {
-        match &self.original_path {
-            // SAFETY: The matching install path mutation is test-local and
-            // synchronized by serial execution, so restoring PATH here is the
-            // only concurrent environment mutation.
-            Some(path) => unsafe { std::env::set_var("PATH", path) },
-            // SAFETY: See the safety note above for PATH restoration.
-            None => unsafe { std::env::remove_var("PATH") },
-        }
+    fn search_path(&self) -> &std::ffi::OsStr {
+        &self.search_path
     }
 }
 
@@ -4132,6 +4161,8 @@ fn test_profile_rejects_invalid_members_and_targets() {
         ProfilePlanDetailCode::UnknownMember,
         ProfilePlanDetailCode::AmbiguousName,
         ProfilePlanDetailCode::UnknownStepField,
+        ProfilePlanDetailCode::InvalidStepEnv,
+        ProfilePlanDetailCode::InvalidStepCwd,
         ProfilePlanDetailCode::TargetRequiresPlatform,
         ProfilePlanDetailCode::TargetOsMismatch,
         ProfilePlanDetailCode::UnsupportedCommandShape,
@@ -4144,6 +4175,8 @@ fn test_profile_rejects_invalid_members_and_targets() {
             "PROFILE.UNKNOWN_MEMBER",
             "PROFILE.AMBIGUOUS_NAME",
             "PROFILE.UNKNOWN_STEP_FIELD",
+            "PROFILE.INVALID_STEP_ENV",
+            "PROFILE.INVALID_STEP_CWD",
             "PROFILE.TARGET_REQUIRES_PLATFORM",
             "PROFILE.TARGET_OS_MISMATCH",
             "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
@@ -4199,6 +4232,147 @@ fn test_profile_rejects_unsupported_test_row_fields() {
         );
         assert_eq!(error.details["field"], field, "{label}");
         assert_eq!(error.details["step"], "unit", "{label}");
+    }
+}
+
+#[test]
+fn lint_step_env_and_cwd_plan() {
+    let rows = "[[tool.sc-lint.lint]]\nname = \"adapted\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\nenv = { PYO3_PYTHON = \".bootstrap-venv/bin/python\" }\ncwd = \"crates/x\"\n";
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+    let loaded = loaded.expect("lint step execution config");
+    let input = loaded.consumer_lint_inputs(None).expect("lint input");
+    let decisions = crate::profile_plan::plan_consumer_lint(
+        &input.steps,
+        None,
+        PlatformScope::All,
+        crate::profile_plan::Platform::Linux,
+    )
+    .expect("plan adapted step");
+    let crate::profile_plan::PlanDecision::Run(planned) = &decisions[0] else {
+        panic!("Windows xwin target should run on Linux");
+    };
+    assert!(planned.uses_cargo_xwin());
+    let xwin = crate::workflow::StepPlan::from_planned(planned);
+    assert_eq!(
+        xwin.env(),
+        &[(
+            OsString::from("PYO3_PYTHON"),
+            OsString::from(".bootstrap-venv/bin/python"),
+        )]
+    );
+    assert_eq!(xwin.cwd(), Some(Path::new("crates/x")));
+    assert_eq!(
+        xwin.display_command(),
+        "cargo xwin check --target x86_64-pc-windows-msvc"
+    );
+
+    let windows_decisions = crate::profile_plan::plan_consumer_lint(
+        &input.steps,
+        None,
+        PlatformScope::All,
+        crate::profile_plan::Platform::Windows,
+    )
+    .expect("plan native Windows target");
+    let crate::profile_plan::PlanDecision::Run(native) = &windows_decisions[0] else {
+        panic!("Windows host should run its native target");
+    };
+    let native = crate::workflow::StepPlan::from_planned(native);
+    assert_eq!(
+        native.env(),
+        &[(
+            OsString::from("PYO3_PYTHON"),
+            OsString::from(".bootstrap-venv/bin/python"),
+        )]
+    );
+    assert_eq!(native.cwd(), Some(Path::new("crates/x")));
+    assert_eq!(
+        native.display_command(),
+        "cargo check --target x86_64-pc-windows-msvc"
+    );
+}
+
+#[test]
+fn lint_step_env_cwd_errors() {
+    let cases = [
+        (
+            "bad env table",
+            "env = \"bad\"",
+            "env",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env must be a table of strings",
+        ),
+        (
+            "non-string env value",
+            "env = { PYO3_PYTHON = 7 }",
+            "env.PYO3_PYTHON",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env must be a table of strings",
+        ),
+        (
+            "empty env key",
+            r#"env = { "" = "value" }"#,
+            "env.",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `` is empty or contains `=` or NUL",
+        ),
+        (
+            "equals env key",
+            r#"env = { "BAD=KEY" = "value" }"#,
+            "env.BAD=KEY",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `BAD=KEY` is empty or contains `=` or NUL",
+        ),
+        (
+            "NUL env key",
+            r#"env = { "BAD\u0000KEY" = "value" }"#,
+            "env.BAD\0KEY",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `BAD\0KEY` is empty or contains `=` or NUL",
+        ),
+        (
+            "escaping cwd",
+            "cwd = \"../outside\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "empty cwd",
+            "cwd = \"\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "absolute cwd",
+            "cwd = \"/outside\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "non-string cwd",
+            "cwd = 7",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+    ];
+    for (label, field_line, field, detail_code, message) in cases {
+        let rows = format!(
+            "[[tool.sc-lint.lint]]\nname = \"invalid\"\ncommand = [\"true\"]\n{field_line}\n"
+        );
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE);
+        assert_eq!(error.details["detail_code"], detail_code);
+        assert_eq!(error.details["field"], field);
+        assert_eq!(error.details["step"], "invalid");
+        assert_eq!(
+            error.message,
+            format!("consumer lint profile configuration is invalid: {message}"),
+            "{label}"
+        );
     }
 }
 

@@ -329,9 +329,12 @@ Current implementation status:
 
 Consumer test selector decoding lives in
 `crates/sc-lint/src/test_selectors.rs`; row/table configuration dispatch lives
-in `crates/sc-lint/src/config.rs`. The stable profile error codes and their
-configuration error construction live in `crates/sc-lint/src/scheduler.rs`,
-alongside the scheduler that reports those errors. The CLI keeps the test
+in `crates/sc-lint/src/config.rs`. Consumer lint profile validation, stable
+profile error codes, and configuration error construction live in
+`crates/sc-lint/src/profile_plan.rs`; `scheduler.rs` owns step scheduling and
+report aggregation. Shared `env` and `cwd` parsing lives in
+`crates/sc-lint/src/step_exec.rs`. Per-step process output files are owned by
+`crates/sc-lint/src/step_logs.rs`. The CLI keeps the test
 selector and its forwarded arguments in one trailing positional field
 (`Command::Test::selector_and_args` in `cli.rs`): this makes every token after
 the selector, including tokens beginning with `-`, pass through to the test
@@ -358,7 +361,9 @@ For release `0.2.x`, this means:
 
 - `sc-lint-boundary` and `sc-lint-attributes` may depend on
   `sc-lint-directives` for shared directive parsing/types, and
-  `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-portability` may depend on `sc-lint-directives` for the shared
+  site-allowance directive model (ADR-022 decision 4). `sc-lint-portability`
+  and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend

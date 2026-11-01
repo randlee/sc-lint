@@ -518,6 +518,8 @@ struct ConsumerProfileStepFile {
     platform: Option<toml::Value>,
     target: Option<toml::Value>,
     after_all: Option<toml::Value>,
+    env: Option<toml::Value>,
+    cwd: Option<toml::Value>,
     #[serde(flatten)]
     extra: std::collections::BTreeMap<String, toml::Value>,
 }
@@ -781,8 +783,10 @@ fn validate_consumer_profile(
         }
         let (platform, target) = profile_step_fields(profile, name, step, path)?;
         let after_all = decode_after_all(step.after_all.as_ref(), name, path)?;
+        let (env, cwd) = profile_step_execution(profile, name, step, path)?;
         let declared = ConsumerProfileStep::new(name, command.clone(), platform, target)
-            .with_after_all(after_all);
+            .with_after_all(after_all)
+            .with_execution(env, cwd);
         if profile == ConsumerProfile::Lint.as_str() {
             validate_lint_step(&declared)
                 .map_err(|error| profile_plan_config_error(error, path))?;
@@ -790,6 +794,60 @@ fn validate_consumer_profile(
         steps.push(declared);
     }
     Ok(steps)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Profile field validation preserves structured CLI configuration errors."
+)]
+fn profile_step_execution(
+    profile: &str,
+    name: &str,
+    step: &ConsumerProfileStepFile,
+    path: &Path,
+) -> Result<(std::collections::BTreeMap<String, String>, Option<PathBuf>), CliError> {
+    if profile != ConsumerProfile::Lint.as_str() {
+        if step.env.is_some() || step.cwd.is_some() {
+            return Err(profile_plan_config_error(
+                crate::profile_plan::ProfilePlanError::new(
+                    crate::profile_plan::ProfilePlanDetailCode::UnknownStepField,
+                    Some(name),
+                    Some(if step.env.is_some() { "env" } else { "cwd" }),
+                    format!(
+                        "test step `{name}` has unknown field `{}`",
+                        if step.env.is_some() { "env" } else { "cwd" }
+                    ),
+                    "Test profile rows accept only `name` and `command`.",
+                ),
+                path,
+            ));
+        }
+        return Ok((std::collections::BTreeMap::new(), None));
+    }
+    let parse_error = |error: crate::step_exec::StepExecError| {
+        let detail_code = match error.kind {
+            crate::step_exec::StepExecErrorKind::Env => {
+                crate::profile_plan::ProfilePlanDetailCode::InvalidStepEnv
+            }
+            crate::step_exec::StepExecErrorKind::Cwd => {
+                crate::profile_plan::ProfilePlanDetailCode::InvalidStepCwd
+            }
+        };
+        let subject = format!("lint step `{name}`");
+        crate::profile_plan::profile_plan_config_error(
+            crate::profile_plan::ProfilePlanError::new(
+                detail_code,
+                Some(name),
+                Some(&error.field),
+                error.message(&subject),
+                format!("Correct the `{}` field on lint step `{name}`.", error.field),
+            ),
+            path,
+        )
+    };
+    let env = crate::step_exec::parse_env(step.env.as_ref()).map_err(parse_error)?;
+    let cwd = crate::step_exec::parse_cwd(step.cwd.as_ref()).map_err(parse_error)?;
+    Ok((env, cwd))
 }
 
 #[expect(

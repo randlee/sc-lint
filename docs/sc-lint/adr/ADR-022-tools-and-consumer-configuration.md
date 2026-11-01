@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-022 |
-| Status | Pending |
+| Status | Accepted — Rand, 2026-10-31 ("3 - accept") |
 | Deciders | Rand |
 | Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786 |
 
@@ -79,8 +79,6 @@ consumer friction arises.
    recipes.
 
 ## Effect On Existing Decisions
-
-If accepted:
 
 - **ADR-016 "How To Extend".** Unchanged. Decision 3 enforces its
   "per-step/per-layer `env`" promise on lint steps.

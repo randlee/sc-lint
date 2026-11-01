@@ -89,6 +89,11 @@ fn main() -> Result<ExitCode> {
                     eprintln!("error: {error}");
                     return Ok(ExitCode::from(3));
                 }
+                Err(error @ sc_lint_portability::PortabilityError::InvalidSiteAllow { .. })
+                | Err(error @ sc_lint_portability::PortabilityError::UnknownRule { .. }) => {
+                    eprintln!("error: {error}");
+                    return Ok(ExitCode::from(3));
+                }
                 Err(error) => return Err(error.into()),
             };
             match OutputFormat::from(format) {

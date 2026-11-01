@@ -2,6 +2,7 @@ mod allowlist;
 mod config;
 mod ownership;
 mod sections;
+mod source_uses;
 
 use std::path::Path;
 

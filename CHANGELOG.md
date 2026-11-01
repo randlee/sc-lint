@@ -53,6 +53,15 @@ All notable changes to sc-lint are documented here.
 - Stable codes `profile.invalid_after_all`, `test.unknown_selector`,
   `test.group_cycle` and `profile.steps_failed`
   ([CLI contract](docs/sc-lint/cli-contract.md#stable-codes)).
+- Phase M m-1: PORT-010 now recognizes S3 same-name `cfg(not(unix))` siblings
+  and S6 Unix-only out-of-line modules, including their public items.
+- Phase M m-4: PORT-010 can be allowed for one item with a required reason;
+  suppressed findings appear in schema `0.2.0` reports as `allowed` entries.
+- Phase M m-2: SCB-MANIFEST-004 resolves local module paths, and SCB-CYCLE-001
+  findings honor `exclude_paths_by_rule`.
+- Phase M m-3: lint steps accept `env` and `cwd`; failed-step output includes
+  both stdout and stderr, and every executed step writes both streams under
+  `<log-root>/steps/`, including passing steps.
 
 ### Changed
 
@@ -65,7 +74,21 @@ All notable changes to sc-lint are documented here.
   `{index, name, exit_code, message}` (zero-based `index`) instead of
   `{index, step, message}`. A consumer failure no longer returns the first
   step's own error, and a missing consumer backend now reports
-  `profile.steps_failed` with the spawn error in `message`.
+  `profile.steps_failed` with the spawn error in `message`. Optional
+  `step_log_destination` and `step_log_error` identify the destination and
+  cause when that step's configured log could not be written. A log-write
+  failure makes the step failed whether its child passed or failed; it
+  preserves the child's exit code (null only if there was none) and keeps
+  stdout and stderr in the report.
+
+### Breaking Changes
+
+- Phase M changes the public Rust report API: `analyzer_report_schema()` now
+  returns schema v2, and `analyzer_report_v1_schema()` exposes v1. Site
+  allowances add public directive and error variants and an optional
+  `FindingsReport.allowed` field. Downstream exhaustive enum matches and
+  `FindingsReport` struct literals may require source changes; see the
+  [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances).
 
 ## [0.8.2] — 2026-10-29
 

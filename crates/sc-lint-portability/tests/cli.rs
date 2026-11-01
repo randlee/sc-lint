@@ -97,6 +97,51 @@ fn run_invalid_adapter_config(config: &str) -> std::process::Output {
         .unwrap()
 }
 
+fn run_site_allow_error(source: &str) -> std::process::Output {
+    let root = TempDir::new().unwrap();
+    fs::write(
+        root.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+    )
+    .unwrap();
+    let package = root.path().join("crates/example");
+    fs::create_dir_all(package.join("src")).unwrap();
+    fs::write(
+        package.join("Cargo.toml"),
+        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    fs::write(package.join("src/lib.rs"), source).unwrap();
+
+    Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .args(["analyze", "--root"])
+        .arg(root.path())
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn site_allow_errors_exit_as_configuration_errors() {
+    for (source, code, recovery) in [
+        (
+            "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)] pub fn only_unix() {}\n",
+            "PORTABILITY.INVALID_SITE_ALLOW",
+            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+        ),
+        (
+            "#[sc_lint(allow(PORT-001), reason = \"unsupported\")]\n#[cfg(unix)] pub fn only_unix() {}\n",
+            "PORTABILITY.UNKNOWN_RULE",
+            "recovery: use PORT-010",
+        ),
+    ] {
+        let output = run_site_allow_error(source);
+        assert_eq!(output.status.code(), Some(3));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(code), "{stderr}");
+        assert!(stderr.contains(recovery), "{stderr}");
+    }
+}
+
 fn port010_findings(shape: &str) -> Vec<serde_json::Value> {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/port010")
@@ -146,11 +191,20 @@ fn port010_items(shape: &str) -> Vec<String> {
 /// shape fixture; expected names are the analyzer's ground truth on the
 /// pinned source (atm-core f4746d500).
 fn assert_port010_items(shape: &str, expected: &[&str]) {
+    assert_port010_transition(shape, expected, expected);
+}
+
+/// Baseline lists were executed on develop before the S3/S6 implementation.
+/// Keep both multisets here so intentional removals remain reviewable.
+fn assert_port010_transition(shape: &str, baseline: &[&str], expected: &[&str]) {
     let mut actual = port010_items(shape);
     actual.sort();
     let mut expected: Vec<String> = expected.iter().map(|name| (*name).to_string()).collect();
     expected.sort();
-    assert_eq!(actual, expected, "PORT-010 items for fixture {shape}");
+    assert_eq!(
+        actual, expected,
+        "PORT-010 items for fixture {shape}; develop baseline: {baseline:?}"
+    );
 }
 
 #[test]
@@ -168,15 +222,16 @@ fn port010_fixture_atm_core_atm_temp() {
 
 #[test]
 fn port010_fixture_atm_core_atm_temp_sweeper() {
-    assert_port010_items(
+    assert_port010_transition(
         "atm_core_atm_temp_sweeper",
         &["from_metadata", "unix_epoch_time"],
+        &["unix_epoch_time"],
     );
 }
 
 #[test]
 fn port010_fixture_atm_core_persistence() {
-    assert_port010_items("atm_core_persistence", &["sync_parent_directory"]);
+    assert_port010_transition("atm_core_persistence", &["sync_parent_directory"], &[]);
 }
 
 #[test]
@@ -192,9 +247,10 @@ fn port010_fixture_atm_core_transfer_script() {
 
 #[test]
 fn port010_fixture_atm_daemon_bootstrap_lib() {
-    assert_port010_items(
+    assert_port010_transition(
         "atm_daemon_bootstrap_lib",
         &["unix_socket_config", "unix_socket_config_for_uid"],
+        &["unix_socket_config_for_uid"],
     );
 }
 
@@ -247,14 +303,19 @@ fn port010_fixture_atm_http_runtime_http1_server() {
 #[test]
 fn port010_fixture_atm_http_runtime_lib() {
     // Two `get` findings: the impl methods on UnixSocketOwnerUid and UnixSocketMode.
-    assert_port010_items("atm_http_runtime_lib", &["unix_socket", "get", "get"]);
+    assert_port010_transition(
+        "atm_http_runtime_lib",
+        &["unix_socket", "get", "get"],
+        &["get", "get"],
+    );
 }
 
 #[test]
 fn port010_fixture_atm_http_runtime_loopback_tcp() {
-    assert_port010_items(
+    assert_port010_transition(
         "atm_http_runtime_loopback_tcp",
         &["create_private_record_file", "validate_record_parent"],
+        &[],
     );
 }
 
@@ -385,17 +446,8 @@ fn port010_fixture_unix_helper_in_paired_file() {
 }
 
 #[test]
-fn port010_fixture_crate_root_main_current_behaviour() {
-    // Records the current classification; the cfg(not(unix)) sibling is not a
-    // portable fallback and this shape is not claimed fixed by L1-4.
-    let findings = port010_findings("crate_root_main");
-    assert_eq!(findings.len(), 1, "{findings:#?}");
-    assert!(
-        findings[0]["message"]
-            .as_str()
-            .unwrap()
-            .contains("restore_default_sigpipe")
-    );
+fn port010_fixture_crate_root_main_same_name_sibling() {
+    assert_port010_transition("crate_root_main", &["restore_default_sigpipe"], &[]);
 }
 
 #[test]

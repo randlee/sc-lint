@@ -25,9 +25,12 @@ sc-lint-schema = "0.8.2"
 Keep field names and status values stable; add compatible fields rather than
 changing the meaning of an existing field.
 
-Rust analyzer reports are checked against the crate's bundled
-`analyzer-report-v1` JSON Schema before the CLI normalizes them. The
-`validate_analyzer_report` API returns the first schema mismatch as a
+Rust analyzer reports are checked against the schema selected by
+`schema_version` before the CLI normalizes them: [`analyzer-report-v1` for
+`0.1.0`](https://github.com/randlee/sc-lint/blob/develop/crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
+or [`analyzer-report-v2` for
+`0.2.0`](https://github.com/randlee/sc-lint/blob/develop/crates/sc-lint-schema/schema/analyzer-report-v2.schema.json).
+The `validate_analyzer_report` API returns the first schema mismatch as a
 path and problem. The schema crate also validates the stable
 `sc-lint-python-v1` adapter envelope; unknown keys remain allowed so the
 transport can grow additively. JSON values use `serde_json`.

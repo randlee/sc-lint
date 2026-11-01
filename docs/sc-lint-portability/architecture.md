@@ -16,6 +16,11 @@ contract.
 
 ## Boundary Rules
 
+- portability shares the directive model with `sc-lint-directives` so PORT-010
+  can honor explicit item-level site allowances under ADR-022 decision 4 and
+  ADR-013
+- portability ignores boundary directives and has no dependency on
+  `sc-lint-attributes`; that proc-macro crate remains a no-op
 - portability rule ids remain crate-owned and versioned as part of this crate's
   public machine surface
 - production-scope path, env, shell, and `cfg` parity follow-ons extend this

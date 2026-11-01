@@ -329,6 +329,7 @@ pub struct CommandContext {
     summary: &'static str,
     requires_repo_root: bool,
     compatibility_binary: Option<std::path::PathBuf>,
+    backend_search_path: Option<std::ffi::OsString>,
     request: Option<CommandRequest>,
 }
 
@@ -343,6 +344,19 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
+        Self::from_cli_with_backend_search_path(cli, std::env::var_os("PATH"))
+    }
+
+    /// Constructs a command context with an explicit backend search path.
+    /// Production captures PATH in `from_cli`; tests inject a controlled path.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
+    )]
+    pub(crate) fn from_cli_with_backend_search_path(
+        cli: &Cli,
+        backend_search_path: Option<std::ffi::OsString>,
+    ) -> Result<Self, CliError> {
         let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
             (Some(command), false) => {
                 validate_command_flags(cli, command)?;
@@ -384,8 +398,13 @@ impl CommandContext {
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
             compatibility_binary,
+            backend_search_path,
             request,
         })
+    }
+
+    pub(crate) fn backend_search_path(&self) -> Option<&std::ffi::OsStr> {
+        self.backend_search_path.as_deref()
     }
 
     pub fn command_id(&self) -> &str {

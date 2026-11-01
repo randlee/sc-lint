@@ -69,6 +69,7 @@ pub(crate) struct StepPlan {
     env: Vec<(OsString, OsString)>,
     cwd: Option<PathBuf>,
     after_all: bool,
+    output_log: Option<(PathBuf, String)>,
 }
 
 impl StepPlan {
@@ -88,6 +89,7 @@ impl StepPlan {
             env: Vec::new(),
             cwd: None,
             after_all: false,
+            output_log: None,
         }
     }
 
@@ -102,6 +104,20 @@ impl StepPlan {
         self
     }
 
+    pub(crate) fn with_optional_cwd(mut self, cwd: Option<PathBuf>) -> Self {
+        self.cwd = cwd;
+        self
+    }
+
+    pub(crate) fn with_output_log(
+        mut self,
+        root: Option<&Path>,
+        file_name: impl Into<String>,
+    ) -> Self {
+        self.output_log = root.map(|root| (root.to_path_buf(), file_name.into()));
+        self
+    }
+
     /// Starts the step only after every other step has finished.
     pub(crate) fn with_after_all(mut self, after_all: bool) -> Self {
         self.after_all = after_all;
@@ -110,14 +126,19 @@ impl StepPlan {
 
     /// Converts a planned consumer lint command into the executable step form.
     pub(crate) fn from_planned(step: &PlannedStep) -> Self {
-        Self::new(
+        let mut plan = Self::new(
             step.name(),
             ConsumerProfile::Lint.as_str(),
             Lane::for_program(step.command()),
             step.command().clone(),
             step.args().iter().cloned(),
         )
-        .with_after_all(step.after_all())
+        .with_optional_cwd(step.cwd().map(Path::to_path_buf))
+        .with_after_all(step.after_all());
+        for (key, value) in step.env() {
+            plan = plan.with_env(key, value);
+        }
+        plan
     }
 
     pub(crate) const fn lane(&self) -> Lane {
@@ -229,6 +250,19 @@ pub(crate) trait SystemAdapter: Send + Sync {
     ) -> Result<StepReport, CliError>;
     #[expect(
         clippy::result_large_err,
+        reason = "The adapter seam preserves the shared top-level CliError contract."
+    )]
+    fn run_planned_step_with_plan(
+        &self,
+        repo_root: &Path,
+        step: &PlannedStep,
+        plan: &StepPlan,
+    ) -> Result<StepReport, CliError> {
+        let _ = plan;
+        self.run_planned_step(repo_root, step)
+    }
+    #[expect(
+        clippy::result_large_err,
         reason = "The adapter seam preserves the shared top-level CliError contract across orchestration tests and production execution."
     )]
     fn run_step(&self, repo_root: &Path, step: &StepPlan) -> Result<StepReport, CliError>;
@@ -260,6 +294,16 @@ impl SystemAdapter for HostSystemAdapter {
             .map(|report| report.for_planned(step))
     }
 
+    fn run_planned_step_with_plan(
+        &self,
+        repo_root: &Path,
+        step: &PlannedStep,
+        plan: &StepPlan,
+    ) -> Result<StepReport, CliError> {
+        self.run_step(repo_root, plan)
+            .map(|report| report.for_planned(step))
+    }
+
     fn run_step(&self, repo_root: &Path, step: &StepPlan) -> Result<StepReport, CliError> {
         let directory = step
             .cwd()
@@ -287,14 +331,16 @@ impl SystemAdapter for HostSystemAdapter {
                 diagnostic
             })?;
 
-        if !output.status.success() {
+        let log_write_error = step.output_log.as_ref().and_then(|(root, file_name)| {
+            crate::step_logs::write_step_output(root, file_name, &output.stdout, &output.stderr)
+                .err()
+                .map(|error| (crate::step_logs::step_log_path(root, file_name), error))
+        });
+
+        if !output.status.success() || log_write_error.is_some() {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            let cause = if stderr.is_empty() {
-                stdout.clone()
-            } else {
-                stderr.clone()
-            };
+            let cause = format!("stdout:\n{stdout}\nstderr:\n{stderr}");
             let mut error = CliError::backend_failure(format!("{} failed", step.name()))
                 .with_detail("step", json!(step.name()))
                 .with_detail("command", json!(step.display_command()))
@@ -302,9 +348,15 @@ impl SystemAdapter for HostSystemAdapter {
                 .with_detail(consts::FIELD_EXIT_CODE, json!(output.status.code()))
                 .with_detail("stdout", json!(stdout))
                 .with_detail("stderr", json!(stderr));
-            if !cause.is_empty() {
-                error = error.with_cause(cause);
+            if let Some((destination, log_error)) = log_write_error {
+                error = error
+                    .with_detail(
+                        "step_log_destination",
+                        json!(destination.display().to_string()),
+                    )
+                    .with_detail("step_log_error", json!(log_error.to_string()));
             }
+            error = error.with_cause(cause);
             return Err(error);
         }
 
@@ -427,13 +479,27 @@ pub(crate) fn run_consumer_lint_with(
         adapter.host_platform(),
     )?;
     preflight_xwin(input.root, adapter, &decisions)?;
+    let log_names = crate::step_logs::step_log_file_names(decisions.iter().filter_map(
+        |decision| match decision {
+            PlanDecision::Run(step) => Some(step.name()),
+            PlanDecision::Skip(_) => None,
+        },
+    ));
+    let mut log_names = log_names.into_iter();
     let scheduled = decisions
         .iter()
         .enumerate()
         .filter_map(|(position, decision)| match decision {
-            PlanDecision::Run(step) => {
-                Some(ScheduledStep::new(position, StepPlan::from_planned(step)).with_planned(step))
-            }
+            PlanDecision::Run(step) => Some(
+                ScheduledStep::new(
+                    position,
+                    StepPlan::from_planned(step).with_output_log(
+                        loaded_config.logging_root().map(PathBuf::as_path),
+                        log_names.next().expect("each run step has a log name"),
+                    ),
+                )
+                .with_planned(step),
+            ),
             PlanDecision::Skip(_) => None,
         })
         .collect::<Vec<_>>();
@@ -495,12 +561,25 @@ pub(crate) fn run_consumer_test_with(
     let expanded = selectors.expand(request.selector())?;
     selectors.check_forwarded_args(request)?;
     let host = adapter.host_platform();
+    let log_names = crate::step_logs::step_log_file_names(
+        expanded
+            .iter()
+            .filter(|selector| selector.runs_on(host))
+            .map(|selector| selector.name()),
+    );
+    let mut log_names = log_names.into_iter();
     let scheduled = expanded
         .iter()
         .enumerate()
         .filter(|(_, selector)| selector.runs_on(host))
         .map(|(position, selector)| {
-            ScheduledStep::new(position, selector.step_plan(request.args()))
+            ScheduledStep::new(
+                position,
+                selector.step_plan(request.args()).with_output_log(
+                    loaded_config.logging_root().map(PathBuf::as_path),
+                    log_names.next().expect("each run selector has a log name"),
+                ),
+            )
         })
         .collect::<Vec<_>>();
     let mut reports = run_steps_scheduled(root, adapter, &scheduled, policy)?.into_iter();

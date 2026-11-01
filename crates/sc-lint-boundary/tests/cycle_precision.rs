@@ -377,3 +377,77 @@ fn path_exclusion_drops_real_cycle_003_finding() {
         (vec![RuleId::ScbCycle003], ReportStatus::Pass)
     );
 }
+
+/// Two independent multi-owner cycles, one per source file (#385).
+fn two_file_cycle_findings(sc_lint_toml: &str) -> Vec<(RuleId, String)> {
+    let fixture = write_workspace("pub mod a;\npub mod b;\n");
+    write(
+        fixture.path(),
+        "crates/example/src/a.rs",
+        "pub struct Alpha { pub beta: Beta }\npub struct Beta { pub alpha: Alpha }\n",
+    );
+    write(
+        fixture.path(),
+        "crates/example/src/b.rs",
+        "pub struct Gamma { pub delta: Delta }\npub struct Delta { pub gamma: Gamma }\n",
+    );
+    write(fixture.path(), "sc-lint.toml", sc_lint_toml);
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.path().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("cycles"),
+    )
+    .expect("configured cycle analysis succeeds");
+    report
+        .findings
+        .into_iter()
+        .map(|finding| (finding.rule_id, finding.message))
+        .collect()
+}
+
+#[test]
+fn boundary_cycle_exclude_paths_by_rule() {
+    let a_cycle = (
+        RuleId::ScbCycle001,
+        "architectural cycle across owners: crate::example::example::module::crate::a::Alpha, crate::example::example::module::crate::a::Beta".to_owned(),
+    );
+    let b_cycle = (
+        RuleId::ScbCycle001,
+        "architectural cycle across owners: crate::example::example::module::crate::b::Delta, crate::example::example::module::crate::b::Gamma".to_owned(),
+    );
+    assert_eq!(
+        two_file_cycle_findings(""),
+        vec![a_cycle.clone(), b_cycle.clone()]
+    );
+    assert_eq!(
+        two_file_cycle_findings(
+            r#"
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-001" = ["crates/example/src/a.rs"]
+"#
+        ),
+        vec![b_cycle.clone()]
+    );
+    assert_eq!(
+        two_file_cycle_findings(
+            r#"
+[tool.sc-lint.analyzers.boundary]
+exclude_paths = ["crates/example/src/b.rs"]
+"#
+        ),
+        vec![a_cycle.clone()]
+    );
+    assert_eq!(
+        two_file_cycle_findings(
+            r#"
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-002" = ["crates/example/src/a.rs"]
+"#
+        ),
+        vec![a_cycle, b_cycle]
+    );
+}

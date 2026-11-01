@@ -35,6 +35,7 @@ fn parse_lint_attributes(attrs: &[Attribute]) -> Result<Vec<LintAttribute>> {
                         values,
                     });
                 }
+                Directive::SiteAllow { .. } => {}
                 Directive::InternalOnly => {
                     parsed.push(LintAttribute {
                         scope: "boundary",
@@ -54,6 +55,20 @@ fn parse_lint_attributes(attrs: &[Attribute]) -> Result<Vec<LintAttribute>> {
     }
 
     Ok(parsed)
+}
+
+#[cfg(test)]
+mod directive_isolation_tests {
+    use super::parse_lint_attributes;
+
+    #[test]
+    fn boundary_parser_ignores_site_allowance() {
+        let item: syn::ItemFn = syn::parse_quote! {
+            #[sc_lint(allow(PORT-010), reason = "intentional POSIX API")]
+            pub fn current_uid() {}
+        };
+        assert!(parse_lint_attributes(&item.attrs).unwrap().is_empty());
+    }
 }
 
 fn resolve_module_source(
