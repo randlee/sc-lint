@@ -21,6 +21,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 from verify_release_arch import EXPECTED, machine, verify as verify_wheel_arch
+from release_artifacts import release_archive_name, release_archive_pattern, wheel_asset_pattern
 
 # This is host policy, not a release-target inventory. The manifest owns that inventory.
 NATIVE_RUNNERS = {
@@ -129,12 +130,45 @@ def tag_from_run(client: GitHub, manifest: dict, run_id: str) -> str:
     if len(matches) != 1:
         raise ValueError(f"Release run {run_id}: expected one available {target['target']} archive artifact; found {len(matches)}")
     payload = client.get(f"actions/artifacts/{matches[0]['id']}/zip", binary=True)
-    pattern = re.compile(rf"{re.escape(manifest['project']['archive_prefix'])}_([0-9]+\.[0-9]+\.[0-9]+)_{re.escape(target['target'])}\.{re.escape(target['archive'])}")
+    pattern = re.compile(release_archive_pattern(manifest["project"], target, r"([0-9]+\.[0-9]+\.[0-9]+)"))
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         versions = [match[1] for name in archive.namelist() if (match := pattern.fullmatch(PurePosixPath(name).name))]
     if len(versions) != 1:
         raise ValueError(f"Release run {run_id}: archive artifact must identify exactly one release version")
     return "v" + versions[0]
+
+
+def production_release_run(client: GitHub, run_id: str) -> bool:
+    """Only a successful production release job enables automatic asset execution."""
+    if not run_id.isdecimal():
+        raise ValueError("automatic verification requires the triggering Release run id")
+    jobs = []
+    page = 1
+    while True:
+        data = client.json(f"actions/runs/{run_id}/jobs?filter=latest&per_page=100&page={page}")
+        jobs.extend(job for job in data["jobs"] if job["name"] == "release")
+        if page * 100 >= data["total_count"]:
+            break
+        page += 1
+    if len(jobs) != 1:
+        raise ValueError(f"Release run {run_id}: cannot establish production status; expected one release job, found {len(jobs)}")
+    conclusion = jobs[0].get("conclusion")
+    if conclusion == "skipped":
+        print(f"Skipping native verification: Release run {run_id} did not run its production release job (conclusion: skipped).", flush=True)
+        return False
+    if conclusion != "success":
+        raise ValueError(f"Release run {run_id}: production release job did not succeed ({conclusion!r})")
+    return True
+
+
+def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str) -> tuple[str, dict] | None:
+    if not tag and not production_release_run(client, run_id):
+        return None
+    tag = tag or tag_from_run(client, manifest, run_id)
+    release_version(tag)
+    # A production job that succeeded without publishing its release must fail, not skip.
+    client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")
+    return tag, native_matrix(client.manifest(tag))
 
 
 def assert_native(target: str) -> None:
@@ -153,7 +187,7 @@ def required_assets(manifest: dict, target: str, tag: str, assets: list[dict]) -
     entries = [entry for entry in manifest["release_targets"] if entry["target"] == target]
     if len(entries) != 1:
         raise ValueError(f"{target}: expected exactly one target in the tag's release manifest")
-    archive = f"{manifest['project']['archive_prefix']}_{version}_{target}.{entries[0]['archive']}"
+    archive = release_archive_name(manifest["project"], entries[0], version)
     names = [entry["name"] for entry in assets]
     for required in (archive, "checksums.txt"):
         if names.count(required) != 1:
@@ -163,7 +197,8 @@ def required_assets(manifest: dict, target: str, tag: str, assets: list[dict]) -
     if not specs:
         raise ValueError(f"{target}: manifest declares no wheel to verify")
     for package, wheel_platform in specs:
-        matching = [name for name in names if name.startswith(f"{package}-{version}-") and name.endswith(".whl") and wheel_platform in name[:-4].rsplit("-", 1)[-1].split(".")]
+        pattern = wheel_asset_pattern(package, wheel_platform, version)
+        matching = [name for name in names if re.fullmatch(pattern, name)]
         if len(matching) != 1:
             raise ValueError(f"{tag} {target}: expected one {package} wheel for {wheel_platform}; found {matching}")
         wheels.append(matching[0])
@@ -197,7 +232,8 @@ def extract_archive(path: Path, destination: Path) -> None:
 
 
 def run_command(argv: list[str]) -> str:
-    result = subprocess.run(argv, capture_output=True, text=True)
+    child_env = {key: value for key, value in os.environ.items() if key.upper() not in {"GH_TOKEN", "GITHUB_TOKEN"}}
+    result = subprocess.run(argv, capture_output=True, text=True, env=child_env)
     if result.returncode:
         raise ValueError(f"command failed ({result.returncode}): {argv!r}\n{result.stdout}\n{result.stderr}")
     if result.stdout.strip():
@@ -264,10 +300,10 @@ def main() -> int:
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         if args.command == "plan":
             local_manifest = tomllib.loads(args.manifest.read_text(encoding="utf-8"))
-            tag = args.tag or tag_from_run(client, local_manifest, args.run_id)
-            release_version(tag)
-            matrix = native_matrix(client.manifest(tag))
-            output = f"tag={tag}\nmatrix={json.dumps(matrix, separators=(',', ':'))}\n"
+            plan = plan_release(client, local_manifest, args.tag, args.run_id)
+            tag, matrix = plan if plan is not None else ("", {"include": []})
+            enabled = "true" if plan is not None else "false"
+            output = f"verify={enabled}\ntag={tag}\nmatrix={json.dumps(matrix, separators=(',', ':'))}\n"
             if args.output:
                 with args.output.open("a", encoding="utf-8") as handle:
                     handle.write(output)

@@ -262,14 +262,16 @@ def test_zip_path_traversal_fails(tmp_path):
 
 
 def test_workflow_only_triggers_for_release_or_explicit_dispatch():
-    text = (ROOT / ".github/workflows/release-native-verify.yml").read_text()
-    assert "  workflow_dispatch:" in text and "  workflow_run:" in text
-    assert "workflows: [Release]" in text
-    assert "conclusion == 'success'" in text
-    assert "  push:" not in text and "  pull_request:" not in text
-    assert "matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}" in text
-    assert 'python-version: "3.13"' in text
-    assert "ref: ${{ github.workflow_sha }}" in text
+    import yaml
+    workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
+    assert set(workflow["on"]) == {"workflow_dispatch", "workflow_run"}
+    assert workflow["on"]["workflow_run"]["workflows"] == ["Release"]
+    assert workflow["on"]["workflow_run"]["types"] == ["completed"]
+    assert workflow["permissions"] == {"contents": "read"}
+    plan = workflow["jobs"]["plan"]
+    assert plan["permissions"] == {"contents": "read", "actions": "read"}
+    assert "needs.plan.outputs.verify" in workflow["jobs"]["native"]["if"]
+    assert "permissions" not in workflow["jobs"]["native"]
 
 
 def test_wheel_payload_must_match_native_target_before_pip(monkeypatch, tmp_path):
@@ -331,3 +333,98 @@ def test_actions_artifact_and_release_asset_downloads_use_their_required_media_t
     assert [media_type for _, media_type in requests] == [
         "application/vnd.github+json", "application/octet-stream", "application/vnd.github+json",
     ]
+
+
+def test_known_target_without_native_host_mapping_fails(monkeypatch):
+    target = "x86_64-unknown-linux-gnu"
+    monkeypatch.delitem(native.NATIVE_RUNNERS, native.native_host(target))
+    with pytest.raises(ValueError, match="no native GitHub-hosted runner"):
+        native.native_matrix(Assets(target).manifest_data)
+
+
+def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setenv("GH_TOKEN", "parent-gh-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "parent-github-token")
+    monkeypatch.setenv("NATIVE_VERIFY_MARKER", "retained")
+    child = {}
+    def execute(argv, **kwargs):
+        child.update(kwargs["env"])
+        return SimpleNamespace(returncode=0, stdout="payload version", stderr="")
+    monkeypatch.setattr(native.subprocess, "run", execute)
+    assert native.run_command(["payload", "--version"]) == "payload version"
+    assert "GH_TOKEN" not in child and "GITHUB_TOKEN" not in child
+    assert child["NATIVE_VERIFY_MARKER"] == "retained"
+    assert native.os.environ["GH_TOKEN"] == "parent-gh-token"
+    assert native.os.environ["GITHUB_TOKEN"] == "parent-github-token"
+
+
+class ReleaseRun(RunArtifact):
+    def __init__(self, conclusion="success", *, published=True):
+        super().__init__("tool_1.2.3_x86_64-unknown-linux-gnu.tar.gz")
+        self.conclusion = conclusion
+        self.published = published
+        self.manifest_data = Assets("x86_64-unknown-linux-gnu").manifest_data
+
+    def json(self, endpoint):
+        if "/jobs?" in endpoint:
+            self.calls.append(endpoint)
+            return {"total_count": 1, "jobs": [{"name": "release", "conclusion": self.conclusion}]}
+        if endpoint == "releases/tags/v1.2.3":
+            self.calls.append(endpoint)
+            if not self.published:
+                raise ValueError("HTTP 404: production GitHub release is missing")
+            return {"assets": []}
+        return super().json(endpoint)
+
+    def manifest(self, tag):
+        assert tag == "v1.2.3"
+        self.calls.append("manifest:" + tag)
+        return self.manifest_data
+
+
+def test_rehearsal_skips_before_artifact_tag_or_release_lookup(capsys):
+    client = ReleaseRun("skipped", published=False)
+    assert native.plan_release(client, {}, "", "42") is None
+    assert client.calls == ["actions/runs/42/jobs?filter=latest&per_page=100&page=1"]
+    assert "Skipping native verification" in capsys.readouterr().out
+
+
+def test_production_release_is_planned_for_native_verification():
+    client = ReleaseRun()
+    tag, matrix = native.plan_release(client, client.manifest_data, "", "42")
+    assert tag == "v1.2.3"
+    assert matrix["include"][0]["target"] == "x86_64-unknown-linux-gnu"
+    assert "releases/tags/v1.2.3" in client.calls
+
+
+def test_production_missing_release_fails_instead_of_skipping():
+    client = ReleaseRun(published=False)
+    with pytest.raises(ValueError, match="production GitHub release is missing"):
+        native.plan_release(client, client.manifest_data, "", "42")
+
+
+def test_production_missing_assets_fails_instead_of_skipping(monkeypatch, tmp_path):
+    client = ReleaseRun()
+    tag, _ = native.plan_release(client, client.manifest_data, "", "42")
+    target = "x86_64-unknown-linux-gnu"
+    host(monkeypatch, target)
+    assets = Assets(target)
+    assets.assets = [entry for entry in assets.assets if entry["name"] != assets.wheel_name]
+    with pytest.raises(ValueError, match="expected one sc_lint wheel"):
+        native.verify_release(assets, tag, target, tmp_path)
+
+
+def test_manual_dispatch_checks_the_release_even_if_no_run_id():
+    client = ReleaseRun()
+    tag, _ = native.plan_release(client, {}, "v1.2.3", "")
+    assert tag == "v1.2.3"
+    assert not any("/jobs?" in call for call in client.calls)
+
+
+@pytest.mark.parametrize("jobs", [[], [{"name": "release", "conclusion": "failure"}]])
+def test_unknown_or_failed_production_state_is_not_a_rehearsal(jobs):
+    client = ReleaseRun()
+    client.json = lambda endpoint: {"total_count": len(jobs), "jobs": jobs}
+    with pytest.raises(ValueError, match="cannot establish production status|did not succeed"):
+        native.production_release_run(client, "42")

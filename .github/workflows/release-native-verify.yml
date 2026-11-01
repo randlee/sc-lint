@@ -13,13 +13,16 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   plan:
+    permissions:
+      contents: read
+      actions: read
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
+      verify: ${{ steps.plan.outputs.verify }}
       tag: ${{ steps.plan.outputs.tag }}
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
@@ -39,6 +42,7 @@ jobs:
         run: python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --run-id "$RELEASE_RUN_ID" --output "$GITHUB_OUTPUT"
 
   native:
+    if: ${{ needs.plan.outputs.verify == 'true' }}
     needs: plan
     name: Native ${{ matrix.target }}
     strategy:

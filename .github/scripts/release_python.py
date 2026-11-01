@@ -73,14 +73,20 @@ def cmd_python_wheel_matrix(args):
     return 0
 
 
+def wheel_asset_pattern(name: str, platform: str, version: str | None = None) -> str:
+    """Match the published wheel naming contract, optionally at one exact version."""
+    distribution = re.escape(name.replace("-", "_"))
+    version_and_tags = ".*" if version is None else re.escape(version) + "-.*"
+    return "^" + distribution + "-" + version_and_tags + "-" + re.escape(platform) + r"\.whl$"
+
+
 def explicit_asset_patterns(manifest):
     for distribution in manifest.get("python_distributions", []):
         targets = [item for item in wheel_targets(distribution) if item["platform"]]
         if not targets:
             continue
-        name = re.escape(distribution["name"].replace("-", "_"))
         for item in targets:
-            yield "^" + name + r"-.*-" + re.escape(item["platform"]) + r"\.whl$"
+            yield wheel_asset_pattern(distribution["name"], item["platform"])
         if distribution["sdist"]:
             yield "^" + re.escape(distribution["name"]).replace(r"\-", "[-_]") + r"-.*\.tar\.gz$"
 
