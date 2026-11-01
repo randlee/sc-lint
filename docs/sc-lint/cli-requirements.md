@@ -450,7 +450,7 @@ specialized backend tools and mixed Rust/Python implementations.
   surface.)
 
 - `REQ-CLI-028` — **Proposed; Pending Rand acceptance**
-  Consumer lint rows may declare `host = "linux" | "macos" | "windows"` to
+  Consumer lint rows only may declare `host = "linux" | "macos" | "windows"` to
   select the operating-system host on which that row's command and literal
   `env` values apply. `host` is independent of `platform`: `platform` continues
   to identify the target OS and, when `target` is present, must match that
@@ -459,10 +459,13 @@ specialized backend tools and mixed Rust/Python implementations.
   Once a row passes the host filter, `decide` selects native cargo or cargo
   xwin from the actual host, platform and target.
 
-  Selection order is: (1) expand the selected step/profile membership, (2)
-  apply the platform-scope filter, (3) apply the optional host filter, and (4)
-  call `decide` for remaining rows. The scope filter matches existing
-  `scope_selects`: default `host` includes untagged rows and rows whose
+  Test selectors do not accept `host`; this amendment does not add host
+  selection to test rows. Selection order is: (1) expand the selected
+  step/profile membership, (2) validate each selected row's fields and
+  host/platform relationship, (3) apply the platform-scope filter, (4) apply
+  the optional host filter, and (5) call `decide` for remaining rows. The scope
+  filter matches existing `scope_selects` behavior: default `host` includes
+  untagged rows and rows whose
   `platform` matches the actual host; `all` includes every platform row; a
   named scope includes untagged rows and rows tagged for either the actual host
   or named platform. Scope-filtered rows are omitted silently and never appear
@@ -489,55 +492,73 @@ specialized backend tools and mixed Rust/Python implementations.
   explicitly selects it; it does not change the Unix host-scope filtering of
   the Linux/macOS xwin rows.
 
-  A host-mismatched row is reported as a non-failing skipped `data.steps[]`
-  row. For rows declaring `host`, `host` in the plan/report is the configured
-  host selector and `actual_host` is the detected execution host; a
-  `host_mismatch` row also carries `platform`, `target`, and `reason`:
+  In `data.steps[]`, `host` always means the actual host. For a row that
+  declares a host selector, add `host_selector` to its Run row and to every
+  skip row (`host_mismatch`, `unsupported_cross_command`, or
+  `unsupported_cross_target`). Keep `host` as the actual host on skips, and
+  include it on host-tagged Run rows. Unannotated Run rows keep their existing
+  report shape; unannotated cross-skip rows retain their existing actual-host
+  `host` field. For example, these are a successful Run row and a
+  host-mismatch skip row:
 
   ```json
-  {"name":"clippy-windows-linux","status":"skipped","host":"linux","actual_host":"macos","platform":"windows","target":"x86_64-pc-windows-msvc","reason":"host_mismatch"}
+  {"name":"clippy-windows-linux","kind":"lint","command":"cargo xwin clippy --all-targets --target x86_64-pc-windows-msvc","status":"pass","platform":"windows","target":"x86_64-pc-windows-msvc","host":"linux","host_selector":"linux"}
+  {"name":"clippy-windows-linux","status":"skipped","host":"macos","host_selector":"linux","platform":"windows","target":"x86_64-pc-windows-msvc","reason":"host_mismatch"}
   ```
 
-  These selector-specific `host` and `actual_host` fields are added only to
-  rows that declare `host`. Rows without `host` keep their existing report
-  shape, including the existing actual-host `host` field on current cross
-  skips. Rows excluded by scope are never reported. A host-mismatch skip is
-  neither a failure nor a scheduler input: it does not fail `--fail-fast`,
-  stop scheduling, block an `after_all` row, or delay its barrier. As today,
+  `host_selector` is the only new selector-specific report key and appears
+  only on rows declaring `host`; do not rename or repurpose `host` or add an
+  `actual_host` key. Rows excluded by scope are never reported. A
+  host-mismatch skip is neither a failure nor a scheduler input: it does not
+  fail `--fail-fast`, stop scheduling, block an `after_all` row, or delay its
+  barrier. As today,
   scope-filtered rows are omitted from the returned plan and report before
   execution scheduling; the `after_all` barrier covers only runnable rows
   that pass both filters. Output stays in
   selected declaration/profile order, independent of execution timing.
 
   **Bare-run default.** Optional `default_lint_profile = "<name>"` at
-  `[tool.sc-lint]` applies only to consumer lint. A direct `sc-lint lint ci
+  `[tool.sc-lint]` applies only to consumer lint. It is a sibling of
+  `lint_profiles`: `[[tool.sc-lint.lint]]` is already an array-of-tables, so
+  `[tool.sc-lint.lint]` cannot also be a table. A direct `sc-lint lint ci
   --consumer` invocation's `ci` is the required lint target; `--profile NAME`
   is its explicit consumer selector. In the Just/bootstrap interface,
   `just lint [selector [scope]]` uses the first positional argument as selector
   and the second as scope: `just lint ci all` means selector `ci`, scope `all`.
   If neither explicit selector form is supplied, the named default profile is
   selected. Direct `--platform-scope all` without `--profile` still selects
-  `default_lint_profile` and applies that scope. In Just, the scope occupies
-  the second positional slot and therefore requires a first-slot selector;
-  `just lint ci all` supplies both. `--profile all` and Just's positional
+  `default_lint_profile` and applies that scope. In Just, an empty first
+  argument leaves the selector unset so the configured default is used with a
+  second-slot scope: `just lint "" all`. `just lint ci all` supplies the `ci`
+  selector and `all` scope. `--profile all` and Just's positional
   `all` explicitly select every declared lint row; the scope and host filters
   still apply. The Just recipe is documented in
   [just-setup.md](../../docs-bundle/just-setup.md#select-lint-steps-and-run-managed-commands).
 
-  The default value must resolve by exact name in `[tool.sc-lint.lint_profiles]`;
-  lint step names are not profiles, so a default naming a step fails with
-  `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`. An empty or unknown default fails
-  with the same code and reports available lint profile names. The reserved
-  selector `all` is not a named profile and does not get a separate special
-  error; a profile declaration named `all` is already rejected with the
-  existing `PROFILE.AMBIGUOUS_NAME`. A declared but empty profile continues to
-  fail with the existing `PROFILE.EMPTY_MEMBERS`. Add proposed
-  `ProfilePlanDetailCode::InvalidHost` (`PROFILE.INVALID_HOST`) and
-  `ProfilePlanDetailCode::UnknownDefaultLintProfile`
-  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). Invalid/non-string host values
-  identify the row, field and accepted values. The config key also needs to be
-  admitted in `SC_LINT_KEYS` and represented in `ScLintConfigFile` when
-  implemented. The default does not affect `sc-lint test`.
+  The type of `default_lint_profile` is checked during config load; it must be
+  a string. Profile-name resolution is lazy and occurs only when a bare
+  consumer lint run uses the default. The value must resolve by exact name in
+  `[tool.sc-lint.lint_profiles]`; lint step names are not profiles, so a
+  default naming a step fails with `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`. An
+  empty, unknown, or `"all"` default fails with the same code and reports
+  available lint profile names; `"all"` does not get a separate special error.
+  A profile declaration named `all` is
+  already rejected with the existing `PROFILE.AMBIGUOUS_NAME`. A declared but
+  empty profile continues to fail with the existing `PROFILE.EMPTY_MEMBERS`.
+  `sc-lint test` and consumer lint with an explicit `--profile` do not resolve
+  or fail on an unknown default string.
+
+  Add proposed `ProfilePlanDetailCode::InvalidHost`
+  (`PROFILE.INVALID_HOST`) and `ProfilePlanDetailCode::UnknownDefaultLintProfile`
+  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). A host value that is malformed,
+  non-string, unsupported, or that contradicts `platform` on a row without
+  `target`, fails
+  `PROFILE.INVALID_HOST` during selected-member validation, before platform
+  scope filtering; even a scope-filtered selected row with an invalid host
+  fails. A host without `platform` filters by host alone. With a `target`,
+  host and target platform may differ, enabling cross-host rows. The config key
+  also needs to be admitted in `SC_LINT_KEYS` and represented in
+  `ScLintConfigFile` when implemented.
 
   **Worked example (atm-core).** Use this consumer configuration. It uses a
   unique name for every row. The Windows-host Windows-target row is a distinct
@@ -605,6 +626,10 @@ specialized backend tools and mixed Rust/Python implementations.
   scope already silently omits the `platform = "windows"` xwin rows. The
   Windows-target check therefore runs in CI on all three operating systems and
   not in a developer's bare lint invocation.
+  A host-matching Linux/macOS row targeting a Windows triple other than
+  `x86_64-pc-windows-msvc` still skips with `unsupported_cross_target`, because
+  `uses_xwin` supports only that target; the host selector does not change this
+  decision.
 
   **Acceptance tests (deterministic).** Use injected host/platform values and
   controlled planner/scheduler inputs; do not rely on sleeps, race timing or
@@ -615,9 +640,9 @@ specialized backend tools and mixed Rust/Python implementations.
      mismatched declared hosts yield `host_mismatch`, never either cross skip;
      matching Linux/macOS hosts choose xwin from actual host; existing untagged
      cross skips retain their current reasons and report shape.
-  2. Verify host-tagged plan and JSON rows carry configured `host` and
-     `actual_host`, while untagged rows keep their current schema. A selected
-     step outside scope has no report row.
+  2. Verify host-tagged plan and JSON rows carry actual-host `host` and
+     configured `host_selector`, while untagged Run rows keep their current
+     schema. A selected step outside scope has no report row.
   3. Verify host-mismatch skips remain non-failing and non-blocking: an
      `after_all` runnable row is scheduled after all runnable rows, and a
      host-mismatch skip neither blocks it nor trips `--fail-fast`.
@@ -625,18 +650,23 @@ specialized backend tools and mixed Rust/Python implementations.
      `--profile` and bare `just lint`, explicit `--profile` and Just positional
      selectors, and direct `--platform-scope all` without `--profile`. Verify
      it does not affect `sc-lint test`.
-  5. Verify empty/unknown default values and a default naming a step produce
-     `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`; an empty named profile continues
-     to produce `PROFILE.EMPTY_MEMBERS`, and declaring profile `all` continues
-     to produce `PROFILE.AMBIGUOUS_NAME`.
-  6. Verify old configs without either new key remain unchanged; old binaries
-     reject `host` as an unknown lint-row field and reject
-     `default_lint_profile` as an unknown `[tool.sc-lint]` key.
+  5. Verify a string unknown default, `"all"`, and a default naming a step
+     produce `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE` only on bare consumer lint;
+     the same config with `sc-lint test` or explicit `--profile ci` succeeds.
+     An empty named profile continues to produce `PROFILE.EMPTY_MEMBERS`, and
+     declaring profile `all` continues to produce `PROFILE.AMBIGUOUS_NAME`.
+  6. Verify malformed/unsupported host values and a no-target host/platform
+     mismatch produce `PROFILE.INVALID_HOST` before scope filtering, including
+     when the row would be scope-filtered. Verify a host without platform
+     filters by host alone. Name the cases
+     `invalid_host_fails_before_platform_scope_filter`,
+     `host_platform_mismatch_without_target_is_invalid`, and
+     `host_without_platform_filters_by_host_only`.
 
   **Compatibility.** Existing configurations without these keys are
   unchanged. Before this change, `host` fails as an unknown lint-row field and
-  `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting a
-  non-local `default_lint_profile` changes that consumer's bare lint run to the
+  `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting
+  `default_lint_profile` changes that consumer's bare lint run to the
   named profile; explicit selectors are unaffected. Both keys require
   sc-lint 0.8.4 or newer, once accepted and implemented; older versions reject
   them during configuration validation.

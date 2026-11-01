@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-022 |
-| Status | Accepted — Rand, 2026-10-31 ("3 - accept") |
+| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Proposed, Pending Rand acceptance |
 | Deciders | Rand |
-| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (proposed); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
+| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Proposed, Pending); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
 
 ## Context
 
@@ -107,41 +107,31 @@ consumer friction arises.
 
 ## Proposed Amendment — Pending Rand Acceptance (#822, #784)
 
-This amendment is a proposal only. The ADR remains Accepted at its existing
-scope; the following changes are not adopted until Rand accepts them in his
-own words. The proposed requirement and full worked example are in
+This amendment is a proposal only. The base ADR remains Accepted at its
+existing scope; the following amendment remains Pending until Rand accepts it
+in his own words. The proposed requirement and full worked example are in
 [REQ-CLI-028](../cli-requirements.md#req-cli-028--proposed-pending-rand-acceptance).
 
-1. **Decision: add host eligibility to consumer lint rows.** Add optional
-   `host = "linux" | "macos" | "windows"`, independently of target `platform`
-   and `target`. Selection expands profile membership, applies platform scope,
-   applies the host eligibility gate, then chooses native cargo/cargo xwin
-   from the actual host. A host mismatch produces non-failing
-   `SkipReason::HostMismatch` / `host_mismatch`; it takes precedence over
-   cross-command and cross-target skips. Scope-filtered rows are omitted
-   silently. Rows without `host` keep the existing report schema; only
-   host-tagged rows gain configured `host` and `actual_host` fields. The
-   selector does not choose cargo xwin; the actual host continues to do so.
+1. **Decision: host selection applies to consumer lint rows only.** Add an
+   optional host selector, independent of target platform, so a consumer can
+   configure host-specific command environments. Test selectors do not accept
+   this field in the amendment.
 2. **Decision: add a lint-only bare-run profile default.** Add optional
-   `default_lint_profile = "<name>"` under `[tool.sc-lint]`. It selects a
-   declared named lint profile only when no direct `--profile` or Just
-   positional selector was provided; a platform scope without a selector
-   still uses the configured default. It does not affect `sc-lint test`.
-   Explicit `all` remains all rows and still composes with scope and host
-   filters. The name does not match a step or an empty/unknown profile; empty
-   membership retains `PROFILE.EMPTY_MEMBERS`, and the existing profile-name
-   rule already rejects a declared profile called `all` with
-   `PROFILE.AMBIGUOUS_NAME`. Proposed error variants are
-   `ProfilePlanDetailCode::InvalidHost` and
-   `ProfilePlanDetailCode::UnknownDefaultLintProfile`. Implementation must add
-   the config field to `ScLintConfigFile` and allow the key in `SC_LINT_KEYS`.
-3. **Rationale for #784.** Default `host` scope already silently removes
+   `default_lint_profile` so consumers choose a named lint profile for bare
+   lint while retaining explicit CI profile selection. It does not apply to
+   `sc-lint test`.
+3. **Rationale for #822 and #784.** Default `host` scope already silently removes
    `platform = "windows"` xwin rows on Linux and macOS. It does not remove a
    Windows-host Windows-platform CI row from a Windows developer's bare run.
    `default_lint_profile` allows CI to select that row while bare lint selects
    the local profile. The example keeps native Windows clippy in `local` and
    uses a distinct CI-only explicit-target `--all-targets` row, so the latter
    adds target-wide CI coverage rather than duplicating default-target clippy.
+   Host-specific literal environments also keep interpreter choice in the
+   consumer configuration, consistent with the base ADR's ownership boundary.
+
+The detailed semantics, validation, compatibility, report examples and
+acceptance criteria are owned by REQ-CLI-028.
 
 Alternatives considered:
 
@@ -155,8 +145,3 @@ Alternatives considered:
 - Per-step `default = false`: rejected because it adds a second inclusion
   rule to each row and complicates the meaning of explicit `all`; the
   consumer-level named profile default keeps inclusion in profile membership.
-
-The default key is `default_lint_profile`, a sibling of `lint_profiles` under
-`[tool.sc-lint]`. TOML cannot define both `[[tool.sc-lint.lint]]` and
-`[tool.sc-lint.lint]`; the name also scopes the setting to lint and leaves
-room for a future test-profile default.
