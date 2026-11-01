@@ -80,8 +80,6 @@ consumer friction arises.
 
 ## Effect On Existing Decisions
 
-If accepted:
-
 - **ADR-016 "How To Extend".** Unchanged. Decision 3 enforces its
   "per-step/per-layer `env`" promise on lint steps.
 - **ADR-020 decision 9.** The outcome stands: `setup.pre` and `runner.python`

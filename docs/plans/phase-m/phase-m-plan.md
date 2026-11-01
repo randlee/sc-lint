@@ -45,8 +45,8 @@ Each stack is rooted on integrate/phase-m. Stack operations follow
 [CLAUDE.md](../../../CLAUDE.md); the lead is the stack writer. The sprint
 beads have no cross-stack must_follow edges. Capacity is two owners:
 clint runs m-1 then m-2; cfast runs m-4 then m-3. These are owner schedules,
-not new dependency gates. m-1's lint-m-adr010 gate is closed; m-4 waits for
-lint-t6i7. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
+not new dependency gates. The m-1 lint-m-adr010 gate and m-4 lint-t6i7
+acceptance gate are closed. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
 amendment, which Rand accepted on 2026-10-31 before dispatch. m-3 implements existing
 ADR-016, REQ-CLI-023 and ADR-020 decisions 7/9. ADR-022 is context for m-2
 and m-3, not their dispatch gate. Plan review and the planning
@@ -94,4 +94,4 @@ test. No extra adoption run or CI gate is introduced.
 
 ## Pending Decisions For Rand
 
-1. Accept ADR-022 (lint-t6i7).
+None; ADR-022 was accepted by Rand on 2026-10-31 (lint-t6i7).

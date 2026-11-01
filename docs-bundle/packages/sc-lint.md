@@ -39,7 +39,8 @@ slow, reporting every failed step; `--fail-fast` stops starting new cargo-lane
 and `after_all` steps after the first failure.
 Lint steps accept `env` and `cwd` just like test command selectors. `env`
 values reach the child verbatim and `cwd` is relative to the repository root.
-With `--log-root`, every executed step writes stdout and stderr
+When a log root is configured (`--log-root` or the configuration file's
+`logging.root`), every executed step writes stdout and stderr
 to `<log-root>/steps/<sanitized-step-name>.log`; sanitized-name collisions
 receive `-2`, `-3` and later suffixes in declaration order. Both streams are
 shown when a step fails.

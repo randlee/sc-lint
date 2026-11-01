@@ -445,8 +445,8 @@ specialized backend tools and mixed Rust/Python implementations.
   its own file under `<log-root>/steps/`, named from the step name (made
   filesystem-safe and unique), overwritten each run.
   (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31
-  ("approve"); ADR-022 decisions 3 and 6 provide related configuration
-  context.)
+  ("approve"); ADR-022 provides context for the consumer configuration
+  surface.)
 
 ## Contract References
 
