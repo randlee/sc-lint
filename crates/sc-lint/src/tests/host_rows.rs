@@ -91,11 +91,34 @@ fn ac1_scope_then_host_then_actual_host_command_adaptation() {
 }
 
 #[test]
+fn ac1_host_mismatch_replaces_unsupported_cross_command() {
+    for host in Platform::ALL {
+        let other = if host == Platform::Windows {
+            "linux"
+        } else {
+            "windows"
+        };
+        let text = consumer_toml(
+            &(row("untagged", &format!("platform='{other}'"))
+                + &row("tagged", &format!("platform='{other}'\nhost='{other}'"))),
+        );
+        let report = run_rows(&text, None, PlatformScope::All, host);
+        assert_eq!(report["steps"][0]["reason"], "unsupported_cross_command");
+        assert_eq!(report["steps"][1]["reason"], "host_mismatch");
+        assert_eq!(
+            run_rows(&text, None, PlatformScope::Host, host)["steps"],
+            json!([])
+        );
+    }
+}
+
+#[test]
 fn ac2_tagged_and_untagged_report_shapes() {
     let text = consumer_toml(
         &(row("plain", "")
             + &row("tagged", "host = 'windows'")
-            + &row("legacy_cross", "platform = 'macos'")),
+            + &row("legacy_cross", "platform = 'macos'")
+            + &row("host_skip", "host = 'linux'")),
     );
     let report = run_rows(&text, None, PlatformScope::All, Platform::Windows);
     assert!(report["steps"][0].get("host").is_none());
@@ -104,6 +127,29 @@ fn ac2_tagged_and_untagged_report_shapes() {
     assert_eq!(report["steps"][2]["reason"], "unsupported_cross_command");
     assert!(report["steps"][2].get("host_selector").is_none());
     assert!(report["steps"][1].get("actual_host").is_none());
+    let (_temp, loaded) = load_consumer_toml(&text);
+    let input = loaded.unwrap().consumer_lint_inputs(None).unwrap().steps;
+    let plan = plan_consumer_lint(&input, None, PlatformScope::All, Platform::Windows).unwrap();
+    let PlanDecision::Run(plain) = &plan[0] else {
+        panic!("plain run")
+    };
+    assert_eq!(plain.context, crate::profile_host::RowContext::default());
+    let PlanDecision::Run(tagged) = &plan[1] else {
+        panic!("tagged run")
+    };
+    assert_eq!(tagged.context.host_selector, Some(Platform::Windows));
+    assert_eq!(tagged.context.actual_host, Some(Platform::Windows));
+    let PlanDecision::Skip(legacy) = &plan[2] else {
+        panic!("legacy skip")
+    };
+    assert_eq!(legacy.host, Platform::Windows);
+    assert_eq!(legacy.context, crate::profile_host::RowContext::default());
+    let PlanDecision::Skip(skipped) = &plan[3] else {
+        panic!("host skip")
+    };
+    assert_eq!(skipped.host, Platform::Windows);
+    assert_eq!(skipped.context.host_selector, Some(Platform::Linux));
+    assert_eq!(skipped.context.actual_host, Some(Platform::Windows));
 }
 
 #[test]
@@ -223,6 +269,22 @@ fn invalid_host_fails_before_platform_scope_filter() {
             "PROFILE.INVALID_HOST"
         );
     }
+    // A Windows row would be omitted on Linux, but its selected relationship
+    // must be checked before that scope filter runs.
+    let text = consumer_toml(&row("bad", "platform='windows'\nhost='linux'"));
+    let (_temp, loaded) = load_consumer_toml(&text);
+    let steps = loaded.unwrap().consumer_lint_inputs(None).unwrap().steps;
+    assert_eq!(
+        plan_consumer_lint(&steps, None, PlatformScope::Host, Platform::Linux)
+            .unwrap_err()
+            .detail_code,
+        ProfilePlanDetailCode::InvalidHost
+    );
+    let valid = consumer_toml(&row("valid", "platform='windows'\nhost='windows'"));
+    assert_eq!(
+        run_rows(&valid, None, PlatformScope::Host, Platform::Linux)["steps"],
+        json!([])
+    );
 }
 
 #[test]
@@ -287,28 +349,23 @@ fn selector_config(fields: &str) -> String {
 #[test]
 fn ac7_env_paths_are_validated_at_load_for_every_row_and_command_selector() {
     let invalid = [
-        "env_paths=[]",
-        "env_paths='bad'",
-        "env_paths={A=3}",
-        "env_paths={A=''}",
-        r#"env_paths={A="x\u0000y"}"#,
-        "env_paths={'A=B'='x'}",
-        "env_paths={''='x'}",
-        r#"env_paths={"A\u0000B"="x"}"#,
+        ("env_paths=[]", "env_paths"),
+        ("env_paths='bad'", "env_paths"),
+        ("env_paths={A=3}", "env_paths.A"),
+        ("env_paths={A=''}", "env_paths.A"),
+        (r#"env_paths={A="x\u0000y"}"#, "env_paths.A"),
+        ("env_paths={'A=B'='x'}", "env_paths.A=B"),
+        ("env_paths={''='x'}", "env_paths."),
+        (r#"env_paths={"A\u0000B"="x"}"#, "env_paths.A\0B"),
     ];
-    for fields in invalid {
+    for (fields, expected_field) in invalid {
         let text = consumer_toml(&(row("good", "") + &row("unselected", fields)));
         let error = load_consumer_toml(&text).1.unwrap_err();
         assert_eq!(
             error.details["detail_code"], "PROFILE.INVALID_STEP_ENV",
             "{fields}"
         );
-        assert!(
-            error.details["field"]
-                .as_str()
-                .unwrap()
-                .starts_with("env_paths")
-        );
+        assert_eq!(error.details["field"], expected_field, "{fields}");
         assert_eq!(
             load_consumer_toml(&selector_config(fields))
                 .1

@@ -14,6 +14,8 @@ from install_helpers import ROOT
 from install_helpers import copy_fixture
 from install_helpers import run
 from install_helpers import write_input
+from install_helpers import run_subprocess
+from conftest import ProductArtifacts
 
 RUST_CONFIG = ROOT / "crates" / "sc-lint" / "src" / "config.rs"
 RUST_PROFILE_PLAN = ROOT / "crates" / "sc-lint" / "src" / "profile_plan.rs"
@@ -141,3 +143,37 @@ def test_install_accepts_and_renders_schema_valid_profile_fields() -> None:
         }
     ]
     assert config["test"] == [{"name": "unit", "command": ["cargo", "test"], "after_all": True}]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(("fields", "detail_code"), [
+    ({"env": {"PYTHON": "literal"}, "env_paths": {"PYTHON": "relative"}}, "PROFILE.DUPLICATE_STEP_ENV_KEY"),
+    ({"platform": "windows", "host": "linux"}, "PROFILE.INVALID_HOST"),
+])
+def test_binary_owns_cross_field_checks_after_install(
+    product_artifacts: ProductArtifacts, fields: dict[str, Any], detail_code: str,
+) -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = write_input(
+        consumer,
+        minimum_version=product_artifacts.version,
+        profiles={"check": {"command": ["cargo", "check"], **fields}},
+    )
+    installed = run("--input", str(input_path), str(consumer))
+    assert installed.returncode == 0, installed.stderr
+    schema = installer_schema()
+    options = schema["properties"]["profiles"]["additionalProperties"]["oneOf"]
+    lint_step = next(option for option in options if option.get("type") == "object")
+    assert "binary owns cross-field validation" in lint_step["description"]
+    assert detail_code in lint_step["description"]
+    # Both errors occur before execution, regardless of the actual host or PATH.
+    result = run_subprocess(
+        [str(product_artifacts.binary), "--json", "--config", str(consumer / "sc-lint.toml"),
+         "lint", "ci", "--consumer", "--platform-scope", "all"],
+        cwd=consumer, text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert result.stdout == ""
+    error = json.loads(result.stderr)["error"]
+    assert error["code"] == "CLI.SC_LINT_PROFILE_CONFIG_INVALID"
+    assert error["details"]["detail_code"] == detail_code

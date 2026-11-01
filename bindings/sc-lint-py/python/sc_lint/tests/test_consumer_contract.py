@@ -435,10 +435,14 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
                 "pathlib.Path('argv.json').write_text(json.dumps(sys.argv[1:]))\n",
                 encoding="utf-8",
             )
+            # cmd /c strips a leading quoted executable when the line has
+            # additional quotes. @ keeps that path inside the command; the
+            # managed recipe normally starts with the unquoted `python` name.
+            python_command = f'@"{sys.executable}"' if os.name == "nt" else f'"{sys.executable}"'
             for tokens in ([], ["", "all"], ["ci", "windows"]):
                 with self.subTest(tokens=tokens):
                     result = subprocess.run(
-                        ["just", "--set", "python", f'"{sys.executable}"', "lint", *tokens],
+                        ["just", "--set", "python", python_command, "lint", *tokens],
                         cwd=consumer,
                         text=True,
                         capture_output=True,

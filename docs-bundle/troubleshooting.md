@@ -28,6 +28,32 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
 | `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, selector, or named profile is invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
 
+## Consumer lint configuration
+
+`CLI.SC_LINT_PROFILE_CONFIG_INVALID` includes a `details.detail_code` and the
+step/field to fix:
+
+| Detail code | Cause | Recovery |
+| --- | --- | --- |
+| `PROFILE.INVALID_HOST` | A lint `host` is not exactly `linux`, `macos`, or `windows`, or a selected no-target row declares different `host` and `platform` values | Correct the host value; match host/platform, omit host, or declare an appropriate target. Host types/values validate at load for every row; the relationship validates only for selected rows, before scope. |
+| `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE` | Bare consumer lint's `default_lint_profile` is empty, unknown, `all`, or names a step | Choose one of the reported available named profiles, or pass an explicit `--profile`. Resolution is lazy; explicit selectors and `sc-lint test` are unaffected. A non-string default instead fails config load. |
+| `PROFILE.INVALID_STEP_ENV` | A lint `env_paths` table, key, or value is malformed | Use non-empty string paths without NUL, and non-empty keys without `=` or NUL. `details.field` identifies `env_paths` or `env_paths.<key>`. |
+| `PROFILE.DUPLICATE_STEP_ENV_KEY` | A lint key occurs in both `env` and `env_paths` | Keep the key in one table: `env` for literal values, `env_paths` for config-root-relative paths. |
+
+Malformed `env_paths` or duplicate environment keys on test command selectors
+use `CLI.SC_LINT_CONFIG_MALFORMED`. Groups reject `env_paths`; test selectors
+reject `host`. The adoption kit schema checks shapes and values, while the
+binary owns duplicate-key and selected no-target host/platform cross-field
+checks. Configs using the new keys require sc-lint 0.8.4 or newer.
+
+A `host_mismatch` row is an eligibility skip, not an error. Check the actual
+`host`, configured `host_selector`, selected profile and platform scope;
+scope-excluded rows have no report row. For an unexpected path, check the
+loaded config file's directory rather than step `cwd`. `env_path_keys` lists
+configured names without exposing resolved values; test listings separately
+retain literal `env_keys`. See [Configuration](./configuration.md) and
+[Using sc-lint](./using-sc-lint.md) for examples and selector defaults.
+
 ## Initialization conflicts
 
 `sc-lint init --just` reports

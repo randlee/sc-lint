@@ -10,7 +10,7 @@
             "items": { "type": "string", "minLength": 1 }
           },
           {
-            "description": "Object lint step matching ConsumerProfileStepFile; the map key supplies the step name unless name is explicitly set.",
+            "description": "Object lint step matching ConsumerProfileStepFile; the map key supplies the step name unless name is explicitly set. The binary owns cross-field validation: env/env_paths duplicate keys (PROFILE.DUPLICATE_STEP_ENV_KEY) and selected no-target platform/host contradictions (PROFILE.INVALID_HOST).",
             "type": "object",
             "additionalProperties": false,
             "required": ["command"],
