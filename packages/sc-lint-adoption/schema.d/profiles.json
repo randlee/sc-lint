@@ -55,7 +55,7 @@
       }
     },
     "lint_profiles": {
-      "description": "Optional named lint profiles: profile name to ordered list of step names from `profiles`. Shape only; the sc-lint binary rejects unknown, duplicate, empty, and colliding members.",
+      "description": "Optional named lint profiles mapping profile names to ordered step-name lists. The sc-lint binary validates membership, unique members, non-empty profiles, and name collisions.",
       "type": "object",
       "additionalProperties": {
         "type": "array",

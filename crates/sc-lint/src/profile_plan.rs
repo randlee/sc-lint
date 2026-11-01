@@ -1,9 +1,9 @@
 //! Consumer lint-profile semantics: validated names, platform/target
 //! declarations, ordered lint profiles, and the pure selection planner.
 //!
-//! Rust is the only place that decides what a consumer's `[[tool.sc-lint.lint]]`
-//! rows and `[tool.sc-lint.lint_profiles]` mean (ADR-017 change 4). The installer
-//! only checks JSON shape. This module owns three things:
+//! Rust owns profile membership and cross-target planning; the installer
+//! enforces platform enums, env property names, and cwd patterns. This module
+//! owns three things:
 //!
 //! - validation of step `platform`/`target` fields and of profile membership,
 //!   reported as [`ProfilePlanError`] with a stable detail code;
