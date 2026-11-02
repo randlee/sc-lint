@@ -85,7 +85,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
 
 @pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--config"],
     ["setup", "extra", "--config", "a"], ["lint", "a", "b", "c", "--config", "a"],
-    ["lint", "", "all", "--config", "a"], ["test", "--config", "a", "--list", "x"],
+    ["lint", "a", "", "--config", "a"], ["test", "--config", "a", "--list", "x"],
     ["exec"], ["exec", "--config", "a", "sc-lint"], ["exec", "--"]])
 def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     result = run_subprocess([sys.executable, str(ASSET), *arguments], text=True, capture_output=True, check=False)
@@ -118,6 +118,11 @@ def test_bootstrap_test_list_conflicts(arguments: list[str]) -> None:
     with pytest.raises(SystemExit) as raised:
         bootstrap.parse(arguments)
     assert raised.value.code == 2
+
+
+def test_bootstrap_lint_accepts_empty_selector_for_scope_only() -> None:
+    bootstrap = load_bootstrap()
+    assert bootstrap.parse(["lint", "", "all", "--config", "c"]) == ("lint", "c", [], ["", "all"], [])
 
 
 def test_bootstrap_lint_accepts_fail_fast() -> None:

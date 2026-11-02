@@ -7,6 +7,7 @@ Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+- [`./adr/ADR-022-tools-and-consumer-configuration.md`](./adr/ADR-022-tools-and-consumer-configuration.md)
 
 ADR-005 governs release-1 profile and `xwin` policy and supersedes earlier
 provisional rollout notes for cross-target preflight membership.
@@ -447,6 +448,327 @@ specialized backend tools and mixed Rust/Python implementations.
   (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31
   ("approve"); ADR-022 provides context for the consumer configuration
   surface.)
+
+- `REQ-CLI-028` — **Accepted (2026-11-01)**
+  Acceptance receipts (verbatim):
+  Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+  team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
+  Delivered in 0.8.4 by the implementation layer stacked above this PR.
+  Consumer lint rows only may declare `host = "linux" | "macos" | "windows"` to
+  select the operating-system host on which that row's command and declared
+  environment apply. `host` is independent of `platform`: `platform` continues
+  to identify the target OS and, when `target` is present, must match that
+  target triple. A row without `host` keeps its existing behavior. A host
+  mismatch is an eligibility skip only; it does not choose the command path.
+  Once a row passes the host filter, `decide` selects native cargo or cargo
+  xwin from the actual host, platform and target.
+
+  Test selectors do not accept `host`; this amendment does not add host
+  selection to test rows. At config load, decode and validate the type and
+  supported value of `host` on every declared lint row, whether or not the
+  row's profile is selected. A non-string or value outside `linux`, `macos`,
+  and `windows` fails with the profile-plan config error detail
+  `PROFILE.INVALID_HOST`. After load, selection order is: (1) expand the
+  selected step/profile membership, (2) validate each selected row's fields
+  and host/platform relationship, (3) apply the platform-scope filter, (4)
+  apply the optional host filter, and (5) call `decide` for remaining rows.
+  The host/platform contradiction check for a no-target row stays in selected
+  row validation, before scope filtering; it does not reject an unselected
+  row. The scope
+  filter matches existing `scope_selects` behavior: default `host` includes
+  untagged rows and rows whose
+  `platform` matches the actual host; `all` includes every platform row; a
+  named scope includes untagged rows and rows tagged for either the actual host
+  or named platform. Scope-filtered rows are omitted silently and never appear
+  in the plan or report. Therefore `platform = "windows"` rows are dropped
+  silently by default host scope on Linux and macOS; the Windows-target xwin
+  rows require `--platform-scope all` (or a scope that selects Windows).
+  Host selection occurs only after scope: `host_mismatch` can appear only for
+  a selected row that survives the scope filter and declares a host different
+  from the actual host. The host check runs before `decide`, replacing either
+  `unsupported_cross_command` or `unsupported_cross_target` when the host does
+  not match. Add `SkipReason::HostMismatch` with stable JSON reason
+  `host_mismatch`.
+
+  Host is needed to split rows that share a `platform`/`target` across
+  different execution hosts, such as Windows-target clippy on Linux versus
+  macOS. For a row without `target`, `platform` already fixes its eligible
+  host; `host` is permitted but redundant. A Windows-target row tagged only
+  `platform = "windows"` is already omitted by default host scope on Linux and
+  macOS, while a row with `host = "linux"` or `"macos"` allows one shared
+  Windows target to use a different literal environment on each host when
+  scope all selects it. Scope host does not exclude a Windows-target row on a
+  Windows developer host. `default_lint_profile` adds the ability to omit a
+  CI-only Windows-host row from bare developer lint while the CI profile still
+  explicitly selects it; it does not change the Unix host-scope filtering of
+  the Linux/macOS xwin rows.
+
+  `env` remains a literal string table: sc-lint passes each value unchanged
+  and does not interpret it as a path. Optional `env_paths` is a table of
+  environment keys to path strings accepted by lint rows and test command
+  selectors. A value is absolute exactly when `std::path::Path::is_absolute`
+  returns true on the actual host; absolute values pass through unchanged.
+  Every other value, including a Windows rooted-but-not-absolute path such as
+  `\x` or drive-relative `C:x`, is joined verbatim to the config root, without
+  separator or `..` normalization. `env_paths` always uses the config root,
+  independent of the step's `cwd`.
+
+  The config root is the directory containing the loaded config file
+  (`config.rs:395-398`). If the config path is relative, make it absolute
+  against the process cwd without canonicalizing; preserve any `..` in that
+  path. This differs from step `cwd`, which is repo-root-relative
+  (`step_exec.rs:74`). Do not canonicalize resolved `env_paths` values, resolve
+  symlinks, or check path existence. `env_paths` is the way to pass
+  config-root-relative paths to child processes. It does not compose or prepend
+  `PATH`; `PATH` composition is out of scope.
+
+  `env_paths` keys follow the `env` key rules: non-empty, with no `=` or NUL.
+  Values must be non-empty strings without NUL. Validate both tables at config
+  load for every declared lint row and test selector, including rows outside
+  the selected lint profile. On lint rows, `StepExecError` key/value errors
+  mirror `env` under `PROFILE.INVALID_STEP_ENV` and identify `env_paths.<key>`;
+  table-shape errors identify `env_paths`. Test-selector load errors use the
+  existing `CLI.SC_LINT_CONFIG_MALFORMED` code. A key declared in both `env` and
+  `env_paths` is invalid: lint rows fail with
+  `PROFILE.DUPLICATE_STEP_ENV_KEY`; test selectors fail with
+  `CLI.SC_LINT_CONFIG_MALFORMED`.
+
+  `env_paths` is command-selector-only for test profiles. Group selectors may
+  not declare `env_paths`, just as they may not declare `env`, `cwd`, or
+  `platforms`; add `env_paths` to `GROUP_FORBIDDEN_KEYS`.
+
+  In `data.steps[]`, `host` always means the actual host. For a row that
+  declares a host selector, add `host_selector` to its Run row and to every
+  skip row (`host_mismatch`, `unsupported_cross_command`, or
+  `unsupported_cross_target`). Keep `host` as the actual host on skips, and
+  include it on host-tagged Run rows. Unannotated Run rows keep their existing
+  report shape; unannotated cross-skip rows retain their existing actual-host
+  `host` field. For example, these are a successful Run row and a
+  host-mismatch skip row:
+
+  ```json
+  {"name":"clippy-windows-linux","kind":"lint","command":"cargo xwin clippy --all-targets --target x86_64-pc-windows-msvc","status":"pass","platform":"windows","target":"x86_64-pc-windows-msvc","host":"linux","host_selector":"linux"}
+  {"name":"clippy-windows-linux","status":"skipped","host":"macos","host_selector":"linux","platform":"windows","target":"x86_64-pc-windows-msvc","reason":"host_mismatch"}
+  ```
+
+  `host_selector` appears only on rows declaring `host`; do not rename or
+  repurpose `host` or add an
+  `actual_host` key. Rows excluded by scope are never reported. A
+  host-mismatch skip is neither a failure nor a scheduler input: it does not
+  fail `--fail-fast`, stop scheduling, block an `after_all` row, or delay its
+  barrier. As today,
+  scope-filtered rows are omitted from the returned plan and report before
+  execution scheduling; the `after_all` barrier covers only runnable rows
+  that pass both filters. Output stays in
+  selected declaration/profile order, independent of execution timing.
+
+  Lint Run and skip rows add `env_path_keys` only when the step declares
+  `env_paths`; lint rows never add `env_keys`. Rows without `env_paths` keep
+  their existing report shape. `env_path_keys` contains only the configured
+  key names, never resolved absolute values. Test-selector listings retain
+  `env_keys` and add a separate `env_path_keys` containing only names from
+  `env_paths`, never the resolved values.
+
+  **Bare-run default.** Optional `default_lint_profile = "<name>"` at
+  `[tool.sc-lint]` applies only to consumer lint. It is a sibling of
+  `lint_profiles`: `[[tool.sc-lint.lint]]` is already an array-of-tables, so
+  `[tool.sc-lint.lint]` cannot also be a table. A direct `sc-lint lint ci
+  --consumer` invocation's `ci` is the required lint target; `--profile NAME`
+  is its explicit consumer selector. In the Just/bootstrap interface,
+  `just lint [selector [scope]]` uses the first positional argument as selector
+  and the second as scope: `just lint ci all` means selector `ci`, scope `all`.
+  If neither explicit selector form is supplied, the named default profile is
+  selected. Direct `--platform-scope all` without `--profile` still selects
+  `default_lint_profile` and applies that scope. In Just, an empty first
+  argument leaves the selector unset so the configured default is used with a
+  second-slot scope: `just lint "" all`. `just lint ci all` supplies the `ci`
+  selector and `all` scope. `--profile all` and Just's positional
+  `all` explicitly select every declared lint row; the scope and host filters
+  still apply. The Just recipe is documented in
+  [just-setup.md](../../docs-bundle/just-setup.md#select-lint-steps-and-run-managed-commands).
+
+  The type of `default_lint_profile` is checked during config load; it must be
+  a string. Profile-name resolution is lazy and occurs only when a bare
+  consumer lint run uses the default. The value must resolve by exact name in
+  `[tool.sc-lint.lint_profiles]`; lint step names are not profiles, so a
+  default naming a step fails with `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`. An
+  empty, unknown, or `"all"` default fails with the same code and reports
+  available lint profile names; `"all"` does not get a separate special error.
+  A profile declaration named `all` is
+  already rejected with the existing `PROFILE.AMBIGUOUS_NAME`. A declared but
+  empty profile continues to fail with the existing `PROFILE.EMPTY_MEMBERS`.
+  `sc-lint test` and consumer lint with an explicit `--profile` do not resolve
+  or fail on an unknown default string.
+
+  The profile-plan detail codes are `ProfilePlanDetailCode::InvalidHost`
+  (`PROFILE.INVALID_HOST`) and `ProfilePlanDetailCode::UnknownDefaultLintProfile`
+  (`PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE`). A host value that is non-string or
+  unsupported fails with `PROFILE.INVALID_HOST` at config load for every
+  declared lint row, including rows outside the selected profile. A host that
+  contradicts `platform` on a row without `target` fails with
+  `PROFILE.INVALID_HOST` during selected-member validation, before platform
+  scope filtering; this relationship check applies only to selected rows. A
+  host without `platform` filters by host alone. With a `target`, host and
+  target platform may differ, enabling cross-host rows.
+  `default_lint_profile` is admitted in `SC_LINT_KEYS` and represented in
+  `ScLintConfigFile`.
+
+  The duplicate-key detail code is `ProfilePlanDetailCode::DuplicateStepEnvKey`
+  (`PROFILE.DUPLICATE_STEP_ENV_KEY`) for a key declared in both `env` and
+  `env_paths` on the same lint row or test selector.
+
+  **Worked example (atm-core).** Use this consumer configuration. It uses a
+  unique name for every row. The Windows-host Windows-target row is a distinct
+  CI-only `--all-targets --target` check; the native Windows row remains a
+  separate default-target check for local development.
+  `just lint ci all` is shorthand for selecting profile `ci` with scope `all`;
+  the direct equivalent is shown after the TOML.
+
+  ```toml
+  [tool.sc-lint]
+  default_lint_profile = "local"
+
+  [tool.sc-lint.lint_profiles]
+  local = ["atm-core-clippy-linux", "atm-core-clippy-macos", "atm-core-clippy-native-windows"]
+  ci = ["atm-core-clippy-linux", "atm-core-clippy-macos", "atm-core-clippy-native-windows", "atm-core-clippy-windows-linux", "atm-core-clippy-windows-macos", "atm-core-clippy-windows"]
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-linux"
+  command = ["cargo", "clippy"]
+  platform = "linux"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-macos"
+  command = ["cargo", "clippy"]
+  platform = "macos"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-native-windows"
+  command = ["cargo", "clippy"]
+  platform = "windows"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows-linux"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "linux"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows-macos"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "macos"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+
+  [[tool.sc-lint.lint]]
+  name = "atm-core-clippy-windows"
+  command = ["cargo", "clippy", "--all-targets"]
+  platform = "windows"
+  target = "x86_64-pc-windows-msvc"
+  host = "windows"
+  env_paths = { PYO3_PYTHON = ".bootstrap-venv/Scripts/python.exe" }
+  ```
+
+  These `PYO3_PYTHON` values use `env_paths` because cargo runs build scripts
+  with the package directory as their working directory; a relative value in
+  `env` would resolve from that package directory. `env_paths` resolves each
+  value from the config root. It does not prepend to `PATH`.
+
+  `sc-lint lint ci --consumer --profile ci --platform-scope all` runs the two
+  Unix-host target rows through cargo xwin and the Windows-host row through
+  native cargo. The host filter selects only rows matching the runner. The
+  Windows-host row is CI-only, so `default_lint_profile = "local"` excludes it
+  from a Windows developer's bare `just lint`; on Linux/macOS, the default
+  scope already silently omits the `platform = "windows"` xwin rows. The
+  Windows-target check therefore runs in CI on all three operating systems and
+  not in a developer's bare lint invocation.
+  A host-matching Linux/macOS row targeting a Windows triple other than
+  `x86_64-pc-windows-msvc` still skips with `unsupported_cross_target`, because
+  `uses_xwin` supports only that target; the host selector does not change this
+  decision.
+
+  **Acceptance tests (deterministic).** Use injected host/platform values and
+  controlled planner/scheduler inputs; do not rely on sleeps, race timing or
+  event-loop ordering:
+
+  1. Verify filter order and reporting: default host scope on Linux/macOS omits
+     Windows-platform rows entirely; scope all admits them to host filtering;
+     mismatched declared hosts yield `host_mismatch`, never either cross skip;
+     matching Linux/macOS hosts choose xwin from actual host; existing untagged
+     cross skips retain their current reasons and report shape.
+  2. Verify host-tagged plan and JSON rows carry actual-host `host` and
+     configured `host_selector`, while untagged Run rows keep their current
+     schema. A selected step outside scope has no report row.
+  3. Verify host-mismatch skips remain non-failing and non-blocking: an
+     `after_all` runnable row is scheduled after all runnable rows, and a
+     host-mismatch skip neither blocks it nor trips `--fail-fast`.
+  4. Verify default selection for `sc-lint lint ci --consumer` without
+     `--profile` and bare `just lint`, explicit `--profile` and Just positional
+     selectors, and direct `--platform-scope all` without `--profile`. Verify
+     it does not affect `sc-lint test`.
+  5. Verify a string unknown default, `"all"`, and a default naming a step
+     produce `PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE` only on bare consumer lint;
+     the same config with `sc-lint test` or explicit `--profile ci` succeeds.
+     An empty named profile continues to produce `PROFILE.EMPTY_MEMBERS`, and
+     declaring profile `all` continues to produce `PROFILE.AMBIGUOUS_NAME`.
+  6. Verify non-string and unsupported host values produce
+     `PROFILE.INVALID_HOST` during config load, even on a lint row outside the
+     selected profile. Verify the no-target host/platform mismatch produces
+     `PROFILE.INVALID_HOST` during selected-member validation before scope
+     filtering, including when the selected row would be scope-filtered.
+     Verify a host without platform filters by host alone. Name the cases
+     `invalid_host_fails_before_platform_scope_filter`,
+     `host_platform_mismatch_without_target_is_invalid`, and
+     `host_without_platform_filters_by_host_only`, and
+     `invalid_host_on_unselected_profile_fails_at_config_load`.
+  7. Verify `env_paths` is accepted by lint rows and test command selectors,
+     and that test group selectors reject it through `GROUP_FORBIDDEN_KEYS`.
+     Malformed tables, invalid keys, empty values and NUL values fail at config
+     load; lint errors use `PROFILE.INVALID_STEP_ENV` and identify
+     `env_paths.<key>` for key/value errors, while test-selector errors use
+     `CLI.SC_LINT_CONFIG_MALFORMED`. Duplicate keys in `env` and `env_paths`
+     fail with `PROFILE.DUPLICATE_STEP_ENV_KEY` on lint rows and
+     `CLI.SC_LINT_CONFIG_MALFORMED` on test selectors.
+  8. Verify `env_paths_uses_config_file_parent_not_step_cwd` with
+     `--config consumer/sc-lint.toml`: the config file's subdirectory is the
+     config root even when a step has `cwd = "crates/pkg"`;
+     `env_paths` ignores that step cwd. For a relative config path, resolve
+     against process cwd without canonicalizing and preserve `..` components.
+     Verify relative env paths resolve from that root on Linux, macOS and
+     Windows: forward slashes work in a relative value such as
+     `venv/Scripts/python.exe`; drive-letter absolute `C:\tools\python.exe`
+     and UNC `\\server\share\python.exe` pass through; rooted-but-not-absolute
+     `\x` and drive-relative `C:x` join to the root. Preserve separators and `..`
+     verbatim when joining, do not reject nonexistent paths, and retain a
+     symlink path without resolving its target.
+  9. Verify lint Run and skip rows add `env_path_keys` only when the step
+     declares `env_paths`, never add `env_keys`, and keep their existing shape
+     otherwise. Verify test-selector listings retain `env_keys` and add a
+     separate `env_path_keys`. Both fields contain only configured key names;
+     resolved absolute values never appear in reports.
+
+  **Compatibility.** Existing configurations without these keys are
+  unchanged. Before this change, `host` and `env_paths` fail as unknown
+  lint-row fields, and `env_paths` is unsupported on test selectors;
+  `default_lint_profile` fails as an unknown `[tool.sc-lint]` key. Adopting
+  `default_lint_profile` changes that consumer's bare lint run to the
+  named profile; explicit selectors are unaffected. `host`,
+  `default_lint_profile`, and `env_paths` require sc-lint 0.8.4 or newer;
+  older versions reject them during configuration validation. The adoption
+  kit schema contract for `packages/sc-lint-adoption/schema.d/profiles.json`
+  requires `host` and `env_paths` on lint step objects and follows the parity
+  rule from #825: it accepts exactly what the binary accepts, including existing
+  `env`, `cwd`, and `after_all` fields. Test selectors are not declared in
+  `install.json` per REQ-CLI-023, so this schema change does not cover them.
+  This PR does not change the schema.
+
+  (Source: #822 and #784, Phase 0.8.4. Accepted 2026-11-01; delivered in 0.8.4 by the implementation layer stacked above this PR. See [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md).)
 
 ## Contract References
 

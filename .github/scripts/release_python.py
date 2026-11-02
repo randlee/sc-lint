@@ -80,17 +80,6 @@ def wheel_asset_pattern(name: str, platform: str, version: str | None = None) ->
     return "^" + distribution + "-" + version_and_tags + "-" + re.escape(platform) + r"\.whl$"
 
 
-def explicit_asset_patterns(manifest):
-    for distribution in manifest.get("python_distributions", []):
-        targets = [item for item in wheel_targets(distribution) if item["platform"]]
-        if not targets:
-            continue
-        for item in targets:
-            yield wheel_asset_pattern(distribution["name"], item["platform"])
-        if distribution["sdist"]:
-            yield "^" + re.escape(distribution["name"]).replace(r"\-", "[-_]") + r"-.*\.tar\.gz$"
-
-
 def verify_platforms(distribution, paths):
     expected = {item["platform"] for item in wheel_targets(distribution) if item["platform"]}
     if not expected:
@@ -104,6 +93,35 @@ def verify_platforms(distribution, paths):
         found |= matched
     if found != expected:
         raise ValueError("Python wheel platform missing from release assets")
+
+
+def asset_rules(manifest: dict, version: str | None = None, *, prerelease: bool = False) -> list[tuple[str, int]]:
+    from release_manifest import release_archive_pattern
+    if version is not None and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+        raise ValueError("release version must be MAJOR.MINOR.PATCH")
+    version_pattern = ".*" if version is None else re.escape(version)
+    rules = []
+    if manifest.get("release_binaries"):
+        rules.extend((release_archive_pattern(manifest["project"], target, version_pattern), 1) for target in manifest.get("release_targets", []))
+    for distribution in manifest.get("python_distributions", []):
+        wheels = wheel_targets(distribution)
+        name = re.escape(distribution["name"].replace("-", "_"))
+        if any(not wheel["platform"] for wheel in wheels):
+            # Legacy runners do not declare platform tags. Require exactly the
+            # declared number of versioned wheels; content validation stays in
+            # verify-python-release-assets, as it was before staging.
+            rules.append(("^" + name + "-" + version_pattern + r"-.*\.whl$", len(wheels)))
+        else:
+            rules.extend((wheel_asset_pattern(distribution["name"], wheel["platform"], version), 1) for wheel in wheels)
+        if distribution.get("sdist") and not prerelease:
+            name = re.escape(distribution["name"]).replace(r"\-", "[-_]")
+            rules.append(("^" + name + "-" + version_pattern + r"\.tar\.gz$", 1))
+    if not prerelease:
+        for package in manifest.get("npm_packages", []):
+            from npm_release import filename as npm_filename
+            pattern = re.escape(npm_filename(package["name"], version)) if version is not None else re.escape(package["name"].replace("@", "").replace("/", "-")) + r"-[0-9].*\.tgz"
+            rules.append(("^" + pattern + "$", 1))
+    return rules
 
 
 def main():

@@ -1,6 +1,6 @@
 {
   "tool": "sc-lint-runtime",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "schema_version": "0.1.0",
   "status": "fail",
   "scanned_crates": 1,

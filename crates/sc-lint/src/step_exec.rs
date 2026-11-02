@@ -8,13 +8,14 @@ use std::path::PathBuf;
 pub(crate) struct StepExecError {
     pub(crate) kind: StepExecErrorKind,
     pub(crate) field: String,
-    cause: String,
+    pub(crate) cause: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StepExecErrorKind {
     Env,
     Cwd,
+    DuplicateEnvKey,
 }
 
 impl StepExecError {

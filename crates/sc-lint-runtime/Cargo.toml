@@ -26,9 +26,9 @@ sc-lint-analyzer-support.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-syn = { version = "2", features = ["full", "parsing", "visit"] }
-thiserror = "1"
+syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }
+thiserror = "2.0.21"
 
 [dev-dependencies]
-dunce = "1"
-tempfile = "3"
+dunce = "1.0.5"
+tempfile = "3.27.0"

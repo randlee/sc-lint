@@ -46,9 +46,10 @@ sc-lint test --config sc-lint.toml
 
 Consumer lint steps are declared in `[[tool.sc-lint.lint]]`; named profiles
 are ordered lists of those step names in `[tool.sc-lint.lint_profiles]`.
-`--profile` selects a step or named profile, and omitting it or using `all`
-runs every step in declaration order. A profile cannot contain another
-profile. `--platform-scope host` is the default: it includes untagged steps and
+`--profile` selects a step or named profile. Omitting it uses
+`[tool.sc-lint] default_lint_profile` when configured; otherwise it selects
+every step. Explicit `--profile all` always selects every step. A profile
+cannot contain another profile. `--platform-scope host` is the default: it includes untagged steps and
 steps for the host OS. `all` also reports unsupported cross-platform commands
 as skips; `linux`, `macos`, or `windows` includes that platform's steps.
 
@@ -81,10 +82,14 @@ Do not put `--target` in the command when using the `target` key. Profiles are
 ordered lists of lint step names; they cannot contain other profiles, and a
 profile name cannot shadow a step name or `all`.
 
-Lint steps also accept `env` and `cwd`, with the same meaning as those keys on
-test command selectors. Environment values are passed verbatim to the child;
+Lint steps also accept `env`, `env_paths`, and `cwd`, with the same meaning as
+those keys on test command selectors. `env` values are passed verbatim;
+relative `env_paths` values resolve from the loaded config file's directory,
+independent of step cwd, without normalizing separators/`..` or resolving
+symlinks. Native absolute values pass through; paths need not exist.
 `cwd` is a non-empty path relative to the repository root, without `..`
-components. Other undeclared lint-step keys remain configuration errors.
+components. A key cannot be declared in both environment tables.
+Other undeclared lint-step keys remain configuration errors.
 
 ```toml
 [[tool.sc-lint.lint]]
@@ -111,6 +116,29 @@ commands as skips; `linux`, `macos`, or `windows` selects that platform's
 steps. Linux and macOS use `cargo xwin` for the Windows MSVC target shown
 above. See [Just setup](./just-setup.md#select-lint-steps-and-run-managed-commands)
 for the consumer command forms.
+
+Lint rows may also declare `host = "linux" | "macos" | "windows"` independently
+of target `platform`. A no-target row's declared `host` and `platform` must
+agree. Selected rows validate before scope filtering; scope runs before host
+eligibility, then the actual host determines native cargo versus xwin.
+`host_mismatch` skips neither fail the run nor block an `after_all` barrier.
+Only rows surviving scope appear in output.
+
+`default_lint_profile` must name a profile in `[tool.sc-lint.lint_profiles]`;
+it is resolved only for a bare consumer lint run. Scope-only selection still
+uses that default. Explicit selectors override it, including `all`;
+`sc-lint test` is unaffected. With the managed Justfile:
+
+```sh
+just lint          # configured default, or every row if no default
+just lint "" all   # configured default with all platform scopes
+just lint ci all   # explicit ci profile with all platform scopes
+```
+
+`host`, `env_paths`, and `default_lint_profile` require sc-lint 0.8.4 or newer;
+existing configs keep their behavior. See [Configuration](./configuration.md)
+for syntax and [Troubleshooting](./troubleshooting.md#consumer-lint-configuration)
+for the new validation codes.
 
 When a consumer adopts the kit, ordinary setup can provision only tools
 declared in `.sc-lint/install.json`, next to `sc-lint.toml`. The persisted JSON
@@ -179,7 +207,10 @@ command = ["cargo", "test", "--test", "integration"]
 group = ["unit", "integration"]
 ```
 
-`env` adds string variables to the inherited environment, `cwd` is relative to
+`env` adds literal string variables to the inherited environment; `env_paths`
+adds path values resolved from the config file's directory as described above.
+Only command selectors accept these fields; groups reject them, and no test
+selector accepts `host`. `cwd` is relative to
 the repository root, and `platforms` (absent or empty means every platform)
 skips the selector on other hosts with a `platform_mismatch` row. `after_all`
 is accepted on command selectors only. Selector names are listed sorted by
@@ -201,6 +232,14 @@ cycle with `test.group_cycle`, and `after_all` on a group with
 `profile.invalid_after_all`.
 
 ## Inspecting output
+
+Lint rows declaring `host` include actual-host `host` and configured
+`host_selector` on Run and skip rows. Untagged Run rows keep their existing
+shape; untagged cross skips retain their actual-host `host`. A lint row adds
+`env_path_keys` only when `env_paths` was declared (including an empty table),
+and never adds `env_keys`. Test-selector listings retain literal `env_keys`
+and add a separate `env_path_keys`. Both contain configured key names only;
+resolved path values never appear in reports.
 
 Add `--json` to receive the stable success/error envelope. Human output names
 the command, stable code, cause, suggested recovery, and documentation guide.

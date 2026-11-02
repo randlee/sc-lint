@@ -991,7 +991,7 @@ def test_github_release_leg_is_detect_and_skip(tmp_path: Path) -> None:
         text.count(
             "if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}"
         )
-        == 5
+        == 4
     )
     assert (
         "if: ${{ steps.published_release_probe.outputs.release_state == 'complete' && inputs.replace_release_assets != true }}"
@@ -1006,7 +1006,9 @@ def test_github_release_leg_is_detect_and_skip(tmp_path: Path) -> None:
     result = run_fixture_command(tmp_path, "release-asset-patterns", manifest=manifest)
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
-        r"^fixture_.*_x86_64\-unknown\-linux\-gnu\.tar\.gz$"
+        r"^fixture_.*_x86_64\-unknown\-linux\-gnu\.tar\.gz$",
+        r"^sc_compose-.*-.*\.whl$",
+        r"^sc[-_]compose-.*\.tar\.gz$",
     ]
 
 
@@ -2215,7 +2217,7 @@ def test_release_workflow_enforces_python_release_invariants() -> None:
     assert "TEST_PYPI_API_TOKEN" in text
     assert "secrets.TEST_PYPI_TOKEN" not in text
     assert "--repository testpypi" in text
-    assert "for pattern in *.tar.gz *.zip *.whl *.tgz; do" in text
+    assert "release_stage.py --manifest" in text
     assert "uses: ./.github/actions/setup-python-release-build" in text
     assert "update-homebrew:" not in text
     assert "publish-winget:" not in text
@@ -2286,6 +2288,7 @@ def test_release_preflight_requires_each_standardized_secret() -> None:
     assert "if result=" not in release_preflight_step_shell("unpublished", "registry_state")
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize(
     ("published", "already_published_channels", "expected_success"),
     (
@@ -2356,6 +2359,7 @@ def test_check_version_unpublished_allows_only_listed_published_channels(
     assert "release version already published for:" in unlisted.stderr
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_gate_readiness_threads_preserved_channel_provenance(
     tmp_path: Path, published_registry_url: str
 ) -> None:
@@ -2390,6 +2394,7 @@ def test_release_gate_readiness_threads_preserved_channel_provenance(
     assert "release version already published for:" in unlisted.stderr
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_gate_final_threads_preserved_channel_provenance(
     tmp_path: Path, published_registry_url: str
 ) -> None:
@@ -2419,6 +2424,7 @@ def test_release_gate_final_threads_preserved_channel_provenance(
     assert "PASS - release gate checks satisfied" in preserved.stdout
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_tag_reuse_requires_verified_ancestor_and_candidate_lineage(
     tmp_path: Path,
 ) -> None:
@@ -2442,6 +2448,7 @@ def test_release_tag_reuse_requires_verified_ancestor_and_candidate_lineage(
     assert "does not descend from release-candidate-v1.5.0" in wrong_candidate.stderr
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_tag_step_emits_resolved_main_sha_for_every_output_path(
     tmp_path: Path,
 ) -> None:
@@ -2469,6 +2476,7 @@ def test_release_tag_step_emits_resolved_main_sha_for_every_output_path(
         )
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_tag_reuse_verifies_real_git_ancestry(tmp_path: Path) -> None:
     """Tag reuse works only for real remote tag/candidate/main ancestry."""
     accepted_repo = write_real_release_tag_fixture(tmp_path / "accepted", "accepted")
@@ -2510,6 +2518,7 @@ def test_root_release_workflow_threads_retry_provenance_and_builds_from_main() -
     assert "ref: ${{ needs.gate-and-tag.outputs.release_ref }}" not in workflow
 
 
+@pytest.mark.usefixtures("posix_shell")
 def test_release_preflight_channel_results_executes_nonempty_json_without_legacy_brace_corruption(
     tmp_path: Path,
 ) -> None:
@@ -3061,15 +3070,11 @@ def test_release_preflight_collects_independent_failures_before_denial() -> None
     assert "REGISTRY_STATE" in preflight_text
 
 
-def test_release_workflow_collects_wheels_without_redundant_zip_sweep() -> None:
+def test_release_workflow_uploads_only_the_dedicated_staging_directory() -> None:
     text = release_workflow_text()
-
-    assert (
-        "find artifacts -type f \\( -name '*.tar.gz' -o -name '*.zip' -o -name '*.tgz' \\) -exec mv {} release/ \\;"
-        in text
-    )
-    assert "find artifacts -type f -name '*.whl' -exec mv {} release/ \\;" in text
-    assert "find artifacts -type f \\( -name '*.zip' -o -name '*.whl' \\)" not in text
+    assert '--source artifacts --destination "$RELEASE_ASSET_DIR"' in text
+    assert "${{ env.RELEASE_ASSET_DIR }}/*" in text
+    assert "release/*" not in text
 
 
 def test_release_workflow_rehearsal_mode_avoids_production_side_effects() -> None:
@@ -3650,33 +3655,22 @@ def test_package_only_release_has_no_binary_asset_expectations(tmp_path):
     assert json.loads(result.stdout)['has_python_wheels'] is True
     result = run_fixture_command(tmp_path, 'release-asset-patterns', manifest=manifest)
     assert result.returncode == 0
-    assert result.stdout == ''
+    assert result.stdout.splitlines() == [r"^sc_compose-.*-.*\.whl$", r"^sc[-_]compose-.*\.tar\.gz$"]
 
 
 @pytest.mark.parametrize("helper", ["artifact_cli", "artifact_git", "script_git"])
-def test_fixture_command_timeout_terminates_stalled_child(tmp_path, monkeypatch, helper):
-    """Exercise the helpers' deadline against a real sleeping child process."""
+def test_fixture_command_timeout_propagates_controlled_failure(tmp_path, monkeypatch, helper):
+    """Check the deadline contract with controlled subprocess failure, without sleeping."""
     import test_publish_kit_scripts as kit_tests
+    deadline = TEST_COMMAND_TIMEOUT_SECONDS
+    commands = []
 
-    real_run = subprocess.run
-    real_popen = subprocess.Popen
-    children = []
-    deadline = 0.2
-    monkeypatch.setattr(sys.modules[__name__], "TEST_COMMAND_TIMEOUT_SECONDS", deadline)
-    monkeypatch.setattr(kit_tests, "TEST_COMMAND_TIMEOUT_SECONDS", deadline)
-
-    def track_child(*args, **kwargs):
-        child = real_popen(*args, **kwargs)
-        children.append(child)
-        return child
-
-    def run_stalled_child(command, **kwargs):
-        # Fail promptly if a helper loses its deadline, then exercise real cleanup.
+    def timed_out(command, **kwargs):
         assert kwargs["timeout"] == deadline
-        return real_run([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+        commands.append(command)
+        raise subprocess.TimeoutExpired(command, deadline)
 
-    monkeypatch.setattr(subprocess, "Popen", track_child)
-    monkeypatch.setattr(subprocess, "run", run_stalled_child)
+    monkeypatch.setattr(subprocess, "run", timed_out)
     with pytest.raises(subprocess.TimeoutExpired) as caught:
         if helper == "artifact_cli":
             run_fixture_command(tmp_path, "--help", manifest=tmp_path / "unused.toml")
@@ -3685,6 +3679,5 @@ def test_fixture_command_timeout_terminates_stalled_child(tmp_path, monkeypatch,
         else:
             kit_tests.ReleaseScriptTests._git(tmp_path, "status")
     assert caught.value.timeout == deadline
-    assert "time.sleep(60)" in str(caught.value)
-    assert len(children) == 1
-    assert children[0].poll() is not None, "timed-out child must be killed and reaped"
+    assert caught.value.cmd == commands[0]
+    assert len(commands) == 1

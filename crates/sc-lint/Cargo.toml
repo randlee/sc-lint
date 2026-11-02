@@ -20,7 +20,7 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
-dunce = "1"
+dunce = "1.0.5"
 etcetera.workspace = true
 sc-observability.workspace = true
 sc-lint-boundary.workspace = true
@@ -31,8 +31,8 @@ semver.workspace = true
 toml.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = "0.2.191"
 
 [dev-dependencies]
-serial_test = "3"
-tempfile = "3"
+serial_test = "4.0.1"
+tempfile = "3.27.0"

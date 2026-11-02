@@ -3,13 +3,14 @@
 import struct
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from verify_release_arch import machine, verify
+from verify_release_arch import machine, pe_imports, verify
 
 
 @pytest.mark.parametrize("arch,expected", [(62, ("elf", 62)), (183, ("elf", 183))])
@@ -119,3 +120,96 @@ def test_pypi_verifier_accepts_all_six_matching_payloads(tmp_path):
         cwd=root, capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+def pe_image(dlls=(), arch=0x8664, pe32=False):
+    """Small PE with an import directory inside a section, not at its start."""
+    data = bytearray(0x600)
+    pe, optional = 0x80, 0x98
+    optional_size = 0xE0 if pe32 else 0xF0
+    directories = optional + (96 if pe32 else 112)
+    data[:2] = b"MZ"
+    struct.pack_into("<I", data, 0x3C, pe)
+    data[pe:pe + 4] = b"PE\0\0"
+    struct.pack_into("<HH", data, pe + 4, arch, 1)
+    struct.pack_into("<H", data, pe + 20, optional_size)
+    struct.pack_into("<H", data, optional, 0x10B if pe32 else 0x20B)
+    struct.pack_into("<I", data, optional + 60, 0x200)
+    struct.pack_into("<I", data, directories - 4, 16)
+    section = optional + optional_size
+    data[section:section + 8] = b".fixture"
+    struct.pack_into("<IIII", data, section + 8, 0x400, 0x3000, 0x400, 0x200)
+    if dlls:
+        struct.pack_into("<II", data, directories + 8, 0x3040, (len(dlls) + 1) * 20)
+    name_offset = 0x400
+    for index, dll in enumerate(dlls):
+        encoded = dll.encode("ascii") + b"\0"
+        struct.pack_into("<IIIII", data, 0x240 + index * 20,
+                         0x3380, 0, 0, 0x3000 + name_offset - 0x200, 0x3380)
+        data[name_offset:name_offset + len(encoded)] = encoded
+        name_offset += len(encoded)
+    # An unreferenced string must never be mistaken for an imported DLL.
+    marker = b"VCRUNTIME140.dll\0"
+    data[0x580:0x580 + len(marker)] = marker
+    return bytes(data)
+
+
+def binary_payload(tmp_path, data):
+    root = Path(__file__).resolve().parents[3]
+    manifest = root / "release/publish-artifacts.toml"
+    names = [entry["name"] for entry in tomllib.loads(manifest.read_text())["release_binaries"]]
+    for name in names:
+        (tmp_path / f"{name}.exe").write_bytes(data)
+    return manifest, names
+
+
+@pytest.mark.parametrize(("target", "arch"), [
+    ("x86_64-pc-windows-msvc", 0x8664), ("aarch64-pc-windows-msvc", 0xAA64),
+])
+@pytest.mark.parametrize("dll", ["VCRUNTIME140.dll", "vcruntime140_1.DLL", "MSVCP140.dll",
+                                 "api-ms-win-crt-runtime-l1-1-0.dll"])
+def test_windows_binaries_reject_dynamic_crt(tmp_path, target, arch, dll):
+    manifest, names = binary_payload(tmp_path, pe_image(["KERNEL32.dll"], arch))
+    failing = names[-1] + ".exe"
+    (tmp_path / failing).write_bytes(pe_image(["KERNEL32.dll", dll], arch))
+    with pytest.raises(ValueError) as error:
+        verify(tmp_path, target, manifest)
+    assert failing in str(error.value)
+    assert dll in str(error.value)
+
+
+@pytest.mark.parametrize(("target", "arch"), [
+    ("x86_64-pc-windows-msvc", 0x8664), ("aarch64-pc-windows-msvc", 0xAA64),
+])
+@pytest.mark.parametrize("dlls", [[], ["KERNEL32.dll", "ntdll.dll", "api-ms-win-core-synch-l1-2-0.dll",
+                                      "SHELL32.dll", "combase.dll", "USERENV.dll", "bcryptprimitives.dll"]])
+def test_windows_binaries_accept_system_imports(tmp_path, target, arch, dlls):
+    manifest, _ = binary_payload(tmp_path, pe_image(dlls, arch))
+    verify(tmp_path, target, manifest)
+
+
+@pytest.mark.parametrize("pe32", [False, True])
+def test_pe_imports_decode_optional_header_variants(pe32):
+    assert pe_imports(pe_image(["KERNEL32.dll", "MSVCP140.dll"], pe32=pe32)) == ["KERNEL32.dll", "MSVCP140.dll"]
+
+
+def test_windows_wheel_keeps_dynamic_crt_policy(tmp_path):
+    wheel = tmp_path / "fixture-win_amd64.whl"
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr("fixture/_native.pyd", pe_image(["VCRUNTIME140.dll"]))
+    verify(wheel, "x86_64-pc-windows-msvc")
+
+
+@pytest.mark.parametrize("corruption", ["truncated_optional", "invalid_rva", "unterminated_table", "unterminated_name"])
+def test_pe_imports_reject_malformed_tables(corruption):
+    data = bytearray(pe_image(["KERNEL32.dll"]))
+    if corruption == "truncated_optional":
+        data = data[:0x100]
+    elif corruption == "invalid_rva":
+        struct.pack_into("<I", data, 0x98 + 112 + 8, 0x9000)
+    elif corruption == "unterminated_table":
+        struct.pack_into("<I", data, 0x98 + 112 + 12, 20)
+    else:
+        data[0x400:] = b"x" * (len(data) - 0x400)
+    with pytest.raises(ValueError):
+        pe_imports(data)

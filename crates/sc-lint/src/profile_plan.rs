@@ -1,9 +1,9 @@
 //! Consumer lint-profile semantics: validated names, platform/target
 //! declarations, ordered lint profiles, and the pure selection planner.
 //!
-//! Rust is the only place that decides what a consumer's `[[tool.sc-lint.lint]]`
-//! rows and `[tool.sc-lint.lint_profiles]` mean (ADR-017 change 4). The installer
-//! only checks JSON shape. This module owns three things:
+//! Rust owns profile membership and cross-target planning; the installer
+//! enforces platform enums, env property names, and cwd patterns. This module
+//! owns three things:
 //!
 //! - validation of step `platform`/`target` fields and of profile membership,
 //!   reported as [`ProfilePlanError`] with a stable detail code;
@@ -28,10 +28,13 @@ use std::path::Path;
 
 use serde_json::json;
 
+mod step;
 use crate::CliError;
 use crate::config::CONSUMER_SELECTOR_ALL;
+use crate::profile_host::RowContext;
 use crate::scheduler::ProfileCode;
 use crate::workflow::WINDOWS_XWIN_TARGET;
+pub(crate) use step::ConsumerProfileStep;
 
 /// Decodes an optional `after_all` value of a lint or test row.
 ///
@@ -83,6 +86,12 @@ pub enum ProfilePlanDetailCode {
     InvalidStepEnv,
     /// A lint step has malformed working-directory data.
     InvalidStepCwd,
+    /// Unsupported or contradictory execution host.
+    InvalidHost,
+    /// Bare lint default does not name a lint profile.
+    UnknownDefaultLintProfile,
+    /// A key occurs in both literal and path environments.
+    DuplicateStepEnvKey,
     /// A step declares `target` without `platform`.
     TargetRequiresPlatform,
     /// A step's `target` is malformed or names a different OS than `platform`.
@@ -102,6 +111,9 @@ impl ProfilePlanDetailCode {
             Self::UnknownStepField => "PROFILE.UNKNOWN_STEP_FIELD",
             Self::InvalidStepEnv => "PROFILE.INVALID_STEP_ENV",
             Self::InvalidStepCwd => "PROFILE.INVALID_STEP_CWD",
+            Self::InvalidHost => "PROFILE.INVALID_HOST",
+            Self::UnknownDefaultLintProfile => "PROFILE.UNKNOWN_DEFAULT_LINT_PROFILE",
+            Self::DuplicateStepEnvKey => "PROFILE.DUPLICATE_STEP_ENV_KEY",
             Self::TargetRequiresPlatform => "PROFILE.TARGET_REQUIRES_PLATFORM",
             Self::TargetOsMismatch => "PROFILE.TARGET_OS_MISMATCH",
             Self::UnsupportedCommandShape => "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
@@ -382,6 +394,7 @@ pub struct PlannedStep {
     after_all: bool,
     env: BTreeMap<String, String>,
     cwd: Option<std::path::PathBuf>,
+    pub(crate) context: RowContext,
 }
 
 impl PlannedStep {
@@ -448,6 +461,8 @@ pub enum SkipReason {
     UnsupportedCrossCommand,
     /// A targeted cargo step has no supported toolchain path from this host.
     UnsupportedCrossTarget,
+    /// The selected row declares a different execution host.
+    HostMismatch,
 }
 
 impl SkipReason {
@@ -456,6 +471,7 @@ impl SkipReason {
         match self {
             Self::UnsupportedCrossCommand => "unsupported_cross_command",
             Self::UnsupportedCrossTarget => "unsupported_cross_target",
+            Self::HostMismatch => "host_mismatch",
         }
     }
 }
@@ -468,7 +484,8 @@ pub struct SkipRecord {
     /// The host the plan was made for.
     pub host: Platform,
     /// The step's declared platform.
-    pub platform: Platform,
+    pub platform: Option<Platform>,
+    pub(crate) context: RowContext,
     /// The step's declared target, when it has one.
     pub target: Option<Target>,
     /// Why the step was skipped.
@@ -567,7 +584,7 @@ pub(crate) fn decode_lint_step_fields(
             Some(step),
             Some(key),
             format!("lint step `{step}` has unknown field `{key}`"),
-            "Lint steps accept only `name`, `command`, `platform`, `target`, `after_all`, `env` and `cwd`.",
+            "Lint steps accept only `name`, `command`, `platform`, `target`, `after_all`, `host`, `env`, `env_paths` and `cwd`.",
         ));
     }
     let platform = platform
@@ -606,8 +623,9 @@ pub(crate) fn decode_lint_step_fields(
 /// Rejects profile-only fields on a consumer test row.
 ///
 /// # Errors
-/// Returns `UNKNOWN_STEP_FIELD` because test rows support only `name` and
-/// `command`; platform profile selection applies exclusively to lint rows.
+/// Returns `UNKNOWN_STEP_FIELD` because test rows support only `name`,
+/// `command` and `after_all`; platform profile selection applies exclusively
+/// to lint rows.
 pub(crate) fn reject_test_step_fields(
     step: &str,
     platform: Option<&toml::Value>,
@@ -627,7 +645,7 @@ pub(crate) fn reject_test_step_fields(
         Some(step),
         Some(field),
         format!("test step `{step}` has unsupported field `{field}`"),
-        "Test steps accept only `name` and `command`; move platform selection to a lint step.",
+        "Test steps accept only `name`, `command` and `after_all`; move platform selection to a lint step.",
     ))
 }
 
@@ -772,6 +790,7 @@ pub fn plan_consumer_lint(
     let mut decisions = Vec::with_capacity(members.len());
     for step in members {
         validate_lint_step(step)?;
+        crate::profile_host::validate_selected_host(step)?;
         if scope_selects(step.platform(), scope, host) {
             decisions.push(decide(step, host)?);
         }
@@ -822,24 +841,44 @@ fn scope_selects(platform: Option<Platform>, scope: PlatformScope, host: Platfor
 }
 
 fn decide(step: &ConsumerProfileStep, host: Platform) -> Result<PlanDecision, ProfilePlanError> {
+    if step
+        .context()
+        .host_selector
+        .is_some_and(|selector| selector != host)
+    {
+        return Ok(PlanDecision::Skip(SkipRecord {
+            name: step.name().to_owned(),
+            host,
+            platform: step.platform(),
+            target: step.target().cloned(),
+            reason: SkipReason::HostMismatch,
+            context: step.context().clone().on_host(host),
+        }));
+    }
     let Some(platform) = step.platform() else {
-        return Ok(PlanDecision::Run(planned(step, None, false)?));
+        return Ok(PlanDecision::Run(planned(step, None, false, host)?));
     };
     let skip = |reason| {
         PlanDecision::Skip(SkipRecord {
             name: step.name().to_string(),
             host,
-            platform,
+            platform: Some(platform),
+            context: step.context().clone().on_host(host),
             target: step.target().cloned(),
             reason,
         })
     };
     match step.target() {
-        None if platform == host => Ok(PlanDecision::Run(planned(step, None, false)?)),
+        None if platform == host => Ok(PlanDecision::Run(planned(step, None, false, host)?)),
         None => Ok(skip(SkipReason::UnsupportedCrossCommand)),
-        Some(_) if platform == host => Ok(PlanDecision::Run(planned(step, step.target(), false)?)),
+        Some(_) if platform == host => Ok(PlanDecision::Run(planned(
+            step,
+            step.target(),
+            false,
+            host,
+        )?)),
         Some(target) if uses_xwin(platform, target, host) => {
-            Ok(PlanDecision::Run(planned(step, Some(target), true)?))
+            Ok(PlanDecision::Run(planned(step, Some(target), true, host)?))
         }
         Some(_) => Ok(skip(SkipReason::UnsupportedCrossTarget)),
     }
@@ -856,6 +895,7 @@ fn planned(
     step: &ConsumerProfileStep,
     target: Option<&Target>,
     xwin: bool,
+    host: Platform,
 ) -> Result<PlannedStep, ProfilePlanError> {
     let (command, args) = match target {
         Some(target) => targeted_argv(step, target, xwin)?,
@@ -883,6 +923,7 @@ fn planned(
         after_all: step.after_all(),
         env: step.env().clone(),
         cwd: step.cwd().map(Path::to_path_buf),
+        context: step.context().clone().on_host(host),
     })
 }
 
@@ -924,84 +965,6 @@ fn targeted_argv(
     Ok(("cargo".into(), args))
 }
 
-/// A command is decoded and validated at the TOML boundary, so profile
-/// orchestration never needs to split shell strings or infer consumer policy.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ConsumerProfileStep {
-    name: String,
-    command: Vec<String>,
-    platform: Option<Platform>,
-    target: Option<Target>,
-    after_all: bool,
-    env: BTreeMap<String, String>,
-    cwd: Option<std::path::PathBuf>,
-}
-
-impl ConsumerProfileStep {
-    /// Builds a step from already-decoded fields; semantic checks live in
-    /// [`validate_lint_step`].
-    pub(crate) fn new(
-        name: impl Into<String>,
-        command: Vec<String>,
-        platform: Option<Platform>,
-        target: Option<Target>,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            command,
-            platform,
-            target,
-            after_all: false,
-            env: BTreeMap::new(),
-            cwd: None,
-        }
-    }
-
-    /// Sets the decoded `after_all` flag of the row.
-    pub(crate) const fn with_after_all(mut self, after_all: bool) -> Self {
-        self.after_all = after_all;
-        self
-    }
-
-    pub(crate) fn with_execution(
-        mut self,
-        env: BTreeMap<String, String>,
-        cwd: Option<std::path::PathBuf>,
-    ) -> Self {
-        self.env = env;
-        self.cwd = cwd;
-        self
-    }
-
-    pub(crate) fn env(&self) -> &BTreeMap<String, String> {
-        &self.env
-    }
-
-    pub(crate) fn cwd(&self) -> Option<&Path> {
-        self.cwd.as_deref()
-    }
-
-    pub(crate) const fn after_all(&self) -> bool {
-        self.after_all
-    }
-
-    pub(crate) fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub(crate) fn command(&self) -> &[String] {
-        &self.command
-    }
-
-    pub(crate) const fn platform(&self) -> Option<Platform> {
-        self.platform
-    }
-
-    pub(crate) const fn target(&self) -> Option<&Target> {
-        self.target.as_ref()
-    }
-}
-
 /// Everything the planner needs for one consumer lint selection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LintPlanInput<'a> {
@@ -1010,6 +973,7 @@ pub(crate) struct LintPlanInput<'a> {
     pub(crate) steps: Vec<ConsumerProfileStep>,
     /// A single-step selector for the planner; `None` selects every `steps` entry.
     pub(crate) selector: Option<ProfileName>,
+    pub(crate) report_selector: String,
 }
 
 pub(crate) fn profile_plan_config_error(error: ProfilePlanError, path: &Path) -> CliError {

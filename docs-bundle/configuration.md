@@ -31,21 +31,57 @@ concurrently (cargo steps serialized in declaration order) and every failed
 entry is reported. Keep commands explicit and reproducible; do not hide
 required work behind an advisory alias.
 
-Lint steps also accept `env` and `cwd`, with the same meaning as these fields
-on test command selectors. Values are passed literally to the child process;
-sc-lint does not expand variables or resolve environment values as paths.
-`cwd` is relative to the repository root.
+Lint steps accept `env`, `env_paths`, and `cwd`, as do test command
+selectors. `env` values are literal strings: no expansion or path resolution.
+`env_paths` values are non-empty strings without NUL. Keys in both tables must
+be non-empty and contain neither `=` nor NUL; a key cannot occur in both.
+`cwd` is a path relative to the repository root, without `..` components.
+
+An absolute `env_paths` value passes through according to the actual host's
+native path rules. Every other value is concatenated verbatim to the loaded
+config file's directory, independent of step `cwd`. A relative config filename
+is made absolute against process cwd without canonicalizing. Separators,
+`..`, and symlinks are preserved; paths need not exist. On Windows, absolute
+drive paths and UNC paths pass through, while `\x` and `C:x` are relative
+values for this purpose. `env_paths` does not compose `PATH`.
 
 ```toml
 [[tool.sc-lint.lint]]
 name = "atm-core-clippy"
 command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
-env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+env_paths = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
 cwd = "crates/atm-core"
 ```
 
-Here `PYO3_PYTHON` is passed verbatim; the child tool decides how to interpret
-it. `[tool.sc-lint].setup` and `[tool.sc-lint].runner` are not supported keys.
+Lint rows alone accept `host = "linux" | "macos" | "windows"`. `host` selects
+where a row can execute; `platform` remains its target OS. With no `target`,
+declared `host` and `platform` must agree. Scope filtering runs before host
+eligibility; scope-omitted rows produce no report, while a host mismatch is a
+non-failing `host_mismatch` skip. Native cargo or xwin is chosen from the
+actual host after these filters.
+
+Set a named default for bare consumer lint under the tool table, alongside
+`minimum_version` (before any array-of-table row):
+
+```toml
+[tool.sc-lint]
+minimum_version = "0.8.4"
+default_lint_profile = "local"
+
+[tool.sc-lint.lint_profiles]
+local = ["atm-core-clippy"]
+```
+
+The default must name a declared lint profile, not a step or `all`. It is
+resolved only when no explicit selector is supplied; `--profile` and
+`sc-lint test` are unaffected. Without a default, bare lint keeps selecting all
+rows. These new keys require sc-lint 0.8.4 or newer. Test group selectors and
+legacy test rows do not accept `env_paths`; test selectors never accept `host`.
+See [troubleshooting](./troubleshooting.md#consumer-lint-configuration) for
+validation codes and [using sc-lint](./using-sc-lint.md#inspecting-output) for
+`host_selector` and `env_path_keys` report metadata.
+`[tool.sc-lint].setup` and `[tool.sc-lint].runner` remain unsupported keys.
+
 When a log root is configured (`--log-root` or the configuration file's
 `logging.root`), each executed profile step writes both output streams
 to `<log-root>/steps/<sanitized-step-name>.log`. ASCII letters, digits, `_` and

@@ -4,6 +4,9 @@ set -euo pipefail
 
 case "$1" in
   binaries)
+    if [[ "$BUILD_TARGET" == *-pc-windows-msvc ]]; then
+      export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C target-feature=+crt-static"
+    fi
     bins="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "$RELEASE_ARTIFACT_MANIFEST")"
     if [[ "$BUILD_TARGET" == 'aarch64-unknown-linux-gnu' ]]; then
       build_venv="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/release-zigbuild.XXXXXXXX")"

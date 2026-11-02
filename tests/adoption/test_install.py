@@ -743,7 +743,10 @@ def test_analyzer_worked_example_declares_all_just_layers() -> None:
             check=False,
         )
         assert command.returncode == 0, command.stderr
-        forwarded = " ".join([arguments[0], "--config", "sc-lint.toml", *arguments[1:]])
+        positional = list(arguments[1:])
+        if arguments[0] == "lint":
+            positional = [f'"{positional[0]}"', *positional[1:]] if positional else ['""']
+        forwarded = " ".join([arguments[0], "--config", "sc-lint.toml", *positional])
         assert command.stderr.rstrip().endswith(forwarded), command.stderr
 
 

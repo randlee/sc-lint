@@ -611,6 +611,12 @@ mod tests {
     fn parses_frozen_boundary_directive_grammar_corpus() {
         let cases = [
             (
+                quote!(boundary.allow("cycle.recursive_value_container")),
+                vec![Directive::Allow(vec![
+                    "cycle.recursive_value_container".to_string(),
+                ])],
+            ),
+            (
                 quote!(boundary.allow("cycle.type_method_self_loop")),
                 vec![Directive::Allow(vec![
                     "cycle.type_method_self_loop".to_string(),

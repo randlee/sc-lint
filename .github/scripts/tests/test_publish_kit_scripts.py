@@ -1,6 +1,7 @@
 """Package-native unit tests for the vendored GitHub scripts."""
 
 from __future__ import annotations
+import pytest
 
 import importlib.util
 import os
@@ -114,6 +115,7 @@ class RegistryVersionStateTests(unittest.TestCase):
 
 
 class ReleaseScriptTests(unittest.TestCase):
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_has_valid_bash_syntax(self) -> None:
         result = subprocess.run(
             ["bash", "-n", str(SCRIPTS / "release_gate.sh")],
@@ -124,6 +126,7 @@ class ReleaseScriptTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_accepts_main_with_post_cut_develop_drift(self) -> None:
         """A release stays valid when new work lands on develop after the RC cut."""
         with tempfile.TemporaryDirectory() as directory:
@@ -199,6 +202,7 @@ class ReleaseScriptTests(unittest.TestCase):
         self.assertIn("PASS - release gate checks satisfied", result.stdout)
         self.assertEqual(emitted_output, f"release_sha={release_sha}\n")
 
+    @pytest.mark.usefixtures("posix_shell")
     def test_release_gate_rejects_candidate_outside_release_history(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -329,11 +333,12 @@ class ReleaseScriptTests(unittest.TestCase):
     def test_write_cli_wrapper_emits_render_compatible_script(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             venv = Path(temporary)
-            python = venv / "bin" / "python"
+            python = BOOTSTRAP.python_path(venv)
             wrapper = BOOTSTRAP.write_cli_wrapper(venv, python)
             text = wrapper.read_text(encoding="utf-8")
-            self.assertEqual(wrapper, venv / "bin" / "renderer")
-            self.assertTrue(wrapper.stat().st_mode & 0o111)
+            self.assertEqual(wrapper, BOOTSTRAP.renderer_cli_path(venv))
+            if os.name != "nt":  # Windows does not expose POSIX executable mode bits.
+                self.assertTrue(wrapper.stat().st_mode & 0o111)
             self.assertIn("sc_compose.ComposeMode.file", text)
             self.assertIn("--var-file", text)
             self.assertIn('choices=["render"]', text)

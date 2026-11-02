@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-022 |
-| Status | Accepted — Rand, 2026-10-31 ("3 - accept") |
+| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Accepted — 2026-11-01. Receipts: Rand 2026-11-01: "I approve conditionally on atm-core acceptance."; team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core." |
 | Deciders | Rand |
-| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786 |
+| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Accepted — 2026-11-01); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
 
 ## Context
 
@@ -57,8 +57,9 @@ consumer friction arises.
    A new consumer setting goes on one of these surfaces.
 
 3. **Parallel keys.** A lint step and a test command selector accept the same
-   execution keys: `command`, `env`, `cwd`, platform restriction and
-   `after_all`.
+   execution keys: `command`, `env`, `env_paths` (added by amendment
+   decision 4), `cwd`, `platform` on lint steps, `platforms` on test
+   selectors, and `after_all`.
 
 4. **PORT-010 site allowance.** PORT-010 can be allowed at a single site with
    `#[sc_lint(allow(PORT-010), reason = "...")]`. This is the exception path
@@ -104,3 +105,61 @@ consumer friction arises.
   and documenting owner `tests/` roots in `allowed_source_roots`.
 - #786 shapes PORT-010 does not recognise, including S8, have a defined
   exception path.
+
+## Accepted Amendment — 2026-11-01 (#822, #784)
+
+This amendment was accepted on 2026-11-01. Acceptance receipts (verbatim):
+
+Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
+
+team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
+
+REQ-CLI-028 was delivered in 0.8.4 by the implementation layer stacked above
+PR #826. Revisions fe9ab8de and 62caf3d9 were clarifications sent to atm-dev;
+there was no objection. The full requirement and worked example are in
+[REQ-CLI-028](../cli-requirements.md#req-cli-028--accepted-2026-11-01).
+
+1. **Decision: host selection applies to consumer lint rows only.** Add an
+   optional host selector, independent of target platform, so a consumer can
+   configure host-specific command environments. Test selectors do not accept
+   this field in the amendment.
+2. **Decision: add a lint-only bare-run profile default.** Add optional
+   `default_lint_profile` so consumers choose a named lint profile for bare
+   lint while retaining explicit CI profile selection. It does not apply to
+   `sc-lint test`.
+3. **Rationale for #822 and #784.** Default `host` scope already silently removes
+   `platform = "windows"` xwin rows on Linux and macOS. It does not remove a
+   Windows-host Windows-platform CI row from a Windows developer's bare run.
+   `default_lint_profile` allows CI to select that row while bare lint selects
+   the local profile. The example keeps native Windows clippy in `local` and
+   uses a distinct CI-only explicit-target `--all-targets` row, so the latter
+   adds target-wide CI coverage rather than duplicating default-target clippy.
+   Host-specific consumer environments also keep interpreter choice in the
+   consumer configuration, consistent with the base ADR's ownership boundary.
+4. **Decision: config-root-relative path environment.** Add optional
+   `env_paths` to lint steps and test selectors. It maps environment keys to
+   paths: relative values resolve against the directory containing the loaded
+   config file, while absolute values pass through unchanged. Do not
+   canonicalize paths, resolve symlinks, check existence, or prepend to `PATH`.
+   Keep `env` literal. Build scripts such as PyO3's may run with the package
+   directory as their cwd, so a repo-relative value in `env` resolves from the
+   wrong directory. `env_paths` lets the consumer declare the path explicitly
+   without sc-lint knowing a venv placeholder or layout.
+
+The detailed semantics, validation, compatibility, report examples and
+acceptance criteria are owned by REQ-CLI-028.
+
+Alternatives considered:
+
+- `env_by_host`: rejected because it adds host branching inside environment
+  configuration instead of keeping each command and its literal environment
+  together in a selectable row.
+- Venv placeholder: rejected because it makes sc-lint interpret a
+  consumer-specific filesystem convention. `env_paths` instead carries an
+  explicit consumer-declared path and gives sc-lint no knowledge of venv
+  layout.
+- Unix alias: rejected because Linux and macOS are distinct host values with
+  different interpreter paths and execution support.
+- Per-step `default = false`: rejected because it adds a second inclusion
+  rule to each row and complicates the meaning of explicit `all`; the
+  consumer-level named profile default keeps inclusion in profile membership.

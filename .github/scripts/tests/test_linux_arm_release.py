@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".just/test_linux_arm_release.sh"
 
 
+@pytest.mark.usefixtures("posix_shell")
 @pytest.mark.parametrize("running", [True, False])
 def test_recipe_requires_running_colima_without_changing_its_lifecycle(tmp_path, running):
     bindir = tmp_path / "bin"

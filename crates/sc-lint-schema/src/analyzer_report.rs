@@ -66,11 +66,8 @@ pub fn validate_analyzer_report(value: &Value) -> Result<(), AnalyzerReportDrift
 
     match validator.validate(value) {
         Ok(()) => Ok(()),
-        Err(mut errors) => {
-            let error = errors
-                .next()
-                .expect("a failed validation must report at least one error");
-            let instance_path = error.instance_path.to_string();
+        Err(error) => {
+            let instance_path = error.instance_path().to_string();
             Err(AnalyzerReportDrift {
                 instance_path: if instance_path.is_empty() {
                     "$".to_string()

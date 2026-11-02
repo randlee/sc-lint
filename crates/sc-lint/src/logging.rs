@@ -5,7 +5,6 @@ use std::time::Duration;
 use sc_observability::ActionName;
 use sc_observability::Level;
 use sc_observability::LogEvent;
-use sc_observability::Logger;
 use sc_observability::LoggerConfig;
 use sc_observability::OBSERVATION_ENVELOPE_VERSION;
 use sc_observability::OutcomeLabel;
@@ -14,6 +13,7 @@ use sc_observability::SchemaVersion;
 use sc_observability::ServiceName as ObservabilityServiceName;
 use sc_observability::TargetCategory;
 use sc_observability::Timestamp;
+use sc_observability::v2::Logger;
 use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
@@ -304,7 +304,7 @@ fn dispatch_event(
             return;
         }
     };
-    let _ = logger.emit(event);
+    let _ = logger.log(event);
 }
 
 #[expect(
