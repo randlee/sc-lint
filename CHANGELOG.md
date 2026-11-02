@@ -32,6 +32,8 @@ All notable changes to sc-lint are documented here.
 
 ### Fixed
 
+- Windows release binaries statically link the MSVC runtime and no longer
+  require an installed Visual C++ runtime.
 - Future stable releases and prereleases upload only manifest-declared
   payloads and their checksums from dedicated staging directories. Checked-in
   release notes, templates, manifests and pin files are no longer uploaded as
