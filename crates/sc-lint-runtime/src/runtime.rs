@@ -59,6 +59,7 @@ struct RuntimeFinding {
     message: String,
     source_path: PathBuf,
     line: usize,
+    column: usize,
     package: PackageName,
     target: TargetName,
     node_label: String,
@@ -73,31 +74,7 @@ pub(crate) fn analyze_runtime_liveness(
     let sleep_scope = SleepScope::from_workspace(workspace);
     let file_findings = source_files
         .par_iter()
-        .map(|file_context| {
-            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
-                format!(
-                    "failed to read Rust source for runtime liveness analysis: {}",
-                    file_context.source_path.display()
-                )
-            })?;
-            let parsed = syn::parse_file(&source).with_context(|| {
-                format!(
-                    "failed to parse Rust source for runtime liveness analysis: {}",
-                    file_context.source_path.display()
-                )
-            })?;
-
-            let mut collector = RuntimeCollector::new(file_context);
-            collector.visit_file_items(&parsed);
-            if sleep_scope.includes(file_context) {
-                for site in crate::sleep::find_blocking_sleeps(&parsed) {
-                    collector
-                        .findings
-                        .push(blocking_sleep_finding(file_context, site));
-                }
-            }
-            Ok(collector.findings)
-        })
+        .map(|file_context| analyze_file(file_context, &sleep_scope))
         .collect::<Vec<Result<Vec<_>>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
@@ -142,6 +119,55 @@ pub(crate) fn analyze_runtime_liveness(
         .collect()
 }
 
+fn analyze_file(
+    file_context: &FileContext,
+    sleep_scope: &SleepScope,
+) -> Result<Vec<RuntimeFinding>> {
+    let source = fs::read_to_string(&file_context.source_path).with_context(|| {
+        format!(
+            "failed to read Rust source for runtime liveness analysis: {}",
+            file_context.source_path.display()
+        )
+    })?;
+    let parsed = syn::parse_file(&source).with_context(|| {
+        format!(
+            "failed to parse Rust source for runtime liveness analysis: {}",
+            file_context.source_path.display()
+        )
+    })?;
+
+    if file_context.is_test_file || !crate::practices::production(&parsed.attrs, None) {
+        return Ok(Vec::new());
+    }
+    let allowances =
+        crate::practices::allowances::Allowances::collect(&parsed).with_context(|| {
+            format!(
+                "invalid runtime allowance in {}",
+                file_context.source_path.display()
+            )
+        })?;
+    let mut collector = RuntimeCollector::new(file_context);
+    collector.visit_file_items(&parsed);
+    if sleep_scope.includes(file_context) {
+        for site in crate::sleep::find_blocking_sleeps(&parsed) {
+            collector
+                .findings
+                .push(blocking_sleep_finding(file_context, site));
+        }
+    }
+    for site in crate::practices::find(&parsed) {
+        if site.rule != RuleId::ScbRuntime004 || sleep_scope.includes(file_context) {
+            collector
+                .findings
+                .push(practice_finding(file_context, site));
+        }
+    }
+    collector
+        .findings
+        .retain(|site| !allowances.allows(site.rule_id, site.line, site.column));
+    Ok(collector.findings)
+}
+
 fn blocking_sleep_finding(
     file_context: &FileContext,
     site: crate::sleep::SleepSite,
@@ -150,11 +176,12 @@ fn blocking_sleep_finding(
         rule_id: RuleId::ScbRuntime003,
         kind: "blocking_thread_sleep_in_tokio_package",
         message: format!(
-            "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `{}`; use `tokio::time::sleep(..).await` instead",
+            "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `{}`; use event-driven synchronization or `yield_now` instead",
             file_context.package
         ),
         source_path: file_context.source_path.clone(),
         line: site.line,
+        column: site.column,
         package: file_context.package.clone(),
         target: file_context.target.clone(),
         node_label: format!(
@@ -162,6 +189,42 @@ fn blocking_sleep_finding(
             file_context.package,
             file_context.target,
             site.enclosing_fn.unwrap_or_else(|| "<module>".into())
+        ),
+    }
+}
+
+fn practice_finding(file: &FileContext, site: crate::practices::Site) -> RuntimeFinding {
+    let (kind, recovery) = match site.rule {
+        RuleId::ScbRuntime004 => (
+            "blocking_thread_sleep_until",
+            "use controlled deadlines or synchronization instead",
+        ),
+        RuleId::ScbRuntime005 => (
+            "tokio_timer_sleep",
+            "use yield_now or event-driven synchronization instead of sleeping",
+        ),
+        RuleId::ScbRuntime006 => (
+            "blocking_executor_entry",
+            "await the future on the existing runtime instead",
+        ),
+        RuleId::ScbRuntime007 => (
+            "mutex_guard_across_await",
+            "drop the guard or end its scope before awaiting",
+        ),
+        _ => unreachable!("practice scanner emits only 004-007"),
+    };
+    RuntimeFinding {
+        rule_id: site.rule,
+        kind,
+        message: format!("{} {}; {}", site.rule.as_str(), site.detail, recovery),
+        source_path: file.source_path.clone(),
+        line: site.line,
+        column: site.column,
+        package: file.package.clone(),
+        target: file.target.clone(),
+        node_label: format!(
+            "crate::{}::{}::{}",
+            file.package, file.target, site.function
         ),
     }
 }
@@ -375,6 +438,7 @@ impl<'a> RuntimeCollector<'a> {
             message: "SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult".to_string(),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(method_call.span()),
+            column: method_call.span().start().column,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -394,6 +458,7 @@ impl<'a> RuntimeCollector<'a> {
             message: "SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding".to_string(),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(expr.span()),
+            column: expr.span().start().column,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(

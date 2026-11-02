@@ -1029,6 +1029,7 @@ dependencies = [
  "dunce",
  "rayon",
  "sc-lint-analyzer-support",
+ "sc-lint-directives 0.8.4",
  "sc-lint-schema",
  "serde",
  "serde_json",

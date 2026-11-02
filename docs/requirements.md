@@ -195,6 +195,14 @@ The product should support both:
   ownership remain in their dedicated analyzer crates (ADR-013).
   (Amended 2026-10-10, Accepted, #201.)
 
+- `REQ-PRODUCT-004E` — **Pending Rand acceptance** (0.8.5, #640)
+  Runtime rules 004–007 cover thread `sleep_until`, Tokio timer sleeps,
+  Runtime/Handle/futures `block_on`, and std Mutex guards held across await.
+  Rule 004 shares 003's production Tokio-package scope; 005–007 cover all
+  non-test source. Test code is exempt, `yield_now` remains legal, and local
+  allows require a reason. The detailed contract and syntactic limits are in
+  [REQ-RUNTIME-001](./sc-lint-runtime/requirements.md).
+
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
   not materially improve correctness or noise characteristics.

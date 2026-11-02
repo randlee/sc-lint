@@ -51,3 +51,19 @@ from the existing collector.
 
 - [requirements.md](./requirements.md)
 - [../sc-lint/crate-architecture.md](../sc-lint/crate-architecture.md)
+
+## Runtime practice checks (0.8.5)
+
+`practices.rs` owns the 004–007 syntax walk and lexical guard state. Its
+`bindings` module resolves file-local use aliases and recognized receiver
+types, and `allowances` parses the shared reasoned directive model through
+`sc-lint-directives`. It has no Tokio crate dependency or runtime executor.
+Rule 004 reuses `SleepScope` unchanged; 005–007 cover all non-test source.
+Function/async-region boundaries isolate guard state, block boundaries remove
+locals, explicit drops release guards, and branch states conservatively join.
+
+Allowances validate before rule filtering and apply only to the annotated
+function/method, with nested functions forming a fresh boundary. Root test
+files and inline test scopes remain exempt. Existing 001–003 IDs/report shape
+are preserved; 003's recovery now suggests event-driven synchronization or
+yielding because rule 005 rejects Tokio timers as well.
