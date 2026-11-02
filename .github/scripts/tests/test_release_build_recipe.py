@@ -13,11 +13,17 @@ SCRIPT = ROOT / ".github/scripts/build_release_target.sh"
 
 
 @pytest.mark.usefixtures("posix_shell")
+@pytest.mark.parametrize("rustflags", ["", "-C debuginfo=1"])
 @pytest.mark.parametrize(
     ("kind", "target", "runner", "manylinux", "expected"),
     [
         ("binaries", "aarch64-unknown-linux-gnu", "ubuntu-latest", "", "cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 --bin fixture"),
         ("binaries", "x86_64-pc-windows-msvc", "windows-latest", "", "cargo build --release --target x86_64-pc-windows-msvc --bin fixture"),
+        ("binaries", "aarch64-pc-windows-msvc", "windows-latest", "", "cargo build --release --target aarch64-pc-windows-msvc --bin fixture"),
+        ("binaries", "x86_64-unknown-linux-gnu", "ubuntu-latest", "", "cargo build --release --target x86_64-unknown-linux-gnu --bin fixture"),
+        ("binaries", "x86_64-apple-darwin", "macos-latest", "", "cargo build --release --target x86_64-apple-darwin --bin fixture"),
+        ("binaries", "aarch64-apple-darwin", "macos-latest", "", "cargo build --release --target aarch64-apple-darwin --bin fixture"),
+        ("wheel", "x86_64-pc-windows-msvc", "windows-latest", "off", "maturin build --release --locked --manifest-path binding/Cargo.toml --out dist --target x86_64-pc-windows-msvc"),
         ("wheel", "aarch64-pc-windows-msvc", "windows-latest", "off", "maturin build --release --locked --manifest-path binding/Cargo.toml --out dist --target aarch64-pc-windows-msvc --features pyo3/generate-import-lib"),
         ("wheel", "aarch64-unknown-linux-gnu", "ubuntu-latest", "2_28", "maturin build --release --locked --manifest-path binding/Cargo.toml --out dist --target aarch64-unknown-linux-gnu --compatibility manylinux_2_28 --zig"),
         ("wheel", "", "ubuntu-24.04-arm", "", "maturin build --release --manifest-path binding/Cargo.toml --out dist --compatibility manylinux2014 --zig"),
@@ -25,7 +31,7 @@ SCRIPT = ROOT / ".github/scripts/build_release_target.sh"
         ("wheel", "", "windows-latest", "", "maturin build --release --manifest-path binding/Cargo.toml --out dist"),
     ],
 )
-def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expected):
+def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expected, rustflags):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     log = tmp_path / "commands"
@@ -33,7 +39,7 @@ def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expec
         command = bindir / name
         command.write_text(
             '#!/bin/sh\n'
-            'printf "%s %s cross=%s version=%s deployment_set=%s\\n" "$(basename "$0")" "$*" "${PYO3_CROSS-}" "${PYO3_CROSS_PYTHON_VERSION-}" "${MACOSX_DEPLOYMENT_TARGET+x}" >> "$CALL_LOG"\n'
+            'printf "%s %s cross=%s version=%s rustflags=%s deployment_set=%s\\n" "$(basename "$0")" "$*" "${PYO3_CROSS-}" "${PYO3_CROSS_PYTHON_VERSION-}" "${RUSTFLAGS-}" "${MACOSX_DEPLOYMENT_TARGET+x}" >> "$CALL_LOG"\n'
             'if [ "$1" = .github/scripts/release_artifacts.py ]; then printf "%s\\n" "--bin fixture"; fi\n'
             'if [ "$1" = -m ] && [ "$2" = venv ]; then mkdir -p "$3/bin"; cp "$0" "$3/bin/python"; fi\n'
         )
@@ -42,13 +48,18 @@ def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expec
            "BUILD_TARGET": target, "BUILD_RUNNER": runner, "BUILD_MANYLINUX": manylinux,
            "BUILD_SYSTEM": "maturin", "BUILD_SOURCE": "binding", "BUILD_CARGO_MANIFEST": "binding/Cargo.toml",
            "RELEASE_ARTIFACT_MANIFEST": "release/publish-artifacts.toml", "RUNNER_TEMP": str(tmp_path),
-           "MACOSX_DEPLOYMENT_TARGET": ""}
+           "MACOSX_DEPLOYMENT_TARGET": "", "RUSTFLAGS": rustflags}
     env.pop("PYO3_CROSS", None)
     env.pop("PYO3_CROSS_PYTHON_VERSION", None)
     result = subprocess.run(["bash", str(SCRIPT), kind], cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     lines = log.read_text().splitlines()
-    assert any(line.startswith(expected + " cross=") for line in lines)
+    build_line = next(line for line in lines if line.startswith(expected + " cross="))
+    expected_flags = rustflags
+    if kind == "binaries" and target.endswith("-pc-windows-msvc"):
+        expected_flags = (rustflags + " -C target-feature=+crt-static").lstrip()
+    assert f"rustflags={expected_flags} deployment_set=" in build_line
+
     if kind == "wheel":
         assert any(line.endswith("deployment_set=") for line in lines if line.startswith("maturin "))
     if target == "aarch64-pc-windows-msvc" and kind == "wheel":
@@ -86,6 +97,7 @@ def test_both_workflows_use_the_same_build_recipe():
         binaries = next(step for step in workflow["jobs"]["build"]["steps"] if step.get("name") == "Build release binaries")
         wheels = next(step for step in workflow["jobs"][wheel_job]["steps"] if step.get("name") == "Build declared wheel")
         assert "bash .github/scripts/build_release_target.sh binaries" in binaries["run"]
+        assert "python3 .github/scripts/verify_release_arch.py --manifest" in binaries["run"]
         assert wheels["run"] == "bash .github/scripts/build_release_target.sh wheel"
 
 
