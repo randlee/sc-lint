@@ -1,17 +1,16 @@
 use std::collections::BTreeSet;
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::Value;
 
 const ANALYZERS: [&str; 3] = ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"];
 const ANALYZER_SUPPORT: &str = "sc-lint-analyzer-support";
 const CLI: &str = "sc-lint";
-const POST_KILL_PIPE_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 /// Failure ceiling for the killed child's exit status. It is not a budget the
 /// passing path depends on: a child that is not reaped within it fails the test.
 const POST_KILL_REAP_CEILING: Duration = Duration::from_secs(30);
@@ -55,26 +54,21 @@ fn analyzer_manifests_remain_dependency_independent() {
     );
 }
 
-/// Runs `command` to completion or kills it at `timeout`. The child is owned by
-/// a waiter thread that blocks in `wait()`, so there is no polling loop: the
-/// deadline is a blocking receive, and a miss kills the child by pid.
+/// Runs `command` to completion or kills it at `timeout`. Output goes to
+/// temporary files, so child exit is the only success-path completion signal;
+/// reader-thread scheduling and inherited output handles cannot delay it. The
+/// child is owned by a waiter thread that blocks in `wait()`, so there is no
+/// polling loop: the deadline is a blocking receive, and a miss kills the child
+/// by pid.
 fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::Result<Output> {
     let description = format!("{command:?}");
+    let mut stdout_file = tempfile::tempfile()?;
+    let mut stderr_file = tempfile::tempfile()?;
     command
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::from(stdout_file.try_clone()?))
+        .stderr(Stdio::from(stderr_file.try_clone()?));
     let mut child = command.spawn()?;
-    let stdout = child.stdout.take().expect("stdout is piped");
-    let stderr = child.stderr.take().expect("stderr is piped");
-    let (stdout_sender, stdout_reader) = mpsc::channel();
-    let (stderr_sender, stderr_reader) = mpsc::channel();
-    thread::spawn(move || {
-        let _ = stdout_sender.send(read_pipe(stdout));
-    });
-    thread::spawn(move || {
-        let _ = stderr_sender.send(read_pipe(stderr));
-    });
     let pid = child.id();
     let (status_sender, status_reader) = mpsc::channel();
     thread::spawn(move || {
@@ -86,14 +80,17 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
             let status = status.map_err(|error| {
                 io::Error::new(error.kind(), format!("{description} wait: {error}"))
             })?;
-            // A grandchild that inherited the pipes can keep them open after
-            // the child exits, so the drain has a deadline.
-            let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
-            let stdout = drain_pipe_reader(stdout_reader, drain_deadline).map_err(|error| {
-                io::Error::new(error.kind(), format!("{description} stdout: {error}"))
+            let stdout = read_capture(&mut stdout_file).map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("{description} stdout capture: {error}"),
+                )
             })?;
-            let stderr = drain_pipe_reader(stderr_reader, drain_deadline).map_err(|error| {
-                io::Error::new(error.kind(), format!("{description} stderr: {error}"))
+            let stderr = read_capture(&mut stderr_file).map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("{description} stderr capture: {error}"),
+                )
             })?;
             Ok(Output {
                 status,
@@ -104,15 +101,6 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
         Err(RecvTimeoutError::Timeout) => {
             kill_process(pid);
             let reaped = status_reader.recv_timeout(POST_KILL_REAP_CEILING).is_ok();
-            let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
-            let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
-                .err()
-                .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
-            let drain_context = drain_error
-                .map(|error| {
-                    format!("; output pipes did not drain after child termination: {error}")
-                })
-                .unwrap_or_default();
             let reap_state = if reaped {
                 "killed and reaped"
             } else {
@@ -120,9 +108,7 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
             };
             Err(io::Error::new(
                 io::ErrorKind::TimedOut,
-                format!(
-                    "{description} timed out after {timeout:?}; child was {reap_state}{drain_context}"
-                ),
+                format!("{description} timed out after {timeout:?}; child was {reap_state}"),
             ))
         }
         Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(format!(
@@ -151,28 +137,16 @@ fn kill_process(pid: u32) {
         .status();
 }
 
-fn read_pipe(mut pipe: impl Read) -> io::Result<Vec<u8>> {
+fn read_capture(file: &mut impl ReadSeek) -> io::Result<Vec<u8>> {
+    file.seek(SeekFrom::Start(0))?;
     let mut output = Vec::new();
-    pipe.read_to_end(&mut output)?;
+    file.read_to_end(&mut output)?;
     Ok(output)
 }
 
-fn drain_pipe_reader(
-    reader: Receiver<io::Result<Vec<u8>>>,
-    deadline: Instant,
-) -> io::Result<Vec<u8>> {
-    let remaining = deadline.saturating_duration_since(Instant::now());
-    match reader.recv_timeout(remaining) {
-        Ok(output) => output,
-        Err(RecvTimeoutError::Timeout) => Err(io::Error::new(
-            io::ErrorKind::TimedOut,
-            format!("pipe reader exceeded {POST_KILL_PIPE_DRAIN_TIMEOUT:?} drain limit"),
-        )),
-        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
-            "child output reader stopped without returning output",
-        )),
-    }
-}
+trait ReadSeek: Read + Seek {}
+
+impl<T: Read + Seek> ReadSeek for T {}
 
 #[test]
 fn timeout_child_sleeps_when_requested() {
@@ -181,6 +155,18 @@ fn timeout_child_sleeps_when_requested() {
         loop {
             thread::park();
         }
+    }
+}
+
+#[test]
+fn timeout_child_writes_output_when_requested() {
+    if std::env::var_os("SC_LINT_TEST_CHILD_OUTPUT").is_some() {
+        io::stdout()
+            .write_all(b"controlled child stdout")
+            .expect("write child stdout");
+        io::stderr()
+            .write_all(b"controlled child stderr")
+            .expect("write child stderr");
     }
 }
 
@@ -204,39 +190,43 @@ fn command_output_deadline_kills_and_reaps_child() {
 }
 
 #[test]
-fn pipe_drain_times_out_while_a_reader_still_holds_the_pipe() {
-    let (_held_sender, reader) = mpsc::channel::<io::Result<Vec<u8>>>();
+fn command_output_captures_both_streams_after_child_exit() {
+    let mut command = Command::new(std::env::current_exe().expect("test executable path"));
+    command
+        .args(["--exact", "timeout_child_writes_output_when_requested"])
+        .env("SC_LINT_TEST_CHILD_OUTPUT", "1");
 
-    let error = drain_pipe_reader(reader, Instant::now())
-        .expect_err("a reader that never returns exceeds the drain deadline");
-    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
-    assert!(error.to_string().contains("drain limit"), "{error}");
-}
-
-#[test]
-fn pipe_drain_returns_output_the_reader_already_sent() {
-    let (sender, reader) = mpsc::channel();
-    sender
-        .send(Ok(b"drained".to_vec()))
-        .expect("send reader output");
-
-    let output = drain_pipe_reader(reader, Instant::now()).expect("output already sent");
-    assert_eq!(output, b"drained");
-}
-
-#[test]
-fn pipe_drain_reports_a_reader_that_stopped_without_output() {
-    let (sender, reader) = mpsc::channel::<io::Result<Vec<u8>>>();
-    drop(sender);
-
-    let error =
-        drain_pipe_reader(reader, Instant::now()).expect_err("a stopped reader returns no output");
+    let output = command_output_with_timeout(command, Duration::from_secs(30))
+        .expect("child completes and its output is captured");
+    assert!(output.status.success());
     assert!(
-        error
-            .to_string()
-            .contains("stopped without returning output"),
-        "{error}"
+        output
+            .stdout
+            .windows(b"controlled child stdout".len())
+            .any(|window| { window == b"controlled child stdout" }),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
     );
+    assert!(
+        output
+            .stderr
+            .windows(b"controlled child stderr".len())
+            .any(|window| { window == b"controlled child stderr" }),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn capture_reads_output_while_another_handle_remains_open() {
+    let mut capture = tempfile::tempfile().expect("create output capture");
+    let mut inherited_handle = capture.try_clone().expect("clone output capture");
+    inherited_handle
+        .write_all(b"captured")
+        .expect("write child output");
+
+    let output = read_capture(&mut capture).expect("read capture without waiting for EOF");
+    assert_eq!(output, b"captured");
 }
 
 fn direct_dependencies(metadata: &Value, package_name: &str) -> BTreeSet<String> {
