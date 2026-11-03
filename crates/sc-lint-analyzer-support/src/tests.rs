@@ -939,3 +939,31 @@ fn non_table_intermediate_node_names_the_offending_path() {
         );
     }
 }
+
+#[test]
+fn test_attribute_helpers_preserve_direct_and_expanded_policies() {
+    for (source, direct, expanded) in [
+        ("#[test] fn f() {}", true, true),
+        ("#[tokio::test] fn f() {}", false, true),
+        ("#[cfg(test)] fn f() {}", true, true),
+        (
+            "#[cfg(all(unix, all(test, feature = \"a\")))] fn f() {}",
+            false,
+            true,
+        ),
+        ("#[cfg(any(test, unix))] fn f() {}", false, false),
+        ("#[cfg(not(test))] fn f() {}", false, false),
+        ("#[cfg_attr(test, test)] fn f() {}", false, false),
+        ("fn tests() {}", false, false),
+    ] {
+        let item: syn::ItemFn = syn::parse_str(source).unwrap();
+        assert_eq!(
+            item.attrs
+                .iter()
+                .any(|attr| super::attr_is_test(attr) || super::attr_is_cfg_test(attr)),
+            direct,
+            "{source}"
+        );
+        assert_eq!(super::is_test_only(&item.attrs), expanded, "{source}");
+    }
+}

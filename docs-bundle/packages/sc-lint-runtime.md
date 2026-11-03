@@ -61,12 +61,17 @@ module/impl allows do not exempt members. Runtime configuration still supports
 
 Checks resolve grouped/renamed/glob use aliases, explicit receiver types,
 recognized constructors, and typed self fields. Guard liveness follows lexical
-blocks, explicit drop aliases and branches; temporaries do not stay live.
+blocks, explicit drop aliases and branches. Temporaries end with their
+expression; lock-result match scrutinees stay live through each arm.
 The tracker recognizes `Arc::clone`/`Rc::clone`, typed file-local static
 Mutexes, poison recovery through `lock().unwrap_or_else(|e| e.into_inner())`,
 glob-qualified `Mutex::new`/`Runtime::new`, and `Ok(g) = m.lock()` patterns
 in if-let, let-else, match and while-let. Guards stay within their binding
-scope and explicit drops release them. Visible `break` tokens inside macros
+scope and explicit drops release them. Match arms track `Ok(g)` guards,
+`Err(p)` poison errors that own guards, and unbound scrutinee resources in
+`Ok(_)` or fallback arms. A guard returned by
+`match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }` stays live in its
+receiving local binding. Visible `break` tokens inside macros
 (including `tokio::select!`) keep loop exits reachable for guard-state joins. Diverging return/break/continue branches,
 built-in panic/unreachable/todo/unimplemented macros and statically known `!`
 calls do not contribute to an if/match guard join.
@@ -78,7 +83,9 @@ bindings/containers/captures. File-flattened imports/type/static names and unpro
 control-flow exits can cause conservative false positives. In particular,
 `consume(g); other().await` and `loop { drop(g); break; } other().await` may
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
-proved. Known `!` declarations are matched by unambiguous file-local names.
+proved. Rule 003's legacy resolver does not recognize renamed `self` imports
+such as `use std::thread::{self as thread}`; use a direct module alias instead.
+Known `!` declarations are matched by unambiguous file-local names.
 Unresolved callable return types are not assumed to diverge. Out-of-line
 `#[cfg(test)]` parent-module context is not propagated to a separate file.
 

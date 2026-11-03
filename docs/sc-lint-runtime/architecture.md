@@ -59,8 +59,8 @@ from the existing collector.
 `bindings` module resolves file-local use aliases and recognized receiver
 types using the runtime-owned `api.rs` canonical registry. `imports.rs` walks
 use trees for both practices and the legacy sleep pass; their adapters preserve
-the distinct alias/glob recognition contracts. `scope.rs` centralizes test
-attribute handling and scope classification while preserving rule 003's lack
+the distinct alias/glob recognition contracts. `scope.rs` calls analyzer support's shared test-attribute recognition and
+scope classification while preserving rule 003's lack
 of name-based test exemption. The `allowances` module parses the shared
 reasoned directive model through `sc-lint-directives`. It has no Tokio crate dependency or runtime executor.
 Rule 004 reuses `SleepScope` unchanged; 005–007 cover all non-test source.
@@ -81,5 +81,8 @@ attribute-path matching and analyzer-owned unknown-rule checks. Runtime
 allowances cache parsed attributes and aggregate located errors in source order.
 
 Lock-result Ok patterns introduce scoped guard bindings in if-let, let-else,
-match and while-let. Break tokens inside opaque macro bodies conservatively
+match and while-let. Match arms also track poison errors and unbound
+scrutinee resources, and direct guard-valued match results transfer into
+receiving local bindings. `PoisonError::into_inner` transfers ownership from
+the error binding to its guard result. Break tokens inside opaque macro bodies conservatively
 keep a loop's exit reachable; macro bodies are not otherwise expanded.

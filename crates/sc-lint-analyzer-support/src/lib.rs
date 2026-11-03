@@ -33,6 +33,7 @@ pub use source_scan::count_scanned_crates;
 pub use source_scan::count_scanned_crates_with_metadata;
 pub use source_scan::discover_source_files;
 pub use source_scan::discover_source_files_with_metadata;
+pub use source_scan::is_test_only;
 pub use source_scan::item_attrs;
 pub use source_scan::item_identifier;
 pub use source_scan::item_name_hint_is_tests;

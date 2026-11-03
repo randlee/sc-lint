@@ -430,7 +430,6 @@ fn lock_result_patterns_keep_guards_live_only_in_their_scope() {
         "let Ok(g) = m.lock() else { return }; drop(g); tick().await;",
         "match m.lock() { Ok(g) => { drop(g); tick().await; }, Err(_) => {} }",
         "match m.lock() { Ok(g) => {}, Err(_) => {} }; tick().await;",
-        "match m.lock() { Ok(g) if ready() => {}, _ => { tick().await; } }",
         "while let Ok(g) = m.lock() { drop(g); tick().await; break; }",
         "while let Ok(g) = m.lock() { break; } tick().await;",
         "let Ok(g) = other() else { return }; tick().await;",
@@ -458,6 +457,8 @@ fn macro_break_inside_loop_preserves_reachable_guard_state() {
 
 #[test]
 fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
+    // Known limitation: rule 003 does not resolve renamed `self` imports.
+    // See the README and offline guide's syntactic coverage and limits.
     for (imports, expected) in [
         (
             "use std::thread::{self};",
@@ -477,4 +478,34 @@ fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
     }
     let source = "mod tests { fn f() { std::thread::sleep(()); std::thread::sleep_until(()); } }";
     assert_eq!(rule_ids(&report(source, true)), vec![RuleId::ScbRuntime003]);
+}
+
+#[test]
+fn lock_match_results_and_scrutinees_keep_resources_across_await() {
+    for body in [
+        "let g = match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }; tick().await;",
+        "match m.lock() { Ok(g) => {}, Err(p) => { tick().await; } }",
+        "match m.lock() { Ok(_) => { tick().await; }, _ => {} }",
+        "match m.lock() { Ok(g) if ready() => {}, _ => { tick().await; } }",
+        "match m.lock() { Ok(_) => {}, Err(p) => { let g = p.into_inner(); tick().await; } }",
+    ] {
+        let source = format!("async fn f(m: &std::sync::Mutex<()>) {{ {body} }}");
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{body}"
+        );
+    }
+    for body in [
+        "let g = match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }; drop(g); tick().await;",
+        "match m.lock() { Ok(g) => {}, Err(p) => { drop(p); tick().await; } }",
+        "drop(match m.lock() { Ok(_) => {}, _ => {} }); tick().await;",
+        "drop(match m.lock() { Ok(g) if ready() => g, Ok(g) => g, Err(p) => p.into_inner() }); tick().await;",
+        "match m.lock() { Ok(_) => {}, Err(p) => { drop(p.into_inner()); tick().await; } }",
+        "match m.lock() { Ok(_) => {}, Err(p) => { let g = p.into_inner(); drop(g); tick().await; } }",
+        "match other.lock() { Ok(_) => { tick().await; }, _ => {} }",
+    ] {
+        let source = format!("async fn f(m: &std::sync::Mutex<()>) {{ {body} }}");
+        assert!(report(&source, false).findings.is_empty(), "{body}");
+    }
 }

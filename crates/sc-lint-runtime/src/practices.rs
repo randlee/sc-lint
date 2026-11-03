@@ -2,6 +2,7 @@
 pub(crate) mod allowances;
 mod bindings;
 mod flow;
+mod matches;
 use crate::RuleId;
 use crate::api::{Api, lookup};
 pub(crate) use crate::scope::production;
@@ -208,6 +209,7 @@ impl Scanner {
         let receiver = self.kind(&call.receiver);
         match call.method.to_string().as_str() {
             "unwrap" | "expect" | "clone" => receiver,
+            "into_inner" if receiver == ValueKind::PoisonedGuard => ValueKind::Guard,
             "handle" if receiver == ValueKind::Runtime => ValueKind::Handle,
             "build" if receiver == ValueKind::Builder => ValueKind::Runtime,
             _ if receiver == ValueKind::Builder => ValueKind::Builder,
@@ -245,6 +247,7 @@ impl Scanner {
                 matches!(call.method.to_string().as_str(), "lock" | "try_lock")
                     && self.kind(&call.receiver) == ValueKind::Mutex
             }
+            syn::Expr::Match(branch) => self.match_result_guard(branch),
             syn::Expr::Try(expr) => self.guard(&expr.expr),
             syn::Expr::Paren(expr) => self.guard(&expr.expr),
             syn::Expr::Call(call) => {
@@ -312,19 +315,18 @@ impl Scanner {
         let syn::Pat::TupleStruct(pattern) = pat else {
             return None;
         };
-        if pattern
-            .path
-            .segments
-            .last()
-            .is_none_or(|part| part.ident != "Ok")
-            || !self.guard(expr)
-        {
+        if !self.guard(expr) {
             return None;
         }
+        let kind = match pattern.path.segments.last()?.ident.to_string().as_str() {
+            "Ok" => ValueKind::Guard,
+            "Err" => ValueKind::PoisonedGuard,
+            _ => return None,
+        };
         let name = pattern.elems.first().and_then(pattern_name)?;
         Some(Binding {
             name,
-            kind: ValueKind::Guard,
+            kind,
             guard: self.asynchronous,
         })
     }
@@ -350,10 +352,10 @@ impl Scanner {
             .arms
             .iter()
             .map(|arm| {
-                let binding = self.pattern_guard(&arm.pat, &branch.expr);
+                let bindings = self.match_arm_bindings(&arm.pat, &branch.expr);
                 self.branch(self.expr_continues(&arm.body), |this| {
                     let count = this.bindings.len();
-                    this.bindings.extend(binding);
+                    this.bindings.extend(bindings);
                     this.visit_arm(arm);
                     this.bindings.truncate(count);
                 })
@@ -494,6 +496,7 @@ impl<'ast> Visit<'ast> for Scanner {
                     );
                 }
                 syn::visit::visit_expr_method_call(self, call);
+                self.release_poisoned_guard(call);
             }
             syn::Expr::Await(awaited) => {
                 self.visit_expr(&awaited.base);

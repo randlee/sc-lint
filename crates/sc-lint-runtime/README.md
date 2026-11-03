@@ -148,7 +148,9 @@ Grouped, renamed and glob `use` imports are resolved syntactically, as in rule
 parameters, inferred constructors/builders/handles, and typed `self` fields.
 Mutex tracking recognizes typed Mutex/Arc<Mutex> parameters, local constructors,
 typed `self` fields and explicit MutexGuard bindings, including `lock`/
-`try_lock`, `unwrap`/`expect`/`?`. Temporary guards are not retained. Nested
+`try_lock`, `unwrap`/`expect`/`?`. Temporary guards are released at the end
+of their expression; lock-result match temporaries remain live through the arm.
+Nested
 block exit and explicit `drop` (including `std::mem::drop` aliases) release a
 binding; branch analysis retains a guard if a continuing branch can keep it alive.
 
@@ -156,7 +158,11 @@ The tracker also recognizes `Arc::clone`/`Rc::clone` of Mutex owners,
 file-local typed static Mutexes, `lock().unwrap_or_else(|e| e.into_inner())`,
 constructors reached through globs (`use std::sync::*`, `Mutex::new`), and
 `Ok(g) = m.lock()` patterns in if-let, let-else, match and while-let.
-Pattern guards live only within their binding scope; explicit drops release them.
+Pattern bindings live only within their scope; explicit drops release them.
+Match arms track guards owned by `Ok(g)`, poisoned guards owned by `Err(p)`,
+and unbound scrutinee guards in `Ok(_)` or fallback arms. A guard returned by
+`match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }` stays live in its
+receiving local binding until dropped or the scope ends.
 A visible `break` inside macro tokens (including `tokio::select!`) keeps a
 loop exit reachable when joining guard states. If/match joins
 exclude diverging branches (`return`, `break`, `continue`, built-in
@@ -173,6 +179,8 @@ control-flow exits are not proved; consumed guards or branch/loop exits may
 produce conservative findings. In particular, `consume(g); other().await`
 and `loop { drop(g); break; } other().await` may still report rule 007;
 interprocedural ownership and loop/labeled-block exit guard transfer are not proved.
+Rule 003's legacy resolver does not recognize renamed `self` imports such as
+`use std::thread::{self as thread}`; use a direct module alias instead.
 Known `!` declarations are matched by unambiguous file-local names.
 Unresolved callable return types are not assumed to diverge. Other `cfg`
 conditions are not evaluated.
