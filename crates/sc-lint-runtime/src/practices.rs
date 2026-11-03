@@ -1,15 +1,54 @@
 //! Syntactic runtime-practice checks; no code under inspection is executed.
 pub(crate) mod allowances;
 mod bindings;
+mod flow;
 use crate::RuleId;
 use bindings::{Imports, ValueKind, type_kind};
 use sc_lint_analyzer_support::{ScopeKind, classify_scope};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PracticeRule {
+    ThreadSleepUntil,
+    TokioSleep,
+    BlockOn,
+    MutexAcrossAwait,
+}
+impl PracticeRule {
+    pub(crate) fn id(self) -> RuleId {
+        match self {
+            Self::ThreadSleepUntil => RuleId::ScbRuntime004,
+            Self::TokioSleep => RuleId::ScbRuntime005,
+            Self::BlockOn => RuleId::ScbRuntime006,
+            Self::MutexAcrossAwait => RuleId::ScbRuntime007,
+        }
+    }
+    pub(crate) fn explanation(self) -> (&'static str, &'static str) {
+        match self {
+            Self::ThreadSleepUntil => (
+                "blocking_thread_sleep_until",
+                "use controlled deadlines or synchronization instead",
+            ),
+            Self::TokioSleep => (
+                "tokio_timer_sleep",
+                "use yield_now or event-driven synchronization instead of sleeping",
+            ),
+            Self::BlockOn => (
+                "blocking_executor_entry",
+                "await the future on the existing runtime instead",
+            ),
+            Self::MutexAcrossAwait => (
+                "mutex_guard_across_await",
+                "drop the guard or end its scope before awaiting",
+            ),
+        }
+    }
+}
+
 pub(crate) struct Site {
-    pub(crate) rule: RuleId,
+    pub(crate) rule: PracticeRule,
     pub(crate) line: usize,
     pub(crate) column: usize,
     pub(crate) function: String,
@@ -24,6 +63,7 @@ struct Binding {
 }
 struct Scanner {
     imports: Imports,
+    never_functions: BTreeSet<String>,
     fields: BTreeMap<(String, String), ValueKind>,
     owner: String,
     bindings: Vec<Binding>,
@@ -34,6 +74,8 @@ struct Scanner {
 
 pub(crate) fn find(file: &syn::File) -> Vec<Site> {
     let imports = Imports::collect(file);
+    let mut never = flow::NeverFunctions::default();
+    never.visit_file(file);
     let mut fields = Fields {
         imports: &imports,
         fields: BTreeMap::new(),
@@ -42,6 +84,7 @@ pub(crate) fn find(file: &syn::File) -> Vec<Site> {
     let fields = fields.fields;
     let mut scanner = Scanner {
         imports,
+        never_functions: never.names,
         fields,
         owner: String::new(),
         bindings: Vec::new(),
@@ -58,6 +101,15 @@ struct Fields<'a> {
     fields: BTreeMap<(String, String), ValueKind>,
 }
 impl<'ast> Visit<'ast> for Fields<'_> {
+    fn visit_item_static(&mut self, item: &'ast syn::ItemStatic) {
+        if production(&item.attrs, None) {
+            self.fields.insert(
+                (String::new(), item.ident.to_string()),
+                type_kind(&item.ty, self.imports),
+            );
+        }
+    }
+
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
         if production(&item.attrs, Some(item.ident == "tests")) {
             syn::visit::visit_item_mod(self, item);
@@ -80,7 +132,7 @@ impl<'ast> Visit<'ast> for Fields<'_> {
 }
 
 impl Scanner {
-    fn record(&mut self, rule: RuleId, expr: &syn::Expr, detail: impl Into<String>) {
+    fn record(&mut self, rule: PracticeRule, expr: &syn::Expr, detail: impl Into<String>) {
         let start = expr.span().start();
         self.sites.push(Site {
             rule,
@@ -113,16 +165,23 @@ impl Scanner {
     }
     fn kind(&self, expr: &syn::Expr) -> ValueKind {
         match expr {
-            syn::Expr::Path(path) => path
-                .path
-                .get_ident()
-                .and_then(|name| {
-                    self.bindings
+            syn::Expr::Path(path) => {
+                if let Some(name) = path.path.get_ident()
+                    && let Some(binding) = self
+                        .bindings
                         .iter()
                         .rev()
                         .find(|binding| *name == binding.name)
-                })
-                .map_or(ValueKind::Other, |binding| binding.kind),
+                {
+                    return binding.kind;
+                }
+                self.imports
+                    .resolve(&path.path)
+                    .last()
+                    .and_then(|name| self.fields.get(&(String::new(), name.clone())))
+                    .copied()
+                    .unwrap_or(ValueKind::Other)
+            }
             syn::Expr::Field(field) if matches!(&*field.base, syn::Expr::Path(path) if path.path.is_ident("self")) => {
                 if let syn::Member::Named(name) = &field.member {
                     self.fields
@@ -132,6 +191,9 @@ impl Scanner {
                 } else {
                     ValueKind::Other
                 }
+            }
+            syn::Expr::Closure(expr) if flow::never_output(&expr.output) => {
+                ValueKind::NeverCallable
             }
             syn::Expr::Reference(expr) => self.kind(&expr.expr),
             syn::Expr::Paren(expr) => self.kind(&expr.expr),
@@ -166,6 +228,10 @@ impl Scanner {
             | "tokio::runtime::Builder::new_multi_thread" => ValueKind::Builder,
             "Arc::new"
             | "std::sync::Arc::new"
+            | "Arc::clone"
+            | "std::sync::Arc::clone"
+            | "Rc::clone"
+            | "std::rc::Rc::clone"
             | "Rc::new"
             | "std::rc::Rc::new"
             | "Box::new"
@@ -179,7 +245,10 @@ impl Scanner {
     fn guard(&self, expr: &syn::Expr) -> bool {
         match expr {
             syn::Expr::MethodCall(call)
-                if matches!(call.method.to_string().as_str(), "unwrap" | "expect") =>
+                if matches!(
+                    call.method.to_string().as_str(),
+                    "unwrap" | "expect" | "unwrap_or_else"
+                ) =>
             {
                 self.guard(&call.receiver)
             }
@@ -202,11 +271,11 @@ impl Scanner {
         };
         let path = self.imports.resolve(&path.path).join("::");
         let rule = match path.as_str() {
-            "std::thread::sleep_until" => Some(RuleId::ScbRuntime004),
-            "tokio::time::sleep" | "tokio::time::sleep_until" => Some(RuleId::ScbRuntime005),
+            "std::thread::sleep_until" => Some(PracticeRule::ThreadSleepUntil),
+            "tokio::time::sleep" | "tokio::time::sleep_until" => Some(PracticeRule::TokioSleep),
             "tokio::runtime::Runtime::block_on"
             | "tokio::runtime::Handle::block_on"
-            | "futures::executor::block_on" => Some(RuleId::ScbRuntime006),
+            | "futures::executor::block_on" => Some(PracticeRule::BlockOn),
             _ => None,
         };
         if let Some(rule) = rule {
@@ -235,14 +304,65 @@ impl Scanner {
         self.asynchronous = old;
         self.bindings = bindings;
     }
-    fn branch(&mut self, visit: impl FnOnce(&mut Self)) -> Vec<Binding> {
+    fn branch(&mut self, continues: bool, visit: impl FnOnce(&mut Self)) -> Option<Vec<Binding>> {
         let before = self.bindings.clone();
         visit(self);
-        std::mem::replace(&mut self.bindings, before)
+        let after = std::mem::replace(&mut self.bindings, before);
+        continues.then_some(after)
     }
-    fn merge_guards(&mut self, branches: &[Vec<Binding>]) {
+    fn merge_guards(&mut self, branches: &[Option<Vec<Binding>>]) {
         for (index, binding) in self.bindings.iter_mut().enumerate() {
-            binding.guard = branches.iter().any(|branch| branch[index].guard);
+            binding.guard = branches.iter().flatten().any(|branch| branch[index].guard);
+        }
+    }
+    fn condition_guard(&self, cond: &syn::Expr) -> Option<Binding> {
+        let syn::Expr::Let(binding) = cond else {
+            return None;
+        };
+        let syn::Pat::TupleStruct(pattern) = &*binding.pat else {
+            return None;
+        };
+        if pattern
+            .path
+            .segments
+            .last()
+            .is_none_or(|part| part.ident != "Ok")
+            || !self.guard(&binding.expr)
+        {
+            return None;
+        }
+        let name = pattern.elems.first().and_then(pattern_name)?;
+        Some(Binding {
+            name,
+            kind: ValueKind::Guard,
+            guard: self.asynchronous,
+        })
+    }
+    fn visit_conditional(&mut self, branch: &syn::ExprIf) {
+        self.visit_expr(&branch.cond);
+        let binding = self.condition_guard(&branch.cond);
+        let then = self.branch(self.block_continues(&branch.then_branch), |this| {
+            let count = this.bindings.len();
+            this.bindings.extend(binding);
+            this.visit_block(&branch.then_branch);
+            this.bindings.truncate(count);
+        });
+        let otherwise = if let Some((_, other)) = &branch.else_branch {
+            self.branch(self.expr_continues(other), |this| this.visit_expr(other))
+        } else {
+            Some(self.bindings.clone())
+        };
+        self.merge_guards(&[then, otherwise]);
+    }
+    fn visit_match_branches(&mut self, branch: &syn::ExprMatch) {
+        self.visit_expr(&branch.expr);
+        let states = branch
+            .arms
+            .iter()
+            .map(|arm| self.branch(self.expr_continues(&arm.body), |this| this.visit_arm(arm)))
+            .collect::<Vec<_>>();
+        if !states.is_empty() {
+            self.merge_guards(&states);
         }
     }
     fn conditional(&mut self, visit: impl FnOnce(&mut Self)) {
@@ -364,7 +484,7 @@ impl<'ast> Visit<'ast> for Scanner {
                     )
                 {
                     self.record(
-                        RuleId::ScbRuntime006,
+                        PracticeRule::BlockOn,
                         expr,
                         "Tokio Runtime/Handle::block_on",
                     );
@@ -382,38 +502,22 @@ impl<'ast> Visit<'ast> for Scanner {
                         .collect::<Vec<_>>();
                     for name in names {
                         self.record(
-                            RuleId::ScbRuntime007,
+                            PracticeRule::MutexAcrossAwait,
                             expr,
                             format!("std::sync::Mutex guard `{name}` is live across .await"),
                         );
                     }
                 }
             }
+            syn::Expr::Block(block) if block.label.is_some() => {
+                self.conditional(|this| this.visit_block(&block.block))
+            }
             syn::Expr::Async(block) => self.deferred(true, |this| this.visit_block(&block.block)),
             syn::Expr::Closure(closure) => self.deferred(closure.asyncness.is_some(), |this| {
                 this.visit_expr(&closure.body)
             }),
-            syn::Expr::If(branch) => {
-                self.visit_expr(&branch.cond);
-                let then = self.branch(|this| this.visit_block(&branch.then_branch));
-                let otherwise = if let Some((_, other)) = &branch.else_branch {
-                    self.branch(|this| this.visit_expr(other))
-                } else {
-                    self.bindings.clone()
-                };
-                self.merge_guards(&[then, otherwise]);
-            }
-            syn::Expr::Match(branch) => {
-                self.visit_expr(&branch.expr);
-                let states = branch
-                    .arms
-                    .iter()
-                    .map(|arm| self.branch(|this| this.visit_arm(arm)))
-                    .collect::<Vec<_>>();
-                if !states.is_empty() {
-                    self.merge_guards(&states);
-                }
-            }
+            syn::Expr::If(branch) => self.visit_conditional(branch),
+            syn::Expr::Match(branch) => self.visit_match_branches(branch),
             syn::Expr::ForLoop(looped) => {
                 self.visit_expr(&looped.expr);
                 self.conditional(|this| this.visit_block(&looped.body));

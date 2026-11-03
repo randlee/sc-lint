@@ -676,7 +676,9 @@ productized second.
 Consumer-proven rule families already shipped in dedicated product crates:
 
 - `sc-lint-portability`: `PORT-004`, `PORT-005`
-- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`, `SCB-RUNTIME-003`
+- `sc-lint-runtime` (shipped through 0.8.4): `SCB-RUNTIME-001`,
+  `SCB-RUNTIME-002`, `SCB-RUNTIME-003`. The 0.8.5 work adds 004–007 to the
+  current inventory above; its requirement remains Pending Rand acceptance.
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer

@@ -13,7 +13,7 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = []
+roots = ["is_sc_lint_attribute", "unknown_owned_rule"]
 
 [dependencies]
 allowed_dependents = ["sc-lint-attributes", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]

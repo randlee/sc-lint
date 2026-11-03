@@ -150,7 +150,15 @@ Mutex tracking recognizes typed Mutex/Arc<Mutex> parameters, local constructors,
 typed `self` fields and explicit MutexGuard bindings, including `lock`/
 `try_lock`, `unwrap`/`expect`/`?`. Temporary guards are not retained. Nested
 block exit and explicit `drop` (including `std::mem::drop` aliases) release a
-binding; branch analysis retains a guard if any branch can keep it alive.
+binding; branch analysis retains a guard if a continuing branch can keep it alive.
+
+The tracker also recognizes `Arc::clone`/`Rc::clone` of Mutex owners,
+file-local typed static Mutexes, `lock().unwrap_or_else(|e| e.into_inner())`,
+constructors reached through globs (`use std::sync::*`, `Mutex::new`), and
+`if let Ok(g) = m.lock()` bindings scoped to the then-body. If/match joins
+exclude diverging branches (`return`, `break`, `continue`, built-in
+`panic!`/`unreachable!`/`todo!`/`unimplemented!`, and statically known `!` calls).
+A branch that reaches the following statement with a live guard still fails.
 
 This is not type checking or borrow checking. Known false negatives include
 macro-generated calls, indirect function pointers, reexports and Cargo crate
@@ -159,7 +167,12 @@ fields/chains, and guards moved through other bindings, containers or deferred
 captures. `use` bindings and struct names are flattened per file; local name
 shadowing can cause false positives. Cross-function ownership transfer and
 control-flow exits are not proved; consumed guards or branch/loop exits may
-produce conservative findings. Other `cfg` conditions are not evaluated.
+produce conservative findings. In particular, `consume(g); other().await`
+and `loop { drop(g); break; } other().await` may still report rule 007;
+interprocedural ownership and loop/labeled-block exit guard transfer are not proved.
+Known `!` declarations are matched by unambiguous file-local names.
+Unresolved callable return types are not assumed to diverge. Other `cfg`
+conditions are not evaluated.
 
 Runtime source discovery scans Rust files under production target source roots.
 It does not resolve Rust module declarations when deciding whether a file is

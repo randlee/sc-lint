@@ -62,11 +62,22 @@ module/impl allows do not exempt members. Runtime configuration still supports
 Checks resolve grouped/renamed/glob use aliases, explicit receiver types,
 recognized constructors, and typed self fields. Guard liveness follows lexical
 blocks, explicit drop aliases and branches; temporaries do not stay live.
+The tracker recognizes `Arc::clone`/`Rc::clone`, typed file-local static
+Mutexes, poison recovery through `lock().unwrap_or_else(|e| e.into_inner())`,
+glob-qualified `Mutex::new`/`Runtime::new`, and `if let Ok(g) = m.lock()`
+bindings inside the then-body. Diverging return/break/continue branches,
+built-in panic/unreachable/todo/unimplemented macros and statically known `!`
+calls do not contribute to an if/match guard join.
+
 They do not expand macros or perform Rust type/borrow checking. Known false
 negatives include indirect calls, reexports/crate renames, type aliases,
 external return types, unrecognized receivers, and guards moved through other
-bindings/containers/captures. File-flattened imports/struct names and unproved
-control-flow exits can cause conservative false positives. Out-of-line
+bindings/containers/captures. File-flattened imports/type/static names and unproved
+control-flow exits can cause conservative false positives. In particular,
+`consume(g); other().await` and `loop { drop(g); break; } other().await` may
+still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
+proved. Known `!` declarations are matched by unambiguous file-local names.
+Unresolved callable return types are not assumed to diverge. Out-of-line
 `#[cfg(test)]` parent-module context is not propagated to a separate file.
 
 ## Finding interpretation and CI

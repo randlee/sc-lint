@@ -26,8 +26,9 @@ its backend machine contract.
   keeps workspace packages that declare a normal or build `tokio` dependency and
   have a lib or bin target. Source files of the package's other targets (tests,
   examples, benches, build scripts) are excluded, and test files are skipped.
-  The runtime analyzer table's `exclude_paths_by_rule` entries then filter
-  `SCB-RUNTIME-003` findings by path.
+  The runtime analyzer table's `exclude_paths_by_rule` entries filter all
+  runtime rule IDs (001–007) by path. Rules 003 and 004 additionally share
+  the production Tokio-package eligibility described here.
 
 ## `SCB-RUNTIME-003` Scope (ATM-QA-008)
 
@@ -67,3 +68,10 @@ function/method, with nested functions forming a fresh boundary. Root test
 files and inline test scopes remain exempt. Existing 001–003 IDs/report shape
 are preserved; 003's recovery now suggests event-driven synchronization or
 yielding because rule 005 rejects Tokio timers as well.
+
+Branch-tail reachability excludes return/break/continue, built-in diverging
+macros and statically known never-returning calls from if/match guard joins.
+An internal four-variant PracticeRule makes conversion into runtime findings
+exhaustive, without an unreachable fallback. Shared directive helpers own
+attribute-path matching and analyzer-owned unknown-rule checks. Runtime
+allowances cache parsed attributes and aggregate located errors in source order.

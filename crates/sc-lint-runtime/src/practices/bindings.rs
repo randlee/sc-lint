@@ -38,32 +38,19 @@ impl Imports {
 
     fn expand(&self, path: Vec<String>) -> Vec<String> {
         let path = self.expand_aliases(path);
-        if path.len() == 1 {
+        if !path.is_empty() {
             for glob in &self.globs {
-                let candidate = self.expand_prefix(glob, &path[0]);
-                if matches!(
-                    candidate.join("::").as_str(),
-                    "std::thread::sleep_until"
-                        | "std::sync::Mutex"
-                        | "std::mem::drop"
-                        | "tokio::time::sleep"
-                        | "tokio::time::sleep_until"
-                        | "tokio::runtime::Runtime"
-                        | "tokio::runtime::Handle"
-                        | "tokio::runtime::Builder"
-                        | "futures::executor::block_on"
-                ) {
+                let mut candidate = glob.clone();
+                candidate.extend(path.iter().cloned());
+                let candidate = self.expand_aliases(candidate);
+                if known_path(&candidate)
+                    || (candidate.len() > 1 && known_path(&candidate[..candidate.len() - 1]))
+                {
                     return candidate;
                 }
             }
         }
         path
-    }
-
-    fn expand_prefix(&self, prefix: &[String], name: &str) -> Vec<String> {
-        let mut path = prefix.to_vec();
-        path.push(name.to_owned());
-        self.expand_aliases(path)
     }
 
     fn tree(&mut self, tree: &syn::UseTree, mut prefix: Vec<String>) {
@@ -156,11 +143,15 @@ pub(super) enum ValueKind {
     Handle,
     Builder,
     Guard,
+    NeverCallable,
     Other,
 }
 
 pub(super) fn type_kind(ty: &syn::Type, imports: &Imports) -> ValueKind {
     match ty {
+        syn::Type::FnPtr(function) if super::flow::never_output(&function.output) => {
+            ValueKind::NeverCallable
+        }
         syn::Type::Reference(reference) => type_kind(&reference.elem, imports),
         syn::Type::Paren(paren) => type_kind(&paren.elem, imports),
         syn::Type::Path(path) => {
@@ -205,4 +196,22 @@ fn wrapped_kind(path: &syn::TypePath, imports: &Imports) -> ValueKind {
         }
     }
     ValueKind::Other
+}
+
+fn known_path(path: &[String]) -> bool {
+    matches!(
+        path.join("::").as_str(),
+        "std::thread::sleep_until"
+            | "std::sync::Mutex"
+            | "std::sync::MutexGuard"
+            | "std::sync::Arc"
+            | "std::rc::Rc"
+            | "std::mem::drop"
+            | "tokio::time::sleep"
+            | "tokio::time::sleep_until"
+            | "tokio::runtime::Runtime"
+            | "tokio::runtime::Handle"
+            | "tokio::runtime::Builder"
+            | "futures::executor::block_on"
+    )
 }

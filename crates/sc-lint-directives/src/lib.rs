@@ -8,6 +8,25 @@ use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 
+/// Recognizes the supported unqualified and crate-qualified directive attributes.
+pub fn is_sc_lint_attribute(attr: &syn::Attribute) -> bool {
+    let parts = &attr.path().segments;
+    parts.last().is_some_and(|part| part.ident == "sc_lint")
+        && (parts.len() == 1 || (parts.len() == 2 && parts[0].ident == "sc_lint_attributes"))
+}
+
+/// Finds the first rule owned by an analyzer prefix but absent from its catalog.
+/// Rules belonging to other analyzers are left for their owning analyzer.
+pub fn unknown_owned_rule<'a>(
+    rules: &'a [SiteRuleId],
+    prefix: &str,
+    known: &[&str],
+) -> Option<&'a SiteRuleId> {
+    rules
+        .iter()
+        .find(|rule| rule.as_str().starts_with(prefix) && !known.contains(&rule.as_str()))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Scope {
     Boundary,
@@ -149,11 +168,14 @@ impl DirectiveError {
             _ => "correct the site allowance syntax",
         };
         let qualified_code = qualify_site_allow_code(code);
-        let cause = message
-            .strip_prefix(qualified_code)
-            .and_then(|remainder| remainder.strip_prefix(": "))
-            .and_then(|remainder| remainder.split_once("; recovery:").map(|(cause, _)| cause))
+        // syn may prepend context such as "unexpected end of input, ".
+        let diagnostic = message
+            .split_once(qualified_code)
+            .and_then(|(_, rest)| rest.strip_prefix(": "))
             .unwrap_or(message);
+        let cause = diagnostic
+            .split_once("; recovery:")
+            .map_or(diagnostic, |(cause, _)| cause);
         Self::new(code, cause.to_owned(), recovery)
     }
 }
@@ -706,5 +728,36 @@ mod tests {
     fn rejects_unknown_boundary_directive() {
         let error = syn::parse2::<AttributeInput>(quote!(boundary.unknown)).unwrap_err();
         assert!(error.to_string().contains("unsupported boundary directive"));
+    }
+}
+
+#[cfg(test)]
+mod site_policy_tests {
+    use super::*;
+    #[test]
+    fn shared_attribute_paths_and_owned_rule_catalog_checks() {
+        for (attribute, expected) in [
+            ("sc_lint", true),
+            ("sc_lint_attributes::sc_lint", true),
+            ("foreign::sc_lint", false),
+        ] {
+            let file = syn::parse_file(&format!(
+                "#[{attribute}(allow(PORT-010),reason=\"adapter\")] fn f(){{}} "
+            ))
+            .unwrap();
+            let syn::Item::Fn(item) = &file.items[0] else {
+                panic!("function")
+            };
+            assert_eq!(is_sc_lint_attribute(&item.attrs[0]), expected);
+        }
+        let rules =
+            ["PORT-010", "PORT-999", "SCB-RUNTIME-007"].map(|id| SiteRuleId::parse(id).unwrap());
+        assert_eq!(
+            unknown_owned_rule(&rules, "PORT-", &["PORT-010"])
+                .unwrap()
+                .as_str(),
+            "PORT-999"
+        );
+        assert!(unknown_owned_rule(&rules, "SCB-RUNTIME-", &["SCB-RUNTIME-007"]).is_none());
     }
 }

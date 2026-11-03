@@ -156,7 +156,7 @@ fn analyze_file(
         }
     }
     for site in crate::practices::find(&parsed) {
-        if site.rule != RuleId::ScbRuntime004 || sleep_scope.includes(file_context) {
+        if site.rule.id() != RuleId::ScbRuntime004 || sleep_scope.includes(file_context) {
             collector
                 .findings
                 .push(practice_finding(file_context, site));
@@ -194,29 +194,12 @@ fn blocking_sleep_finding(
 }
 
 fn practice_finding(file: &FileContext, site: crate::practices::Site) -> RuntimeFinding {
-    let (kind, recovery) = match site.rule {
-        RuleId::ScbRuntime004 => (
-            "blocking_thread_sleep_until",
-            "use controlled deadlines or synchronization instead",
-        ),
-        RuleId::ScbRuntime005 => (
-            "tokio_timer_sleep",
-            "use yield_now or event-driven synchronization instead of sleeping",
-        ),
-        RuleId::ScbRuntime006 => (
-            "blocking_executor_entry",
-            "await the future on the existing runtime instead",
-        ),
-        RuleId::ScbRuntime007 => (
-            "mutex_guard_across_await",
-            "drop the guard or end its scope before awaiting",
-        ),
-        _ => unreachable!("practice scanner emits only 004-007"),
-    };
+    let (kind, recovery) = site.rule.explanation();
+    let rule_id = site.rule.id();
     RuntimeFinding {
-        rule_id: site.rule,
+        rule_id,
         kind,
-        message: format!("{} {}; {}", site.rule.as_str(), site.detail, recovery),
+        message: format!("{} {}; {}", rule_id.as_str(), site.detail, recovery),
         source_path: file.source_path.clone(),
         line: site.line,
         column: site.column,
