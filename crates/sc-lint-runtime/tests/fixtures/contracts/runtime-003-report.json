@@ -8,7 +8,7 @@
     {
       "rule_id": "SCB-RUNTIME-003",
       "kind": "blocking_thread_sleep_in_tokio_package",
-      "message": "<root>/crates/example/src/lib.rs:1: SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead",
+      "message": "<root>/crates/example/src/lib.rs:1: SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use event-driven synchronization or `yield_now` instead",
       "owner_ids": ["crate::example::example"],
       "node_ids": ["crate::example::example::blocks"]
     }

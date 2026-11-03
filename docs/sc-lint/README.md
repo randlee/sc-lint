@@ -288,13 +288,17 @@ Scaffold status:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
 
-Implemented code moves for the completed extraction partition:
+Implemented code moves for the completed extraction partition (historical):
 
 - imported std runtime/concurrency rules from the current `atm-core` proving
   surface into `sc-lint-runtime`:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
   - `SCB-RUNTIME-003`
+- 0.8.5 extends the runtime inventory through `SCB-RUNTIME-007` for sleeps,
+  executor entry and Mutex guards across await; see the
+  [current runtime guide](../../crates/sc-lint-runtime/README.md) and
+  [Pending runtime requirement](../sc-lint-runtime/requirements.md).
 - keep the portability wrapper surface pointed at `sc-lint-portability`:
   - `.just/lint_sc_portability.py`
   - `.just/run_lint.py`

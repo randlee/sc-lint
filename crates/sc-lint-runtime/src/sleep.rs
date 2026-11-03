@@ -5,6 +5,7 @@ use syn::visit::Visit;
 
 pub(crate) struct SleepSite {
     pub(crate) line: usize,
+    pub(crate) column: usize,
     pub(crate) enclosing_fn: Option<String>,
 }
 
@@ -189,6 +190,7 @@ impl<'ast> Visit<'ast> for CallVisitor {
         if self.is_sleep(&call.func) {
             self.sites.push(SleepSite {
                 line: span_start_line(call.span()),
+                column: call.span().start().column,
                 enclosing_fn: self.functions.last().cloned(),
             });
         }
@@ -248,7 +250,7 @@ fn has_arguments(segment: &syn::PathSegment) -> bool {
     !matches!(segment.arguments, syn::PathArguments::None)
 }
 
-fn is_test_only(attributes: &[syn::Attribute]) -> bool {
+pub(crate) fn is_test_only(attributes: &[syn::Attribute]) -> bool {
     attributes
         .iter()
         .any(|attribute| attr_is_test(attribute) || cfg_is_test(attribute))

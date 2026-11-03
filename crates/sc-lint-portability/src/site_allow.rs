@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use sc_lint_directives::{AttributeInput, Directive, DirectiveError, SiteAllowReason, SiteRuleId};
+use sc_lint_directives::{
+    AttributeInput, Directive, DirectiveError, SiteAllowReason, SiteRuleId, is_sc_lint_attribute,
+    unknown_owned_rule,
+};
 use sc_lint_schema::AllowedFinding;
 use syn::Attribute;
 use syn::ImplItem;
@@ -84,11 +87,9 @@ impl SiteAllowVisitor<'_> {
                 let Directive::SiteAllow { rules, reason } = directive else {
                     continue;
                 };
-                for rule in &rules {
-                    if rule.as_str().starts_with("PORT-") && rule.as_str() != "PORT-010" {
-                        self.fail_unknown_rule(line, rule.clone());
-                        return;
-                    }
+                if let Some(rule) = unknown_owned_rule(&rules, "PORT-", &["PORT-010"]) {
+                    self.fail_unknown_rule(line, rule.clone());
+                    return;
                 }
                 self.allowances.push(SiteAllowance {
                     path: self.path.to_path_buf(),
@@ -232,15 +233,6 @@ pub(super) fn source_file_module_path(path: &Path) -> Vec<String> {
         modules.push(stem);
     }
     modules
-}
-
-fn is_sc_lint_attribute(attr: &Attribute) -> bool {
-    let segments = &attr.path().segments;
-    segments
-        .last()
-        .is_some_and(|segment| segment.ident == "sc_lint")
-        && (segments.len() == 1
-            || (segments.len() == 2 && segments[0].ident == "sc_lint_attributes"))
 }
 
 pub(super) fn apply_site_allowances(

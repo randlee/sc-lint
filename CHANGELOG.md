@@ -4,6 +4,13 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Runtime rules reject thread `sleep_until` in production Tokio packages,
+  Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
+  held across `.await` (`SCB-RUNTIME-004`–`007`, #640). Test code is exempt;
+  function/method allows require a non-empty reason. `yield_now` stays legal.
+
 ## [0.8.4] — 2026-11-01
 
 ### Added

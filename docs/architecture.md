@@ -361,8 +361,8 @@ For release `0.2.x`, this means:
 
 - `sc-lint-boundary` and `sc-lint-attributes` may depend on
   `sc-lint-directives` for shared directive parsing/types, and
-  `sc-lint-portability` may depend on `sc-lint-directives` for the shared
-  site-allowance directive model (ADR-022 decision 4). `sc-lint-portability`
+  `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-directives` for the shared site-allowance directive model (ADR-022 decision 4). `sc-lint-portability`
   and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
@@ -464,6 +464,10 @@ Current intended distribution is:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
     - `SCB-RUNTIME-003`
+    - `SCB-RUNTIME-004`: thread sleep_until (same Tokio-package scope as 003)
+    - `SCB-RUNTIME-005`: Tokio sleep/sleep_until (all non-test source)
+    - `SCB-RUNTIME-006`: Runtime/Handle/futures block_on (all non-test source)
+    - `SCB-RUNTIME-007`: std Mutex guard live across await (all non-test source)
 - `sc-lint-tokio`
   - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - must remain distinct from generic runtime rules
@@ -672,7 +676,9 @@ productized second.
 Consumer-proven rule families already shipped in dedicated product crates:
 
 - `sc-lint-portability`: `PORT-004`, `PORT-005`
-- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`, `SCB-RUNTIME-003`
+- `sc-lint-runtime` (shipped through 0.8.4): `SCB-RUNTIME-001`,
+  `SCB-RUNTIME-002`, `SCB-RUNTIME-003`. The 0.8.5 work adds 004–007 to the
+  current inventory above; its requirement remains Pending Rand acceptance.
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer

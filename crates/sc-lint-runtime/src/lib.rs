@@ -19,6 +19,7 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod practices;
 mod runtime;
 mod sleep;
 #[cfg(test)]
@@ -33,17 +34,29 @@ pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
         CatalogRuleId::new("SCB-RUNTIME-001"),
         CatalogRuleId::new("SCB-RUNTIME-002"),
         CatalogRuleId::new("SCB-RUNTIME-003"),
+        CatalogRuleId::new("SCB-RUNTIME-004"),
+        CatalogRuleId::new("SCB-RUNTIME-005"),
+        CatalogRuleId::new("SCB-RUNTIME-006"),
+        CatalogRuleId::new("SCB-RUNTIME-007"),
     ],
     path_addressable_rules: &[
         CatalogRuleId::new("SCB-RUNTIME-001"),
         CatalogRuleId::new("SCB-RUNTIME-002"),
         CatalogRuleId::new("SCB-RUNTIME-003"),
+        CatalogRuleId::new("SCB-RUNTIME-004"),
+        CatalogRuleId::new("SCB-RUNTIME-005"),
+        CatalogRuleId::new("SCB-RUNTIME-006"),
+        CatalogRuleId::new("SCB-RUNTIME-007"),
     ],
     families: &[],
     default_fail: &[
         CatalogRuleId::new("SCB-RUNTIME-001"),
         CatalogRuleId::new("SCB-RUNTIME-002"),
         CatalogRuleId::new("SCB-RUNTIME-003"),
+        CatalogRuleId::new("SCB-RUNTIME-004"),
+        CatalogRuleId::new("SCB-RUNTIME-005"),
+        CatalogRuleId::new("SCB-RUNTIME-006"),
+        CatalogRuleId::new("SCB-RUNTIME-007"),
     ],
     own_keys: &[],
 };
@@ -63,6 +76,10 @@ pub enum RuleId {
     ScbRuntime001,
     ScbRuntime002,
     ScbRuntime003,
+    ScbRuntime004,
+    ScbRuntime005,
+    ScbRuntime006,
+    ScbRuntime007,
 }
 
 impl RuleId {
@@ -71,6 +88,10 @@ impl RuleId {
             Self::ScbRuntime001 => "SCB-RUNTIME-001",
             Self::ScbRuntime002 => "SCB-RUNTIME-002",
             Self::ScbRuntime003 => "SCB-RUNTIME-003",
+            Self::ScbRuntime004 => "SCB-RUNTIME-004",
+            Self::ScbRuntime005 => "SCB-RUNTIME-005",
+            Self::ScbRuntime006 => "SCB-RUNTIME-006",
+            Self::ScbRuntime007 => "SCB-RUNTIME-007",
         }
     }
 }
