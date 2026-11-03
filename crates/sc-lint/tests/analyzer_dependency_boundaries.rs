@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -227,6 +228,215 @@ fn capture_reads_output_while_another_handle_remains_open() {
 
     let output = read_capture(&mut capture).expect("read capture without waiting for EOF");
     assert_eq!(output, b"captured");
+}
+
+// All network deadlines below are hang guards. Readiness and release are
+// explicit messages; no passing assertion depends on elapsed time.
+const GRANDCHILD_HANG_GUARD: Duration = Duration::from_secs(30);
+
+struct PendingConnection {
+    address: SocketAddr,
+    receiver: mpsc::Receiver<io::Result<TcpStream>>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl PendingConnection {
+    fn listen() -> Self {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind control listener");
+        let address = listener.local_addr().expect("control address");
+        let (sender, receiver) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let _ = sender.send(listener.accept().map(|(stream, _)| stream));
+        });
+        Self {
+            address,
+            receiver,
+            worker: Some(worker),
+        }
+    }
+
+    fn accept(&mut self) -> TcpStream {
+        let stream = self
+            .receiver
+            .recv_timeout(GRANDCHILD_HANG_GUARD)
+            .expect("control peer connects before the hang guard")
+            .expect("accept control peer");
+        self.worker
+            .take()
+            .expect("accept worker")
+            .join()
+            .expect("join accept worker");
+        stream
+            .set_read_timeout(Some(GRANDCHILD_HANG_GUARD))
+            .expect("control read guard");
+        stream
+            .set_write_timeout(Some(GRANDCHILD_HANG_GUARD))
+            .expect("control write guard");
+        stream
+    }
+}
+
+impl Drop for PendingConnection {
+    fn drop(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            // Unblock accept even if spawning/collecting the child failed.
+            let _ = TcpStream::connect_timeout(&self.address, GRANDCHILD_HANG_GUARD);
+            let _ = worker.join();
+        }
+    }
+}
+
+struct ParkedGrandchild {
+    pid: Option<u32>,
+    control: TcpStream,
+}
+
+impl ParkedGrandchild {
+    fn receive(mut control: TcpStream) -> Self {
+        let mut pid = [0; 4];
+        control
+            .read_exact(&mut pid)
+            .expect("grandchild sends its pid before parking");
+        Self {
+            pid: Some(u32::from_be_bytes(pid)),
+            control,
+        }
+    }
+
+    fn kill_and_confirm_exit(mut self) {
+        kill_process(self.pid.take().expect("live grandchild pid"));
+        let mut byte = [0];
+        match self.control.read(&mut byte) {
+            Ok(0) => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+                ) => {}
+            other => panic!("grandchild must close control on exit: {other:?}"),
+        }
+    }
+}
+
+impl Drop for ParkedGrandchild {
+    fn drop(&mut self) {
+        if let Some(pid) = self.pid.take() {
+            // Also clean up when an output/status assertion panics.
+            kill_process(pid);
+        }
+        // EOF is a fallback release if process killing fails on the host.
+        let _ = self.control.shutdown(Shutdown::Both);
+    }
+}
+
+#[test]
+fn timeout_grandchild_parks_when_requested() {
+    let Some(address) = std::env::var_os("SC_LINT_TEST_GRANDCHILD_CONTROL") else {
+        return;
+    };
+    let address: SocketAddr = address
+        .to_str()
+        .expect("control address string")
+        .parse()
+        .expect("control address");
+    let mut control = TcpStream::connect_timeout(&address, GRANDCHILD_HANG_GUARD)
+        .expect("connect test controller");
+    control
+        .set_read_timeout(Some(GRANDCHILD_HANG_GUARD))
+        .expect("release hang guard");
+    control
+        .write_all(&std::process::id().to_be_bytes())
+        .expect("send grandchild pid");
+    io::stdout().flush().expect("flush startup stdout");
+    io::stderr().flush().expect("flush startup stderr");
+    let ready: SocketAddr = std::env::var("SC_LINT_TEST_GRANDCHILD_READY")
+        .expect("readiness address")
+        .parse()
+        .expect("parse readiness address");
+    let mut readiness =
+        TcpStream::connect_timeout(&ready, GRANDCHILD_HANG_GUARD).expect("connect child readiness");
+    readiness
+        .write_all(b"R")
+        .expect("signal ready with inherited streams open");
+    drop(readiness);
+    let mut release = [0];
+    // A release byte or EOF both release the helper. Keep the stream alive
+    // until process exit, so the controller observes process termination.
+    match control.read(&mut release) {
+        Ok(0 | 1) => std::process::exit(0),
+        other => panic!("read grandchild release: {other:?}"),
+    }
+}
+
+#[test]
+fn timeout_child_spawns_lingering_grandchild_when_requested() {
+    let Some(address) = std::env::var_os("SC_LINT_TEST_LINGERING_GRANDCHILD") else {
+        return;
+    };
+    let mut readiness = PendingConnection::listen();
+    let _grandchild = Command::new(std::env::current_exe().expect("test executable path"))
+        .args([
+            "--exact",
+            "timeout_grandchild_parks_when_requested",
+            "--nocapture",
+        ])
+        .env("SC_LINT_TEST_GRANDCHILD_CONTROL", address)
+        .env(
+            "SC_LINT_TEST_GRANDCHILD_READY",
+            readiness.address.to_string(),
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("spawn grandchild with inherited output handles");
+    let mut peer = readiness.accept();
+    let mut ready = [0];
+    peer.read_exact(&mut ready)
+        .expect("grandchild signals readiness");
+    assert_eq!(ready, *b"R");
+    io::stdout()
+        .write_all(b"lingering child stdout")
+        .expect("write child stdout");
+    io::stdout().flush().expect("flush child stdout");
+    io::stderr()
+        .write_all(b"lingering child stderr")
+        .expect("write child stderr");
+    io::stderr().flush().expect("flush child stderr");
+    std::process::exit(17);
+}
+
+#[test]
+fn command_output_returns_child_status_and_streams_while_grandchild_is_parked() {
+    let mut controller = PendingConnection::listen();
+    let mut command = Command::new(std::env::current_exe().expect("test executable path"));
+    command
+        .args([
+            "--exact",
+            "timeout_child_spawns_lingering_grandchild_when_requested",
+            "--nocapture",
+        ])
+        .env(
+            "SC_LINT_TEST_LINGERING_GRANDCHILD",
+            controller.address.to_string(),
+        );
+    let output = command_output_with_timeout(command, GRANDCHILD_HANG_GUARD)
+        .expect("child exit returns output while grandchild holds both capture handles");
+    let grandchild = ParkedGrandchild::receive(controller.accept());
+    assert_eq!(output.status.code(), Some(17));
+    for (stream, marker) in [
+        (&output.stdout, b"lingering child stdout".as_slice()),
+        (&output.stderr, b"lingering child stderr".as_slice()),
+    ] {
+        assert!(
+            stream.windows(marker.len()).any(|window| window == marker),
+            "{}",
+            String::from_utf8_lossy(stream)
+        );
+    }
+    // Nothing releases the grandchild before the status/output assertions.
+    // Killing it and observing EOF confirms no process is left parked.
+    grandchild.kill_and_confirm_exit();
 }
 
 fn direct_dependencies(metadata: &Value, package_name: &str) -> BTreeSet<String> {
