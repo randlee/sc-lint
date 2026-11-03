@@ -29,7 +29,7 @@ TEMPLATES = {
     Path("templates/sc-lint-workflow.yml.tmpl"): Path(".github/workflows/sc-lint.yml"),
 }
 TEMPLATE_PLACEHOLDERS = {
-    "sc-lint.toml.tmpl": {"minimum_version", "analyzers", "profiles", "test_layers"},
+    "sc-lint.toml.tmpl": {"minimum_version", "analyzers", "profiles", "test_layers", "helper_policies", "default_lint_profile"},
     "Justfile.import.tmpl": {"windows_shell", "python_binding"},
     "sc-lint-workflow.yml.tmpl": {"ci_os", "lint_steps"},
 }
@@ -150,10 +150,11 @@ def values(path: Path) -> dict:
 
 
 def toml_value(value: object) -> str:
+    if value is None: raise ValueError("TOML configuration cannot contain null")
     if isinstance(value, dict): return "{ " + ", ".join(f"{json.dumps(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
     if isinstance(value, list): return "[" + ", ".join(toml_value(item) for item in value) + "]"
     if isinstance(value, bool): return str(value).lower()
-    return json.dumps(value)
+    return json.dumps(value, allow_nan=False)
 
 
 def substitute_template_variables(source: str, replacements: dict[str, str]) -> str:
@@ -218,7 +219,11 @@ def render(template: Path, data: dict) -> str:
     profiles = "\n\n".join(filter(None, [lint_profiles_table(data.get("lint_profiles", {})), *(lint_step(name, step) for name, step in data["profiles"].items())]))
     layers = "\n\n".join(test_layer(name, step) for name, step in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
+    policy_tables = [f"[{name}]\n" + "\n".join(f"{toml_key(key)} = {toml_value(value)}" for key, value in data[name].items())
+                     for name in ("line_counts", "identities", "version_sync", "cargo_shear", "logging", "artifacts") if name in data]
     replacements = {
+        "helper_policies": "\n\n".join(policy_tables) + "\n\n" if policy_tables else "",
+        "default_lint_profile": "\ndefault_lint_profile = " + toml_value(data["default_lint_profile"]) if "default_lint_profile" in data else "",
         "minimum_version": data["minimum_version"],
         "analyzers": analyzers,
         "profiles": profiles,
@@ -267,7 +272,9 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.tmpl" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
-    result[INSTALL_INPUT] = json.dumps(data, indent=2, sort_keys=True).encode() + b"\n"
+    # Persist declaration order: sorting map keys would reorder rendered rows
+    # and create drift when the persisted input is reused.
+    result[INSTALL_INPUT] = json.dumps(data, indent=2).encode() + b"\n"
     justfile = repo / "Justfile"; original = justfile.read_text() if justfile.exists() else (ROOT / "templates/Justfile.default").read_text()
     if not re.search(r"^test(?![\w-])[^:\n]*:(?!=)", unmanaged(original), re.M): original = (original.rstrip() + "\n\n" + (ROOT / "templates/test.just").read_text()).lstrip("\n")
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")

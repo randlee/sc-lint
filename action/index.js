@@ -27,16 +27,18 @@ class ActionError extends Error {
 function releaseTarget(platform, architecture) {
   const targets = {
     "linux/x64": ["x86_64-unknown-linux-gnu", "tar.gz"],
+    "linux/arm64": ["aarch64-unknown-linux-gnu", "tar.gz"],
     "darwin/x64": ["x86_64-apple-darwin", "tar.gz"],
     "darwin/arm64": ["aarch64-apple-darwin", "tar.gz"],
     "win32/x64": ["x86_64-pc-windows-msvc", "zip"],
+    "win32/arm64": ["aarch64-pc-windows-msvc", "zip"],
   };
   const found = targets[`${platform}/${architecture}`];
   if (!found) {
     throw new ActionError(
       ERROR.artifact,
       `No verified sc-lint release is published for ${platform}/${architecture}.`,
-      "Use a supported Linux x86_64, macOS x86_64/aarch64, or Windows x86_64 runner.",
+      "Use a supported Linux, macOS, or Windows runner on x86_64 or ARM64.",
     );
   }
   return { triple: found[0], extension: found[1] };

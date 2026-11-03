@@ -272,7 +272,12 @@ fn bootstrap_exec_does_not_reenter_consumer_profile() {
         );
         assert!(captured.contains("custom=kept with spaces\n"), "{captured}");
         assert!(
-            captured.contains(&format!("path={}:{}\n", managed.display(), search_path)),
+            captured.contains(&format!(
+                "path={}:{}:{}\n",
+                managed.display(),
+                canonical_root.join(".sc-lint/venv/bin").display(),
+                search_path
+            )),
             "{captured}"
         );
         assert!(captured.contains(&format!("arg=--config\narg={config}\narg=lint\narg=sc-boundary\narg=--rule-filter\narg=SCB-TEST\n")), "{captured}");
@@ -668,7 +673,12 @@ fn bootstrap_exec_preserves_argv_and_exit_status() {
     );
     assert!(captured.contains("custom=preserved\n"), "{captured}");
     assert!(
-        captured.contains(&format!("path={}:{}\n", managed.display(), "/usr/bin:/bin")),
+        captured.contains(&format!(
+            "path={}:{}:{}\n",
+            managed.display(),
+            canonical_root.join(".sc-lint/venv/bin").display(),
+            "/usr/bin:/bin"
+        )),
         "{captured}"
     );
     assert!(captured.contains("arg=two words\narg=tail\n"), "{captured}");

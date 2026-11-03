@@ -213,3 +213,26 @@ def test_pe_imports_reject_malformed_tables(corruption):
         data[0x400:] = b"x" * (len(data) - 0x400)
     with pytest.raises(ValueError):
         pe_imports(data)
+
+@pytest.mark.parametrize("module", [
+    "test_consumer_contract", "test_consumer_lifecycle",
+    "test_orchestration_contracts", "test_release_artifacts",
+])
+@pytest.mark.parametrize("cached", [False, True])
+def test_release_verification_rejects_repo_only_wheel_tests(tmp_path, module, cached):
+    wheel = tmp_path / "sc_lint-0.8.4-cp39-abi3-win_amd64.whl"
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr("sc_lint/_native.pyd", pe_image())
+        name = f"sc_lint/tests/__pycache__/{module}.cpython-314.pyc" if cached else f"sc_lint/tests/{module}.py"
+        archive.writestr(name, "repository-only test")
+        archive.writestr("sc_lint-0.8.4.dist-info/METADATA", "Metadata-Version: 2.1\nName: sc-lint\nVersion: 0.8.4\n")
+    with pytest.raises(ValueError, match="repository-only tests"):
+        verify(wheel, "x86_64-pc-windows-msvc")
+    root = Path(__file__).resolve().parents[3]
+    result = subprocess.run(
+        [sys.executable, str(root / ".github/scripts/verify_sc_lint_wheels.py"),
+         str(root / "release/publish-artifacts.toml"), str(tmp_path)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "repository-only tests" in result.stderr

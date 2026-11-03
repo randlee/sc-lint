@@ -259,7 +259,7 @@ class Bootstrap:
 
     def activate(self):
         os.environ["SC_LINT_BIN"] = str(self.binary)
-        os.environ["PATH"] = str(Path(self.binary).parent) + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = os.pathsep.join([str(Path(self.binary).parent), str(self.python.parent), os.environ.get("PATH", "")])
 
 
 def main(argv=None):
@@ -271,8 +271,9 @@ def main(argv=None):
         if not binary or not Path(binary).is_file() or (os.name != "nt" and not os.access(binary, os.X_OK)):
             fail(f"sc-lint binary is unavailable at {override or managed}; run just setup", 1)
         binary = os.path.abspath(binary)
-        os.environ["SC_LINT_BIN"] = binary
-        os.environ["PATH"] = str(Path(binary).parent) + os.pathsep + os.environ.get("PATH", "")
+        bootstrap = Bootstrap(config or "sc-lint.toml")
+        bootstrap.binary = binary
+        bootstrap.activate()
         if command[0] == "sc-lint":
             command = [binary, *(["--config", config] if config else []), *command[1:]]
         return run(command)
