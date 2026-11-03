@@ -105,7 +105,8 @@ planned.
   consumer `Justfile` has none, after which the consumer owns it.
 - (c) embeds a copy of the (d) bootstrap assets
   (`crates/sc-lint/assets/bootstrap.py`, included by `installer.rs`),
-  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap.py`.
+  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap.py` and
+  the source checkout copy `.sc-lint/bootstrap.py`.
 
 ADR-017's accepted Phase K changes are delivered within these existing
 owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;

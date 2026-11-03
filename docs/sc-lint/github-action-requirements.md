@@ -9,7 +9,7 @@ source-checkout, or analyzer-package interface.
 
 | ID | Requirement | Validation reference |
 | --- | --- | --- |
-| GA-001 | The Action must obtain only a named `sc-lint` release archive and its sibling `checksums.txt` from the release download location. It selects the archive for Linux x86_64, macOS x86_64/aarch64, or Windows x86_64. | [`action.yml`](../../action.yml), [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
+| GA-001 | The Action must obtain only a named `sc-lint` release archive and its sibling `checksums.txt` from the release download location. It selects the archive for Linux x86_64/aarch64, macOS x86_64/aarch64, or Windows x86_64/aarch64. | [`action.yml`](../../action.yml), [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-002 | Before extracting an archive, the Action must verify its SHA-256 digest against the entry for that exact archive in `checksums.txt`. | [`action/index.js`](../../action/index.js), `checksum mismatch` fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-003 | The Action accepts `operation` values `setup`, `lint`, and `test`. `setup` installs and preflights the release; `lint` and `test` run the E.3 consumer commands only after the E.1 compatibility preflight. | [`action.yml`](../../action.yml), operation fixtures in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-004 | The Action must run `sc-lint --config <config> compatibility check --binary <installed binary>` before a consumer command. It must fail when the configured minimum is incompatible. | [`action/index.js`](../../action/index.js), incompatible-floor fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |

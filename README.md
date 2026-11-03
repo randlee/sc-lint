@@ -156,9 +156,9 @@ cargo run -p sc-lint-boundary -- export-graph --root . --format turtle
 
 ## Config
 
-The repo-local lint runner currently uses:
-
-- `.just/lint-config.toml`
+The repo-local lint runner reads `sc-lint.toml` first. Python-backed helper
+policies fall back per table to `.just/lint-config.toml` when that table is absent
+from `sc-lint.toml`.
 
 Current live config knobs include:
 

@@ -247,17 +247,44 @@ def test_child_helpers_use_managed_python_ahead_of_controlled_host_path(tmp_path
     python = "python" if os.name == "nt" else "python3"
     helper = [python, "-m", "sc_lint.controlled_probe"]
     observed = []
+    launch = bootstrap.run
 
     def execute(command, **options):
         assert os.environ["PATH"].split(os.pathsep)[:2] == [str(archive_bin), str(model.python.parent)]
         # Model the product executing its configured row; exec runs it directly.
         argv = helper if str(command[0]) == str(binary) else command
-        result = subprocess.run(argv, text=True, capture_output=True, timeout=30)
+        import tempfile
+        with tempfile.TemporaryFile(mode="w+") as stdout, tempfile.TemporaryFile(mode="w+") as stderr:
+            status = launch(argv, text=True, stdout=stdout, stderr=stderr, timeout=30)
+            stdout.seek(0)
+            stderr.seek(0)
+            result = subprocess.CompletedProcess(argv, status, stdout.read(), stderr.read())
         observed.append(result)
         return result.returncode
 
     monkeypatch.setattr(bootstrap, "run", execute)
     argv = [operation, "--config", str(config)] + (["--", *helper] if operation == "exec" else [])
-    assert bootstrap.main(argv) == 0
+    status = bootstrap.main(argv)
+    assert status == 0, [(result.args, result.returncode, result.stdout, result.stderr) for result in observed]
     assert len(observed) == 1
     assert Path(observed[0].stdout.strip()).resolve() == managed.resolve(), observed[0].stderr
+
+
+def test_run_resolves_command_before_spawning(monkeypatch):
+    bootstrap = load_bootstrap()
+    observed = []
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda command: "/managed/python" if command == "python" else None)
+    monkeypatch.setattr(bootstrap.subprocess, "run", lambda argv, **options: observed.append(argv) or subprocess.CompletedProcess(argv, 0))
+    assert bootstrap.run(["python", "-m", "probe"]) == 0
+    assert observed == [["/managed/python", "-m", "probe"]]
+
+
+def test_exec_activates_without_setup_model(tmp_path, monkeypatch):
+    bootstrap = load_bootstrap()
+    binary = tmp_path / ("sc-lint.exe" if os.name == "nt" else "sc-lint")
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    monkeypatch.setenv("SC_LINT_BIN", str(binary))
+    monkeypatch.setattr(bootstrap, "Bootstrap", lambda *args: pytest.fail("exec must not construct setup state"))
+    monkeypatch.setattr(bootstrap, "run", lambda command: 0)
+    assert bootstrap.main(["exec", "--", "probe"]) == 0

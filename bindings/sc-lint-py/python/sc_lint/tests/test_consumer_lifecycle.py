@@ -70,12 +70,12 @@ class WheelConsumerTests(unittest.TestCase):
             excluded = project["tool"]["maturin"]["exclude"]
             modules = {Path(pattern).stem for pattern in excluded if Path(pattern).stem.startswith("test_")}
             built_wheels = list(Path(wheels).glob(f"sc_lint-{version}-*.whl"))
-            self.assertTrue(built_wheels, "the current source wheel must be built")
-            for wheel in built_wheels:
-                with zipfile.ZipFile(wheel) as archive:
-                    self.assertFalse([name for name in archive.namelist() if Path(name).name.split(".")[0] in modules])
+            self.assertEqual(len(built_wheels), 1, f"expected exactly one current source wheel: {built_wheels}")
+            wheel = built_wheels[0]
+            with zipfile.ZipFile(wheel) as archive:
+                self.assertFalse([name for name in archive.namelist() if Path(name).name.split(".")[0] in modules])
             subprocess.run(
-                [str(python), "-m", "pip", "install", "--no-index", "--find-links", wheels, f"sc-lint=={version}"],
+                [str(python), "-m", "pip", "install", "--no-index", "--find-links", wheels, str(wheel)],
                 check=True, capture_output=True, text=True, timeout=120,
             )
             self.assertFalse((consumer / "scripts").exists())

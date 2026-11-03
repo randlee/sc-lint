@@ -28,8 +28,10 @@ TEMPLATES = {
     Path("templates/Justfile.import.tmpl"): Path("Justfile"),
     Path("templates/sc-lint-workflow.yml.tmpl"): Path(".github/workflows/sc-lint.yml"),
 }
+HELPER_POLICY_TABLES = ("line_counts", "identities", "version_sync", "cargo_shear", "logging", "artifacts")
+
 TEMPLATE_PLACEHOLDERS = {
-    "sc-lint.toml.tmpl": {"minimum_version", "analyzers", "profiles", "test_layers", "helper_policies", "default_lint_profile"},
+    "sc-lint.toml.tmpl": {"tool_settings", "analyzers", "profiles", "test_layers", "helper_policies"},
     "Justfile.import.tmpl": {"windows_shell", "python_binding"},
     "sc-lint-workflow.yml.tmpl": {"ci_os", "lint_steps"},
 }
@@ -220,11 +222,13 @@ def render(template: Path, data: dict) -> str:
     layers = "\n\n".join(test_layer(name, step) for name, step in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
     policy_tables = [f"[{name}]\n" + "\n".join(f"{toml_key(key)} = {toml_value(value)}" for key, value in data[name].items())
-                     for name in ("line_counts", "identities", "version_sync", "cargo_shear", "logging", "artifacts") if name in data]
+                     for name in HELPER_POLICY_TABLES if name in data]
+    tool_settings = {"minimum_version": data["minimum_version"]}
+    if "default_lint_profile" in data:
+        tool_settings["default_lint_profile"] = data["default_lint_profile"]
     replacements = {
         "helper_policies": "\n\n".join(policy_tables) + "\n\n" if policy_tables else "",
-        "default_lint_profile": "\ndefault_lint_profile = " + toml_value(data["default_lint_profile"]) if "default_lint_profile" in data else "",
-        "minimum_version": data["minimum_version"],
+        "tool_settings": "\n".join(f"{key} = {toml_value(value)}" for key, value in tool_settings.items()),
         "analyzers": analyzers,
         "profiles": profiles,
         "test_layers": layers,

@@ -11,6 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from verify_release_arch import machine, pe_imports, verify
+from wheel_contents import REPO_ONLY_TESTS
 
 
 @pytest.mark.parametrize("arch,expected", [(62, ("elf", 62)), (183, ("elf", 183))])
@@ -214,10 +215,7 @@ def test_pe_imports_reject_malformed_tables(corruption):
     with pytest.raises(ValueError):
         pe_imports(data)
 
-@pytest.mark.parametrize("module", [
-    "test_consumer_contract", "test_consumer_lifecycle",
-    "test_orchestration_contracts", "test_release_artifacts",
-])
+@pytest.mark.parametrize("module", sorted(REPO_ONLY_TESTS))
 @pytest.mark.parametrize("cached", [False, True])
 def test_release_verification_rejects_repo_only_wheel_tests(tmp_path, module, cached):
     wheel = tmp_path / "sc_lint-0.8.4-cp39-abi3-win_amd64.whl"
@@ -236,3 +234,11 @@ def test_release_verification_rejects_repo_only_wheel_tests(tmp_path, module, ca
     )
     assert result.returncode != 0
     assert "repository-only tests" in result.stderr
+
+
+def test_repo_only_tests_match_wheel_exclusions():
+    root = Path(__file__).resolve().parents[3]
+    project = tomllib.loads((root / "bindings/sc-lint-py/pyproject.toml").read_text())
+    excluded = {Path(pattern).stem for pattern in project["tool"]["maturin"]["exclude"]
+                if Path(pattern).stem.startswith("test_")}
+    assert REPO_ONLY_TESTS == excluded

@@ -387,9 +387,7 @@ Workspace bumped from `0.5.0` → `0.6.0`; adoption plugin `0.6.0`.
 ### Removed
 
 - The legacy `.just/lint-config.toml` repo-config fallback in the CLI and in
-  `sc-lint-portability`; native CLI/analyzer configuration uses `sc-lint.toml`.
-  Python-backed helper policies retain per-table fallback to
-  `.just/lint-config.toml` (see the 0.8.1 consumer contract).
+  `sc-lint-portability`; `sc-lint.toml` is the only repo configuration file.
 
 ## [0.5.0] — 2026-08-12
 
