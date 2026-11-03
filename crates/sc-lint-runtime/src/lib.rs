@@ -19,8 +19,11 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod api;
+mod imports;
 mod practices;
 mod runtime;
+mod scope;
 mod sleep;
 #[cfg(test)]
 mod tests;

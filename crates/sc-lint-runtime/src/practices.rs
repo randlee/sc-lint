@@ -3,8 +3,9 @@ pub(crate) mod allowances;
 mod bindings;
 mod flow;
 use crate::RuleId;
+use crate::api::{Api, lookup};
+pub(crate) use crate::scope::production;
 use bindings::{Imports, ValueKind, type_kind};
-use sc_lint_analyzer_support::{ScopeKind, classify_scope};
 use std::collections::{BTreeMap, BTreeSet};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -218,24 +219,12 @@ impl Scanner {
             return ValueKind::Other;
         };
         let path = self.imports.resolve(&path.path).join("::");
-        match path.as_str() {
-            "std::sync::Mutex::new" => ValueKind::Mutex,
-            "tokio::runtime::Runtime::new" => ValueKind::Runtime,
-            "tokio::runtime::Handle::current" | "tokio::runtime::Handle::try_current" => {
-                ValueKind::Handle
-            }
-            "tokio::runtime::Builder::new_current_thread"
-            | "tokio::runtime::Builder::new_multi_thread" => ValueKind::Builder,
-            "Arc::new"
-            | "std::sync::Arc::new"
-            | "Arc::clone"
-            | "std::sync::Arc::clone"
-            | "Rc::clone"
-            | "std::rc::Rc::clone"
-            | "Rc::new"
-            | "std::rc::Rc::new"
-            | "Box::new"
-            | "std::boxed::Box::new" => call
+        match lookup(&path) {
+            Some(Api::MutexNew) => ValueKind::Mutex,
+            Some(Api::RuntimeNew) => ValueKind::Runtime,
+            Some(Api::HandleCurrent) => ValueKind::Handle,
+            Some(Api::BuilderNew) => ValueKind::Builder,
+            Some(Api::OwnerConstructor) => call
                 .args
                 .first()
                 .map_or(ValueKind::Other, |arg| self.kind(arg)),
@@ -259,7 +248,7 @@ impl Scanner {
             syn::Expr::Try(expr) => self.guard(&expr.expr),
             syn::Expr::Paren(expr) => self.guard(&expr.expr),
             syn::Expr::Call(call) => {
-                matches!(&*call.func, syn::Expr::Path(path) if matches!(self.imports.resolve(&path.path).join("::").as_str(), "std::sync::Mutex::lock" | "std::sync::Mutex::try_lock"))
+                matches!(&*call.func, syn::Expr::Path(path) if lookup(&self.imports.resolve(&path.path).join("::")) == Some(Api::MutexLock))
             }
             _ => false,
         }
@@ -270,19 +259,17 @@ impl Scanner {
             return;
         };
         let path = self.imports.resolve(&path.path).join("::");
-        let rule = match path.as_str() {
-            "std::thread::sleep_until" => Some(PracticeRule::ThreadSleepUntil),
-            "tokio::time::sleep" | "tokio::time::sleep_until" => Some(PracticeRule::TokioSleep),
-            "tokio::runtime::Runtime::block_on"
-            | "tokio::runtime::Handle::block_on"
-            | "futures::executor::block_on" => Some(PracticeRule::BlockOn),
+        let rule = match lookup(&path) {
+            Some(Api::ThreadSleepUntil) => Some(PracticeRule::ThreadSleepUntil),
+            Some(Api::TokioSleep | Api::TokioSleepUntil) => Some(PracticeRule::TokioSleep),
+            Some(Api::BlockOn) => Some(PracticeRule::BlockOn),
             _ => None,
         };
         if let Some(rule) = rule {
             self.record(rule, expr, path.clone());
         }
         syn::visit::visit_expr_call(self, call);
-        if matches!(path.as_str(), "drop" | "std::mem::drop")
+        if lookup(&path) == Some(Api::Drop)
             && call.args.len() == 1
             && let Some(name) = call.args.first().and_then(expression_name)
             && let Some(binding) = self
@@ -319,7 +306,10 @@ impl Scanner {
         let syn::Expr::Let(binding) = cond else {
             return None;
         };
-        let syn::Pat::TupleStruct(pattern) = &*binding.pat else {
+        self.pattern_guard(&binding.pat, &binding.expr)
+    }
+    fn pattern_guard(&self, pat: &syn::Pat, expr: &syn::Expr) -> Option<Binding> {
+        let syn::Pat::TupleStruct(pattern) = pat else {
             return None;
         };
         if pattern
@@ -327,7 +317,7 @@ impl Scanner {
             .segments
             .last()
             .is_none_or(|part| part.ident != "Ok")
-            || !self.guard(&binding.expr)
+            || !self.guard(expr)
         {
             return None;
         }
@@ -359,7 +349,15 @@ impl Scanner {
         let states = branch
             .arms
             .iter()
-            .map(|arm| self.branch(self.expr_continues(&arm.body), |this| this.visit_arm(arm)))
+            .map(|arm| {
+                let binding = self.pattern_guard(&arm.pat, &branch.expr);
+                self.branch(self.expr_continues(&arm.body), |this| {
+                    let count = this.bindings.len();
+                    this.bindings.extend(binding);
+                    this.visit_arm(arm);
+                    this.bindings.truncate(count);
+                })
+            })
             .collect::<Vec<_>>();
         if !states.is_empty() {
             self.merge_guards(&states);
@@ -452,6 +450,12 @@ impl<'ast> Visit<'ast> for Scanner {
             return;
         }
         syn::visit::visit_local(self, local);
+        if let Some(init) = &local.init
+            && init.diverge.is_some()
+            && let Some(binding) = self.pattern_guard(&local.pat, &init.expr)
+        {
+            self.bindings.push(binding);
+        }
         if let Some(name) = pattern_name(&local.pat) {
             let kind = if let syn::Pat::Type(pat) = &local.pat {
                 type_kind(&pat.ty, &self.imports)
@@ -524,16 +528,18 @@ impl<'ast> Visit<'ast> for Scanner {
             }
             syn::Expr::While(looped) => {
                 self.visit_expr(&looped.cond);
-                self.conditional(|this| this.visit_block(&looped.body));
+                let binding = self.condition_guard(&looped.cond);
+                self.conditional(|this| {
+                    let count = this.bindings.len();
+                    this.bindings.extend(binding);
+                    this.visit_block(&looped.body);
+                    this.bindings.truncate(count);
+                });
             }
             syn::Expr::Loop(looped) => self.conditional(|this| this.visit_block(&looped.body)),
             _ => syn::visit::visit_expr(self, expr),
         }
     }
-}
-pub(crate) fn production(attrs: &[syn::Attribute], tests: Option<bool>) -> bool {
-    classify_scope(attrs, ScopeKind::NonTest, tests) == ScopeKind::NonTest
-        && !crate::sleep::is_test_only(attrs)
 }
 
 fn pattern_name(pat: &syn::Pat) -> Option<String> {

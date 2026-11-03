@@ -411,3 +411,70 @@ fn local_label_breaks_do_not_hide_a_reachable_live_guard() {
         );
     }
 }
+
+#[test]
+fn lock_result_patterns_keep_guards_live_only_in_their_scope() {
+    for body in [
+        "let Ok(g) = m.lock() else { return }; tick().await;",
+        "match m.lock() { Ok(g) => { tick().await; }, Err(_) => {} }",
+        "while let Ok(g) = m.lock() { tick().await; break; }",
+    ] {
+        let source = format!("async fn f(m: &std::sync::Mutex<()>) {{ {body} }}");
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{body}"
+        );
+    }
+    for body in [
+        "let Ok(g) = m.lock() else { return }; drop(g); tick().await;",
+        "match m.lock() { Ok(g) => { drop(g); tick().await; }, Err(_) => {} }",
+        "match m.lock() { Ok(g) => {}, Err(_) => {} }; tick().await;",
+        "match m.lock() { Ok(g) if ready() => {}, _ => { tick().await; } }",
+        "while let Ok(g) = m.lock() { drop(g); tick().await; break; }",
+        "while let Ok(g) = m.lock() { break; } tick().await;",
+        "let Ok(g) = other() else { return }; tick().await;",
+    ] {
+        let source = format!("async fn f(m: &std::sync::Mutex<()>) {{ {body} }}");
+        assert!(report(&source, false).findings.is_empty(), "{body}");
+    }
+}
+
+#[test]
+fn macro_break_inside_loop_preserves_reachable_guard_state() {
+    for body in [
+        "if ready() { drop(g); } else { loop { tokio::select! { _ = event() => break, } } } tick().await;",
+        "match ready() { true => drop(g), false => loop { tokio::select! { _ = event() => { break; } } } } tick().await;",
+    ] {
+        let source =
+            format!("async fn f(m: &std::sync::Mutex<()>) {{ let g = m.lock().unwrap(); {body} }}");
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{body}"
+        );
+    }
+}
+
+#[test]
+fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
+    for (imports, expected) in [
+        (
+            "use std::thread::{self};",
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime004],
+        ),
+        (
+            "use std::thread::{self as thread};",
+            vec![RuleId::ScbRuntime004],
+        ),
+        (
+            "use std::*;",
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime004],
+        ),
+    ] {
+        let source = format!("{imports} fn f() {{ thread::sleep(()); thread::sleep_until(()); }}");
+        assert_eq!(rule_ids(&report(&source, true)), expected, "{imports}");
+    }
+    let source = "mod tests { fn f() { std::thread::sleep(()); std::thread::sleep_until(()); } }";
+    assert_eq!(rule_ids(&report(source, true)), vec![RuleId::ScbRuntime003]);
+}

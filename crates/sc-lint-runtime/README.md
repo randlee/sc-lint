@@ -155,7 +155,10 @@ binding; branch analysis retains a guard if a continuing branch can keep it aliv
 The tracker also recognizes `Arc::clone`/`Rc::clone` of Mutex owners,
 file-local typed static Mutexes, `lock().unwrap_or_else(|e| e.into_inner())`,
 constructors reached through globs (`use std::sync::*`, `Mutex::new`), and
-`if let Ok(g) = m.lock()` bindings scoped to the then-body. If/match joins
+`Ok(g) = m.lock()` patterns in if-let, let-else, match and while-let.
+Pattern guards live only within their binding scope; explicit drops release them.
+A visible `break` inside macro tokens (including `tokio::select!`) keeps a
+loop exit reachable when joining guard states. If/match joins
 exclude diverging branches (`return`, `break`, `continue`, built-in
 `panic!`/`unreachable!`/`todo!`/`unimplemented!`, and statically known `!` calls).
 A branch that reaches the following statement with a live guard still fails.

@@ -1027,6 +1027,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dunce",
+ "proc-macro2",
  "rayon",
  "sc-lint-analyzer-support",
  "sc-lint-directives 0.8.4",

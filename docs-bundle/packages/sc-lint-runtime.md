@@ -64,8 +64,10 @@ recognized constructors, and typed self fields. Guard liveness follows lexical
 blocks, explicit drop aliases and branches; temporaries do not stay live.
 The tracker recognizes `Arc::clone`/`Rc::clone`, typed file-local static
 Mutexes, poison recovery through `lock().unwrap_or_else(|e| e.into_inner())`,
-glob-qualified `Mutex::new`/`Runtime::new`, and `if let Ok(g) = m.lock()`
-bindings inside the then-body. Diverging return/break/continue branches,
+glob-qualified `Mutex::new`/`Runtime::new`, and `Ok(g) = m.lock()` patterns
+in if-let, let-else, match and while-let. Guards stay within their binding
+scope and explicit drops release them. Visible `break` tokens inside macros
+(including `tokio::select!`) keep loop exits reachable for guard-state joins. Diverging return/break/continue branches,
 built-in panic/unreachable/todo/unimplemented macros and statically known `!`
 calls do not contribute to an if/match guard join.
 
