@@ -287,4 +287,9 @@ def test_exec_activates_without_setup_model(tmp_path, monkeypatch):
     monkeypatch.setenv("SC_LINT_BIN", str(binary))
     monkeypatch.setattr(bootstrap, "Bootstrap", lambda *args: pytest.fail("exec must not construct setup state"))
     monkeypatch.setattr(bootstrap, "run", lambda command: 0)
+    original_path = os.environ.get("PATH", "")
+    monkeypatch.setenv("PATH", original_path)
     assert bootstrap.main(["exec", "--", "probe"]) == 0
+    assert os.environ["PATH"] == os.pathsep.join([
+        str(binary.parent), str(bootstrap.venv_scripts("sc-lint.toml")), original_path,
+    ])

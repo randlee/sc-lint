@@ -89,7 +89,7 @@ class WheelConsumerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("pytests fixtures total:", result.stdout)
             self.assertIn("RunPytestsTests", result.stdout)
-            for module in ("test_consumer_contract", "test_consumer_lifecycle", "test_orchestration_contracts", "test_release_artifacts"):
+            for module in modules:
                 self.assertNotIn(module + ".", result.stdout)
 
 
