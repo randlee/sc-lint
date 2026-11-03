@@ -45,9 +45,27 @@ impl Scanner {
         }
     }
 
+    fn pattern_binding(&self, pat: &syn::Pat, kind: ValueKind) -> Option<Binding> {
+        let name = pattern_name(pat)?;
+        let kind = if borrowed_pattern(pat) {
+            ValueKind::BorrowedGuard
+        } else {
+            kind
+        };
+        Some(self.owned_binding(name, kind))
+    }
+
     pub(super) fn pattern_guard(&self, pat: &syn::Pat, expr: &syn::Expr) -> Option<Binding> {
-        if let syn::Pat::Paren(pat) = pat {
-            return self.pattern_guard(&pat.pat, expr);
+        match pat {
+            syn::Pat::Paren(pat) => return self.pattern_guard(&pat.pat, expr),
+            syn::Pat::Type(pat) => return self.pattern_guard(&pat.pat, expr),
+            syn::Pat::Or(pat) => {
+                return pat
+                    .cases
+                    .iter()
+                    .find_map(|case| self.pattern_guard(case, expr));
+            }
+            _ => {}
         }
         let resource = self.match_resource(expr)?;
         let syn::Pat::TupleStruct(pattern) = pat else {
@@ -61,40 +79,45 @@ impl Scanner {
             if poisoned.path.segments.last()?.ident != "Poisoned" {
                 return None;
             }
-            let name = poisoned.elems.first().and_then(pattern_name)?;
-            return Some(self.owned_binding(name, ValueKind::PoisonedGuard));
+            return self.pattern_binding(poisoned.elems.first()?, ValueKind::PoisonedGuard);
         }
         let kind = match variant.as_str() {
             "Ok" if resource != MatchResource::Guard => ValueKind::Guard,
             "Err" if resource == MatchResource::LockResult => ValueKind::PoisonedGuard,
             _ => return None,
         };
-        let name = pattern.elems.first().and_then(pattern_name)?;
-        Some(self.owned_binding(name, kind))
+        self.pattern_binding(pattern.elems.first()?, kind)
     }
 
     pub(super) fn match_arm_bindings(&self, pat: &syn::Pat, expr: &syn::Expr) -> Vec<Binding> {
+        match pat {
+            syn::Pat::Paren(pat) => return self.match_arm_bindings(&pat.pat, expr),
+            syn::Pat::Type(pat) => return self.match_arm_bindings(&pat.pat, expr),
+            syn::Pat::Or(pat) => {
+                return pat
+                    .cases
+                    .iter()
+                    .map(|case| self.match_arm_bindings(case, expr))
+                    .find(|bindings| !bindings.is_empty())
+                    .unwrap_or_default();
+            }
+            _ => {}
+        }
         let Some(resource) = self.match_resource(expr) else {
             return Vec::new();
         };
-        if let Some(name) = pattern_name(pat) {
-            // A move binding (including @ and typed patterns) owns the whole
-            // scrutinee. Use its name so an explicit drop releases it.
-            let kind = if borrowed_pattern(pat) {
-                ValueKind::BorrowedGuard
-            } else {
-                ValueKind::Guard
-            };
-            return vec![self.owned_binding(name, kind)];
+        if let Some(binding) = self.pattern_binding(pat, ValueKind::Guard) {
+            // Move bindings own the scrutinee; ref bindings keep it borrowed.
+            return vec![binding];
         }
         if let Some(binding) = self.pattern_guard(pat, expr) {
             return vec![binding];
         }
-        if resource == MatchResource::TryLockResult || !unnamed_resource(pat) {
+        if !unnamed_resource(pat, resource) {
             return Vec::new();
         }
-        // Blocking lock-result wildcards retain a scrutinee resource, including
-        // fallback arms reached after a guarded Ok pattern fails.
+        // Unnamed successful payloads retain the scrutinee resource. Blocking
+        // lock results also retain errors and guarded-pattern fallback values.
         vec![self.owned_binding("<match scrutinee>".into(), ValueKind::Guard)]
     }
 
@@ -145,19 +168,26 @@ fn returns_guard(expr: &syn::Expr, binding: &Binding) -> bool {
     }
 }
 
-fn unnamed_resource(pat: &syn::Pat) -> bool {
+fn unnamed_resource(pat: &syn::Pat, resource: MatchResource) -> bool {
     match pat {
-        syn::Pat::Wild(_) => true,
-        syn::Pat::Paren(pat) => unnamed_resource(&pat.pat),
-        syn::Pat::Type(pat) => unnamed_resource(&pat.pat),
+        syn::Pat::Wild(_) | syn::Pat::Rest(_) => resource != MatchResource::TryLockResult,
+        syn::Pat::Paren(pat) => unnamed_resource(&pat.pat, resource),
+        syn::Pat::Type(pat) => unnamed_resource(&pat.pat, resource),
+        syn::Pat::Or(pat) => pat
+            .cases
+            .iter()
+            .any(|case| unnamed_resource(case, resource)),
         syn::Pat::TupleStruct(pattern) => {
-            pattern
-                .path
-                .segments
-                .last()
-                .is_some_and(|part| part.ident == "Ok" || part.ident == "Err")
-                && pattern.elems.len() == 1
-                && matches!(pattern.elems.first(), Some(syn::Pat::Wild(_)))
+            let Some(variant) = pattern.path.segments.last() else {
+                return false;
+            };
+            let retains = variant.ident == "Ok"
+                || (variant.ident == "Err" && resource != MatchResource::TryLockResult);
+            retains
+                && pattern
+                    .elems
+                    .iter()
+                    .any(|pat| unnamed_resource(pat, MatchResource::Guard))
         }
         _ => false,
     }

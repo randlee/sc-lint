@@ -85,11 +85,14 @@ control-flow exits can cause conservative false positives. In particular,
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
 proved. Rule 003's legacy resolver does not recognize renamed `self` imports
 such as `use std::thread::{self as thread}`; use a direct module alias instead.
-For raw `try_lock()` result-variant arms, named `Ok(g)` and explicit
-`Err(TryLockError::Poisoned(p))` bindings are tracked. Ownership in unrefined
+For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
+including `Ok(_)` and `Ok(..)` scrutinees. Explicit
+`Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined
 `Err(p)` and wildcard fallback arms is a known limitation; those arms are not
 assumed to hold a guard. Move bindings of an entire scrutinee use the binding
-name, so `drop(name)` releases the tracked resource.
+name, so `drop(name)` releases the tracked resource. Blocking lock-result
+rest and or-patterns retain their scrutinee resources. Dropping a nested
+`ref` binding does not release the scrutinee-held guard.
 Known `!` declarations are matched by unambiguous file-local names.
 Unresolved callable return types are not assumed to diverge. Out-of-line
 `#[cfg(test)]` parent-module context is not propagated to a separate file.

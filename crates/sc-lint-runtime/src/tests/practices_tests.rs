@@ -617,3 +617,97 @@ fn dropping_a_match_reference_binding_does_not_release_its_scrutinee() {
         }
     }
 }
+
+#[test]
+fn try_lock_ok_wildcard_and_rest_patterns_keep_the_scrutinee_guard() {
+    for scrutinee in ["m.try_lock()", "std::sync::Mutex::try_lock(m)"] {
+        for pattern in ["Ok(_)", "Ok(..)"] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ tick().await; }}, _ => {{}} }} }}"
+            );
+            assert_eq!(
+                rule_ids(&report(&source, false)),
+                vec![RuleId::ScbRuntime007],
+                "{source}"
+            );
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{}}, _ => {{}} }}; tick().await; }}"
+            );
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
+        for pattern in ["Err(_)", "Err(..)", "_"] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ Ok(g) => {{ use_it(g); }}, {pattern} => {{ tick().await; }} }} }}"
+            );
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
+    }
+}
+
+#[test]
+fn lock_rest_and_or_patterns_keep_the_scrutinee_guard() {
+    for scrutinee in ["m.lock()", "std::sync::Mutex::lock(m)"] {
+        for pattern in ["Ok(..)", "Err(..)", "Ok(_) | Err(_)", "Ok(..) | Err(..)"] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ tick().await; }}, _ => {{}} }} }}"
+            );
+            assert_eq!(
+                rule_ids(&report(&source, false)),
+                vec![RuleId::ScbRuntime007],
+                "{source}"
+            );
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{}}, _ => {{}} }}; tick().await; }}"
+            );
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
+    }
+}
+
+#[test]
+fn dropping_nested_ref_patterns_does_not_release_the_scrutinee_guard() {
+    for (scrutinee, pattern, name) in [
+        ("m.lock()", "Ok(ref g)", "g"),
+        ("m.lock()", "Err(ref p)", "p"),
+        ("m.try_lock()", "Ok(ref g)", "g"),
+        ("m.try_lock()", "Err(TryLockError::Poisoned(ref p))", "p"),
+        ("std::sync::Mutex::lock(m)", "Ok(ref g)", "g"),
+        ("std::sync::Mutex::lock(m)", "Err(ref p)", "p"),
+        (
+            "std::sync::Mutex::try_lock(m)",
+            "Err(TryLockError::Poisoned(ref p))",
+            "p",
+        ),
+    ] {
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ drop({name}); tick().await; }}, _ => {{}} }} }}"
+        );
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{source}"
+        );
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ drop({name}); }}, _ => {{}} }}; tick().await; }}"
+        );
+        assert!(report(&source, false).findings.is_empty(), "{source}");
+    }
+}
+
+#[test]
+fn or_patterns_preserve_named_and_borrowed_guard_ownership() {
+    for (pattern, release, expected) in [
+        ("g @ Ok(_) | g @ Err(_)", "drop(g);", false),
+        ("g @ Ok(_) | g @ Err(_)", "", true),
+        ("Ok(ref g) | Ok(ref g)", "drop(g);", true),
+    ] {
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match m.lock() {{ {pattern} => {{ {release} tick().await; }}, _ => {{}} }} }}"
+        );
+        assert_eq!(
+            report(&source, false).findings.len(),
+            usize::from(expected),
+            "{source}"
+        );
+    }
+}
