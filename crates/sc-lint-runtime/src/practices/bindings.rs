@@ -129,6 +129,7 @@ pub(super) enum ValueKind {
     Handle,
     Builder,
     Guard,
+    BorrowedGuard,
     PoisonedGuard,
     NeverCallable,
     Other,

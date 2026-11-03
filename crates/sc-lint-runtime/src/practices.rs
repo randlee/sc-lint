@@ -251,7 +251,7 @@ impl Scanner {
             syn::Expr::Try(expr) => self.guard(&expr.expr),
             syn::Expr::Paren(expr) => self.guard(&expr.expr),
             syn::Expr::Call(call) => {
-                matches!(&*call.func, syn::Expr::Path(path) if lookup(&self.imports.resolve(&path.path).join("::")) == Some(Api::MutexLock))
+                matches!(&*call.func, syn::Expr::Path(path) if matches!(lookup(&self.imports.resolve(&path.path).join("::")), Some(Api::MutexLock | Api::MutexTryLock)))
             }
             _ => false,
         }
@@ -280,6 +280,7 @@ impl Scanner {
                 .iter_mut()
                 .rev()
                 .find(|binding| binding.name == name)
+            && binding.kind != ValueKind::BorrowedGuard
         {
             binding.guard = false;
         }
@@ -310,25 +311,6 @@ impl Scanner {
             return None;
         };
         self.pattern_guard(&binding.pat, &binding.expr)
-    }
-    fn pattern_guard(&self, pat: &syn::Pat, expr: &syn::Expr) -> Option<Binding> {
-        let syn::Pat::TupleStruct(pattern) = pat else {
-            return None;
-        };
-        if !self.guard(expr) {
-            return None;
-        }
-        let kind = match pattern.path.segments.last()?.ident.to_string().as_str() {
-            "Ok" => ValueKind::Guard,
-            "Err" => ValueKind::PoisonedGuard,
-            _ => return None,
-        };
-        let name = pattern.elems.first().and_then(pattern_name)?;
-        Some(Binding {
-            name,
-            kind,
-            guard: self.asynchronous,
-        })
     }
     fn visit_conditional(&mut self, branch: &syn::ExprIf) {
         self.visit_expr(&branch.cond);
@@ -549,6 +531,7 @@ fn pattern_name(pat: &syn::Pat) -> Option<String> {
     match pat {
         syn::Pat::Ident(pat) => Some(pat.ident.to_string()),
         syn::Pat::Type(pat) => pattern_name(&pat.pat),
+        syn::Pat::Paren(pat) => pattern_name(&pat.pat),
         _ => None,
     }
 }

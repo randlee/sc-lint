@@ -360,6 +360,8 @@ fn allowance_errors_are_all_located_source_ordered_and_not_duplicated() {
 
 #[test]
 fn documented_conservative_move_and_loop_exit_cases_still_report() {
+    // Known limitation: interprocedural moves and loop-exit ownership transfer
+    // remain conservative. See README and docs-bundle syntactic coverage limits.
     for body in [
         "consume(g);other().await;",
         "loop{drop(g);break;}other().await;",
@@ -507,5 +509,111 @@ fn lock_match_results_and_scrutinees_keep_resources_across_await() {
     ] {
         let source = format!("async fn f(m: &std::sync::Mutex<()>) {{ {body} }}");
         assert!(report(&source, false).findings.is_empty(), "{body}");
+    }
+}
+
+#[test]
+fn try_lock_variant_arms_track_only_recognized_guard_owners() {
+    // Known limitation: unrefined try_lock errors and wildcard fallbacks are
+    // not modeled as owning a guard. See README and docs-bundle limits.
+    for scrutinee in ["m.try_lock()", "std::sync::Mutex::try_lock(m)"] {
+        for arms in [
+            "Ok(g) => { use_it(g); }, Err(_) => { tick().await; }",
+            "Ok(g) => { use_it(g); }, Err(TryLockError::WouldBlock) => { tick().await; }, _ => {}",
+            "Ok(g) => { use_it(g); }, Err(p) => { tick().await; }",
+            "Ok(g) => { use_it(g); }, _ => { tick().await; }",
+            "Ok(g) if ready() => { use_it(g); }, _ => { tick().await; }",
+            "Ok(g) if ready() => { use_it(g); }, Err(p) => { tick().await; }, _ => {}",
+        ] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {arms} }} }}"
+            );
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ Ok(g) => {{ tick().await; }}, _ => {{}} }} }}"
+        );
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{source}"
+        );
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ Err(TryLockError::Poisoned(p)) => {{ tick().await; }}, _ => {{}} }} }}"
+        );
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{source}"
+        );
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ Err(TryLockError::Poisoned(p)) => {{ drop(p); tick().await; }}, _ => {{}} }} }}"
+        );
+        assert!(report(&source, false).findings.is_empty(), "{source}");
+    }
+}
+
+#[test]
+fn moved_match_scrutinees_are_released_by_their_pattern_name() {
+    for scrutinee in ["m.lock().unwrap()", "m.lock()"] {
+        for pattern in ["g", "g @ _", "(g)"] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ drop(g); tick().await; }} }} }}"
+            );
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ tick().await; }} }} }}"
+            );
+            assert_eq!(
+                rule_ids(&report(&source, false)),
+                vec![RuleId::ScbRuntime007],
+                "{source}"
+            );
+        }
+    }
+}
+
+#[test]
+fn typed_match_move_bindings_keep_and_release_their_named_owner() {
+    // Typed patterns are an AST form; construct one explicitly because Rust's
+    // source grammar does not accept type ascription in match-arm patterns.
+    for release in ["", "drop(g);"] {
+        let source = format!(
+            "async fn f(m: &std::sync::Mutex<()>) {{ match m.lock() {{ g => {{ {release} tick().await; }} }} }}"
+        );
+        let mut file = syn::parse_file(&source).unwrap();
+        let syn::Item::Fn(function) = &mut file.items[0] else {
+            panic!("function fixture")
+        };
+        let syn::Stmt::Expr(syn::Expr::Match(branch), _) = &mut function.block.stmts[0] else {
+            panic!("match fixture")
+        };
+        branch.arms[0].pat = syn::Pat::Type(syn::PatType {
+            attrs: Vec::new(),
+            pat: Box::new(branch.arms[0].pat.clone()),
+            colon_token: Default::default(),
+            ty: Box::new(syn::parse_str("_").unwrap()),
+        });
+        assert_eq!(
+            crate::practices::find(&file).len(),
+            usize::from(release.is_empty()),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn dropping_a_match_reference_binding_does_not_release_its_scrutinee() {
+    for scrutinee in ["m.lock()", "m.lock().unwrap()"] {
+        for pattern in ["ref g", "ref g @ _"] {
+            let source = format!(
+                "async fn f(m: &std::sync::Mutex<()>) {{ match {scrutinee} {{ {pattern} => {{ drop(g); tick().await; }} }} }}"
+            );
+            assert_eq!(
+                rule_ids(&report(&source, false)),
+                vec![RuleId::ScbRuntime007],
+                "{source}"
+            );
+        }
     }
 }
