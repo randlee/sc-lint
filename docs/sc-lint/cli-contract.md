@@ -337,11 +337,17 @@ is present in the JSON envelope. The rule reflects the existing
 `render_success_human` implementation; it does not request a renderer change.
 
 - `compatibility.check` and `view.graph` render exactly `{id}: ok`.
-- `init` renders `init: <status>` (`current`, `would_create` or `created`),
-  then one line for each non-empty file list: `Created:` (`Would create:`
-  under `--dry-run`), `Preserved:` and `Version-only stale:`, each followed by
-  the comma-separated paths from `created_files`, `preserved_files` and
-  `version_only_stale_files`.
+- `init` renders `init: <status>`, where status is `current`, `created`,
+  `updated`, `would_create` or `would_update`. Any refresh of a prior-release
+  file makes it `updated` (`would_update` under `--dry-run`), even when
+  missing files are also created. Then one line for each non-empty file list,
+  in order: `Created:` (`Would create:` under `--dry-run`), `Refreshed:`
+  (`Would refresh:` under `--dry-run`), `Preserved:` and `Version-only
+  stale:`, each followed by the comma-separated paths from `created_files`,
+  `refreshed_files` (`would_refresh_files`), `preserved_files` and
+  `version_only_stale_files`. `refreshed_files` and `would_refresh_files` are
+  always arrays; the one that does not apply to the run is empty. A refreshed
+  file also appears in `version_only_stale_files`.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
 

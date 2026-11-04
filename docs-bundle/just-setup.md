@@ -12,14 +12,25 @@ sc-lint init --just --dry-run # validate without writing; --json lists paths
 sc-lint init --just           # create or update managed files
 ```
 
-Human output starts with `init: <status>`: `current` when nothing needs
-writing, `would_create` for a `--dry-run` that would write files, and
-`created` after writing. Non-empty file lists follow, one line each:
-`Created:` (or `Would create:` for `--dry-run`), `Preserved:` and
-`Version-only stale:` (generated files from an earlier release). A
+Human output starts with `init: <status>`:
+
+| Status | Meaning |
+| --- | --- |
+| `current` | Nothing needs writing. |
+| `created` | Only missing files were written. |
+| `updated` | At least one prior-release file was refreshed, with or without missing files created. |
+| `would_create` | `--dry-run`: only missing files would be written. |
+| `would_update` | `--dry-run`: at least one prior-release file would be refreshed. |
+
+Non-empty file lists follow, one line each, in this order: `Created:` (or
+`Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
+`--dry-run`), `Preserved:` and `Version-only stale:` (generated files from an
+earlier release). A refreshed file is also listed under `Version-only
+stale:`. A
 generated `sc-lint.toml` that differs only in the sc-lint version is kept,
-not rewritten. An unedited 0.8.4 `.sc-lint/bootstrap.py` is rewritten with
-the current one, and `--check` reports it as outdated. An unedited 0.8.4
+not rewritten. An unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed: it is
+rewritten with the current one and listed under `Refreshed:`, and `--check`
+reports it as outdated. An unedited 0.8.4
 `Justfile` with its old managed header is accepted as current. Edits to any
 of these files make it user-owned, and init reports a conflict instead of
 overwriting it. For example:
@@ -31,9 +42,20 @@ Preserved: /work/repo/sc-lint.toml
 ```
 
 Paths are printed as the repository root joined with each file name.
+Upgrading an unedited 0.8.4 integration prints, for example:
+
+```text
+init: updated
+Refreshed: /work/repo/.sc-lint/bootstrap.py
+Preserved: /work/repo/sc-lint.toml, /work/repo/Justfile
+Version-only stale: /work/repo/sc-lint.toml, /work/repo/.sc-lint/bootstrap.py
+```
 
 `sc-lint --json init --just` reports the same lists as `created_files`,
-`preserved_files` and `version_only_stale_files`, plus `managed_files`.
+`refreshed_files`, `would_refresh_files`, `preserved_files` and
+`version_only_stale_files`, plus `managed_files`. Every list is always present
+as an array. A real run fills `refreshed_files` and leaves
+`would_refresh_files` empty; `--dry-run` does the reverse.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an

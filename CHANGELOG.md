@@ -132,9 +132,11 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   Scripts that test for exit 6 from `sc-lint view findings` or another
   Python-backed command must also accept 5.
 - `sc-lint init --just` human output reports `init: <status>` (`current`,
-  `would_create` or `created`) followed by `Created:` (`Would create:` under
-  `--dry-run`), `Preserved:` and `Version-only stale:` file lists, instead of
-  `init: ok`.
+  `created`, `updated`, `would_create` or `would_update`) followed by
+  `Created:` (`Would create:` under `--dry-run`), `Refreshed:` (`Would
+  refresh:`), `Preserved:` and `Version-only stale:` file lists, instead of
+  `init: ok`. JSON adds `refreshed_files` and `would_refresh_files`, always
+  arrays (lint-085.61).
 - `sc-lint docs --path` prints the bare path without the
   `Documentation root:` prefix, so the output can be used directly in
   scripts; with a guide name, the bare path precedes the guide text.
@@ -236,8 +238,9 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   ending is accepted (lint-085.47, lint-085.51, lint-085.55).
 - `sc-lint init --just` upgrades an unedited 0.8.4 integration without a
   conflict: a 0.8.4 `Justfile` with its old managed header is accepted as
-  current, and an unedited 0.8.4 `.sc-lint/bootstrap.py` is rewritten with
-  the current one (`--check` reports it as outdated). An edited `Justfile` or
+  current, and an unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed with
+  the current one and reported with status `updated` and a `Refreshed:` line
+  (`--check` reports it as outdated; lint-085.61). An edited `Justfile` or
   `bootstrap.py` stays user-owned and is reported as a conflict. A
   `sc-lint.toml` counts as version-only stale only when the version value is
   a well-formed minimum version, so a key inserted after it makes the file a
