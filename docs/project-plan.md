@@ -416,8 +416,11 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
   `SCB-RUNTIME-003` allowances, `lint-085.43`) and #837 (compound test `cfg`
   expressions classified in `rust_file_test_scope`, `lint-085.42`)
 - phase-end review and documentation fixes (`lint-085.35`, `lint-085.37`,
-  `lint-085.39`, `lint-085.40`, `lint-085.44`) and QA round-1 fixes
-  (`lint-085.45` to `lint-085.48`), merged through the version-bump PR #842
+  `lint-085.39`, `lint-085.40`, `lint-085.44`) and QA fixes:
+  round 1 (`lint-085.45` to `lint-085.48`), round 2 (`lint-085.50` to
+  `lint-085.53`, and `lint-085.55` for generated-file line endings) and
+  round 3 (`lint-085.56` to `lint-085.59`), merged through the version-bump
+  PR #842
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker

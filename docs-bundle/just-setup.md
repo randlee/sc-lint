@@ -16,8 +16,13 @@ Human output starts with `init: <status>`: `current` when nothing needs
 writing, `would_create` for a `--dry-run` that would write files, and
 `created` after writing. Non-empty file lists follow, one line each:
 `Created:` (or `Would create:` for `--dry-run`), `Preserved:` and
-`Version-only stale:` (generated files that differ only in the sc-lint
-version; they are kept, not rewritten). For example:
+`Version-only stale:` (generated files from an earlier release). A
+generated `sc-lint.toml` that differs only in the sc-lint version is kept,
+not rewritten. An unedited 0.8.4 `.sc-lint/bootstrap.py` is rewritten with
+the current one, and `--check` reports it as outdated. An unedited 0.8.4
+`Justfile` with its old managed header is accepted as current. Edits to any
+of these files make it user-owned, and init reports a conflict instead of
+overwriting it. For example:
 
 ```text
 init: created

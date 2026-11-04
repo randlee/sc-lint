@@ -16,7 +16,7 @@ concurrency model.
 
 ```sh
 sc-lint lint sc-runtime
-sc-lint lint ci
+sc-lint lint ci --consumer
 ```
 
 The analyzer reads Rust source under the configured root and emits normalized
