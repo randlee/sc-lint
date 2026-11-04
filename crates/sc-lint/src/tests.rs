@@ -451,11 +451,11 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert_eq!(created["status"], "created");
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
-    assert!(root.join(".sc-lint/bootstrap.py").is_file());
+    let bootstrap_path =
+        crate::consumer_integration::consumer_integration_path(root, &[".sc-lint", "bootstrap.py"]);
+    assert!(bootstrap_path.is_file());
     assert_eq!(
-        fs::read(root.join(".sc-lint/bootstrap.py"))
-            .expect("bootstrap")
-            .get(..22),
+        fs::read(&bootstrap_path).expect("bootstrap").get(..22),
         Some(&b"#!/usr/bin/env python3"[..])
     );
     assert_eq!(
@@ -936,7 +936,10 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         );
         return;
     }
-    let bootstrap = fixture.path().join(".sc-lint/bootstrap.py");
+    let bootstrap = crate::consumer_integration::consumer_integration_path(
+        fixture.path(),
+        &[".sc-lint", "bootstrap.py"],
+    );
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
     fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
