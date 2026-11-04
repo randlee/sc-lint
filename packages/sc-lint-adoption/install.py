@@ -280,7 +280,7 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
     for source in ROOT.rglob("*"):
-        if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc" or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
+        if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc" or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"tests", "templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
         result[consumer_path(source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.tmpl" and not data["ci"]["enabled"]: continue
