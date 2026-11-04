@@ -1,7 +1,3 @@
-set windows-shell := ["cmd.exe", "/c"]
-
-python := if os_family() == "windows" { "python" } else { "python3" }
-
 default: lint
 
 # sc-lint's recommended `test` recipe: runs the selected `[tool.sc-lint.test]` selector (or its
@@ -11,6 +7,6 @@ default: lint
 test *layer:
     {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
 
-# >>> sc-lint managed integration >>>
+set windows-shell := ["cmd.exe", "/c"]
+python := if os_family() == "windows" { "python" } else { "python3" }
 import '.sc-lint/justfile'
-# <<< sc-lint managed integration <<<
