@@ -1,3 +1,12 @@
+//! Boundary analyzer for `sc-lint`: builds a workspace owner graph with
+//! `cargo_metadata` and `syn`, and reports the `SCB-CYCLE`, `SCB-BOUNDARY`,
+//! `SCB-CALLER`, `SCB-DEPENDENCY`, `SCB-FEATURE` and `SCB-MANIFEST` rules.
+//! Run it as `sc-lint lint sc-boundary`.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;

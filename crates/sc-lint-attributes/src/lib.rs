@@ -1,3 +1,13 @@
+//! The `#[sc_lint(...)]` attribute for source-level lint declarations.
+//!
+//! The attribute is a no-op: it validates its arguments with
+//! `sc-lint-directives` and returns the item unchanged. The `sc-lint` analyzers
+//! read the declarations from source.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use sc_lint_directives::AttributeInput;

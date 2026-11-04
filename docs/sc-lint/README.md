@@ -120,9 +120,9 @@ Contents:
 - [`sprint-D1.md`](../plans/phase-D/sprint-D1.md) — direct workspace package-edge
   enforcement planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
-  the planned top-level `sc-lint` CLI
+  the top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
-  the planned top-level `sc-lint` CLI
+  the top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — implemented top-level success/error
   envelope and backend-to-CLI normalization contract
 - [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
@@ -149,248 +149,142 @@ Contents:
 
 ## Homebrew Distribution
 
-The primary supported Homebrew install path is:
+The supported Homebrew install path is:
 
 ```bash
 brew install randlee/tap/sc-lint
 ```
 
-That top-level formula is intended to expose the shipped CLI plus backend
-analyzer binaries from one install path:
+That formula installs the CLI and the three analyzer binaries:
 
 - `sc-lint`
 - `sc-lint-boundary`
 - `sc-lint-portability`
 - `sc-lint-runtime`
 
-`randlee/tap/sc-lint-boundary` may remain as a legacy compatibility surface
-for boundary-only callers, but it is not the supported default install path.
+`randlee/tap/sc-lint-boundary` remains as a legacy formula for boundary-only
+callers; it is not the default install path. Release archives and Python
+wheels are described in the offline
+[installation guide](../../docs-bundle/installation.md).
 
-Intended crate split:
+## Workspace crates
 
-- `sc-lint`
-  - top-level CLI crate
-  - command parsing, config loading, output normalization, tool dispatch
-  - canonical AI-first machine contract for non-interactive commands
-  - implemented profiles:
-    - `fast`
-    - `full`
-    - `ci`
-  - implemented top-level CI-equivalent command:
-    - `sc-lint ci`
-  - implemented Windows preflight commands when `cargo xwin` is installed:
-    - `sc-lint check xwin`
-    - `sc-lint clippy xwin`
-  - implemented Python-backed utility commands:
-    - `sc-lint lint line-counts`
-    - `sc-lint lint identity-literals`
-    - `sc-lint view findings`
-- `sc-lint-directives`
-  - shared directive parsing/types
-- `sc-lint-boundary`
-  - analyzer CLI + library
-  - AST parsing, graph construction, semantic boundary rule evaluation
-- `sc-lint-portability`
-  - analyzer crate for shared OS/platform portability rules
-  - planned next shared follow-ons:
-    - production Unix-only and Windows-only path-literal checks
-    - broad production env-portability checks
-    - shell invocation portability checks
-    - structural `cfg(unix)` / `cfg(windows)` parity checks
-- `sc-lint-runtime`
-  - analyzer crate for shared std runtime/concurrency rules
-- `sc-lint-version`
-  - planned future workspace crate for stable interface version checks and
-    canonical interface artifacts
-  - planned top-level invocation path:
-    - `sc-lint check interfaces`
-  - planned to start with `cargo-semver-checks` for Rust public APIs and
-    expand to CLI and transport surfaces while consuming a shared
-    `sc-compose`/Jinja reporting layer rather than owning HTML generation
-- `sc-lint-attributes`
-  - proc-macro attribute crate
-  - intentionally minimal at first
-  - exists early so source-level declarations can be added without late
-    packaging churn
+All crates share the workspace version line (0.8.5). The primary product is
+`sc-lint`; the other crates are its analyzers and support libraries, and each
+crate README points back to `sc-lint`.
 
-Scaffold status:
+- `sc-lint` — the top-level CLI: command parsing, configuration loading,
+  output normalization and analyzer dispatch. It owns the machine contract in
+  [`cli-contract.md`](./cli-contract.md). Commands: `lint`, `test`, `ci`,
+  `check xwin`, `clippy xwin`, `view graph|findings`, `compatibility check`, `setup`,
+  `upgrade`, `init`, `docs` and `version`.
+- `sc-lint-boundary` — boundary analyzer CLI and library: workspace discovery
+  through `cargo_metadata`, module-driven traversal through `syn`, an owner
+  graph exported as JSON or Turtle, and the `SCB-CYCLE`, `SCB-BOUNDARY`,
+  `SCB-CALLER`, `SCB-DEPENDENCY`, `SCB-FEATURE` and `SCB-MANIFEST` rules.
+- `sc-lint-portability` — OS and platform portability rules `PORT-001` to
+  `PORT-010`.
+- `sc-lint-runtime` — std and Tokio runtime rules `SCB-RUNTIME-001` to
+  `SCB-RUNTIME-007`.
+- `sc-lint-directives` — shared parsing of `#[sc_lint(...)]` directives and
+  site allowances.
+- `sc-lint-attributes` — the no-op `#[sc_lint(...)]` proc-macro attribute; it
+  validates arguments and returns the item unchanged.
+- `sc-lint-analyzer-support` — rule-neutral AST and source-discovery support
+  shared by the analyzers (ADR-013).
+- `sc-lint-schema` — shared finding, output-format and report types.
 
-- `sc-lint-directives`
-  - exists now
-  - currently shares the workspace `0.8.5` version line
-  - currently provides shared parsing for `#[sc_lint(...)]` directives
-- `sc-lint-attributes`
-  - exists now
-  - currently shares the workspace `0.8.5` version line
-  - currently provides compile-valid, no-op `#[sc_lint(...)]` support for:
-    - `boundary.allow("cycle.type_method_self_loop")`
-    - `boundary.allow("cycle.recursive_value_container")`
-    - `boundary.internal_only`
-- `sc-lint-boundary`
-  - exists now
-  - currently shares the workspace `0.8.5` version line
-  - currently provides:
-    - workspace discovery through `cargo_metadata`
-    - module-driven source traversal through `syn`
-    - graph nodes for:
-      - crates
-      - modules
-      - types
-      - impls
-      - variants
-      - fields
-      - traits
-      - trait references
-      - functions
-      - methods
-    - `#[sc_lint(...)]` attribute ingestion for `boundary.allow(...)` and
-      `boundary.internal_only`
-    - owner-graph cycle classification with:
-      - `SCB-CYCLE-001` multi-owner architectural cycle
-      - `SCB-CYCLE-002` type/method self-loop
-      - `SCB-CYCLE-003` trait-impl self-loop
-      - built-in default trait-self-loop policy from:
-        - `crates/sc-lint-boundary/config/defaults.toml`
-  - A.3 extraction surfaces now include:
-    - `bindings/sc-lint-py/python/sc_lint/lint_line_counts.py`
-    - `bindings/sc-lint-py/python/sc_lint/lint_identity_literals.py`
-    - `bindings/sc-lint-py/python/sc_lint/view_findings.py`
-    - `bindings/sc-lint-py/python/sc_lint/python_adapter.py`
-    - boundary enforcement with:
-      - `SCB-BOUNDARY-001` internal_only visibility violation
-      - `SCB-BOUNDARY-002` internal_only external reference
-      - `SCB-BOUNDARY-003` forbid_external_impls violation
-    - stable text/JSON findings output
-    - graph export in:
-      - JSON
-      - Turtle
-- `sc-lint-portability`
-  - exists now
-  - currently shares the workspace `0.8.5` version line
-  - currently provides:
-    - `PORT-001` hardcoded Unix-only absolute paths in test code
-    - `PORT-002` direct `dirs::home_dir()` without configured override check
-    - `PORT-003` `std::env::set_var()` in test code
-    - `PORT-004` ungated `std::os::unix` imports in production code
-    - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
-    - `PORT-006` hardcoded Unix-only absolute paths in production code
-    - `PORT-007` hardcoded Windows absolute paths in production code
-    - `PORT-008` direct production lookup of home/config environment variables
-    - `PORT-009` production invocation of Unix-only shells
-    - `PORT-010` Unix-only production items without a Windows companion/fallback
-    - stable text/JSON findings output
-- `sc-lint`
-  - exists now
-  - currently provides the stable top-level CLI contract and delegated backend
-    dispatch for:
-    - `sc-boundary`
-    - `sc-portability`
-    - `sc-runtime`
-  - detailed CLI requirements and architecture remain defined in:
-    - [`cli-requirements.md`](./cli-requirements.md)
-    - [`cli-architecture.md`](./cli-architecture.md)
+`sc-lint-version` is planned and has no crate yet; see
+[`../sc-lint-version/requirements.md`](../sc-lint-version/requirements.md).
 
-Implemented code moves for the completed extraction partition (historical):
+## Analyzer rules
 
-- imported std runtime/concurrency rules from the current `atm-core` proving
-  surface into `sc-lint-runtime`:
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
-  - `SCB-RUNTIME-003`
-- 0.8.5 extends the runtime inventory through `SCB-RUNTIME-007` for sleeps,
-  executor entry and Mutex guards across await; see the
-  [current runtime guide](../../crates/sc-lint-runtime/README.md) and
-  [Pending runtime requirement](../sc-lint-runtime/requirements.md).
-- keep the portability wrapper surface pointed at `sc-lint-portability` through
-  the Python helpers under `bindings/sc-lint-py/python/sc_lint/`.
+`sc-lint lint sc-boundary` (`sc-lint-boundary`):
 
-Planned primary lint-target mapping for the top-level CLI:
+- `SCB-CYCLE-001` multi-owner architectural cycle; `SCB-CYCLE-002` type/method
+  self-loop; `SCB-CYCLE-003` trait-impl self-loop
+- `SCB-BOUNDARY-001` to `SCB-BOUNDARY-004` internal-only visibility and
+  references, external impls of `forbid_external_impls` traits, and invalid
+  boundary inventory records
+- `SCB-CALLER-001` named-caller allowlist
+- `SCB-DEPENDENCY-001` to `SCB-DEPENDENCY-004` workspace package edges and
+  stale permissions
+- `SCB-FEATURE-001` use of another package's features outside
+  `allowed_feature_dependencies`
+- `SCB-MANIFEST-001` to `SCB-MANIFEST-006` manifest and dependency ownership
+  policy
 
-- `sc-lint lint sc-boundary`
-  - backend owner: `sc-lint-boundary`
-- `sc-lint lint sc-portability`
-  - backend owner: `sc-lint-portability`
-- `sc-lint lint sc-runtime`
-  - backend owner: `sc-lint-runtime`
+`sc-lint lint sc-portability` (`sc-lint-portability`):
 
-Grouped subset aliases may exist later, but these crate-mapped targets are the
-primary ownership-preserving command surface.
+- test code: `PORT-001` Unix-only absolute paths, `PORT-002` unchecked
+  `dirs::home_dir()`, `PORT-003` `std::env::set_var()`
+- production code: `PORT-004` ungated `std::os::unix` imports, `PORT-005`
+  `cfg_attr(not(unix), allow(dead_code))` suppressors, `PORT-006` Unix-only
+  path literals, `PORT-007` Windows path literals, `PORT-008` `HOME`/`USER`/`XDG_*`
+  lookups, `PORT-009` Unix shell invocations, `PORT-010` `cfg(unix)` items
+  without a Windows or portable companion
 
-Kept local to consumer repos for now:
+`sc-lint lint sc-runtime` (`sc-lint-runtime`):
 
-- duplicate semantic string-literal policy
-- fixed-sleep test-hygiene policy
-- TTL triage consistency policy
+- `SCB-RUNTIME-001` bare `Condvar::wait`; `SCB-RUNTIME-002` discarded
+  `wait_timeout*` result; `SCB-RUNTIME-003` `std::thread::sleep` and
+  `SCB-RUNTIME-004` `std::thread::sleep_until` in Tokio packages;
+  `SCB-RUNTIME-005` `tokio::time::sleep*`; `SCB-RUNTIME-006` `block_on`;
+  `SCB-RUNTIME-007` a `std::sync::Mutex` guard held across `.await`
 
-Repo integration status:
+The offline bundle's package guides
+([boundary](../../docs-bundle/packages/sc-lint-boundary.md),
+[portability](../../docs-bundle/packages/sc-lint-portability.md),
+[runtime](../../docs-bundle/packages/sc-lint-runtime.md)) describe each rule,
+its default severity and its allowances.
 
-- The repository's `just lint` recipe runs the configured source-maintenance
-  gate; it does not define per-analyzer recipes such as `just lint sc-boundary`.
-- Use `sc-lint lint sc-boundary`, `sc-lint lint sc-portability`, or
-  `sc-lint lint sc-runtime` to select one analyzer through the product CLI.
+## Lint targets and profiles
 
-Implemented profile policy:
+`sc-lint lint <target>` accepts the analyzer targets `sc-boundary`,
+`sc-portability` and `sc-runtime`, the repository-policy targets
+`function-length`, `line-counts` and `identity-literals`, and three profiles:
 
-- `fast`
-  - local low-latency lint profile
-  - excludes `xwin` to preserve low-latency local feedback
-- `full`
-  - stronger local pre-push lint profile
-  - includes `xwin check` and `xwin clippy` when available
-- `ci`
-  - lint-only CI-parity profile
-  - excludes `xwin`
-- top-level `ci`
-  - lint plus tests
+- `fast` — `cargo fmt --check` plus the Python source checks (version sync,
+  manifests, codespell, pytests); no `xwin`
+- `ci` — `fast` plus clippy, cargo-deny, cargo-shear and the three analyzers;
+  no `xwin`
+- `full` — `ci` plus function-length, line-counts and identity-literals, and
+  `xwin check` / `xwin clippy` when `cargo xwin` is installed
 
-Current wrapper and CLI mapping:
+`sc-lint ci` runs lint plus tests. `sc-lint lint --consumer` instead runs the
+consumer steps declared in `sc-lint.toml`; see the offline
+[usage guide](../../docs-bundle/using-sc-lint.md).
 
-- In this repository, `just lint` and `just test` run the complete source
-  maintenance gates.
-- `just lint ci` invokes the configured `ci` lint target where the repository
-  consumer configuration provides it.
-- `sc-lint lint fast`, `sc-lint lint full`, and `sc-lint lint ci` are supported
-  CLI targets; they are not corresponding `just lint <profile>` recipes here.
-- `sc-lint ci` is the top-level lint-and-test command; this repository's
-  source-maintenance contract uses `just lint` followed by `just test`.
+The Python checks live in the `sc_lint` package at
+[`bindings/sc-lint-py/python/sc_lint/`](../../bindings/sc-lint-py/python/sc_lint/)
+(for example `run_lint.py`, `lint_line_counts.py`,
+`lint_identity_literals.py`, `view_findings.py` and `python_adapter.py`).
 
-Rule-disable policy:
+Profile orchestration adds no rule-disable flags and does not override backend
+rule configuration; rule selection stays with the owning analyzer's
+configuration.
 
-- A.2 does not add top-level `sc-lint` rule-disable flags
-- profile orchestration does not override backend rule configuration
-- current rule-disable behavior stays with the owning backend or delegated tool
+## This repository's recipes
 
-Repo boundary source status:
+The root `Justfile` uses the same consumer contract that adopters get:
 
-- canonical boundary TOML is expected under `boundaries/`
-- `sc-lint` crate boundaries are now defined there for current planning and
-  active inventory-backed linting
+- `just setup` — checks the compatible product binary
+- `just lint` — runs every `[[tool.sc-lint.lint]]` step in `sc-lint.toml`
+  (currently `source-full`, which runs `sc-lint lint full` through
+  `python -m sc_lint.run_lint full`); `just lint ci` is accepted and runs the
+  same steps
+- `just test` — runs every `[[tool.sc-lint.test]]` step (currently
+  `source-workspace`: cargo tests, Python tests and the Action tests)
 
-Phase `B` hardening follow-ons recorded for later implementation:
+A single analyzer or profile runs directly, for example
+`target/debug/sc-lint lint sc-boundary` or
+`target/debug/sc-lint lint fast`.
 
-- recurring shared lint-gate backlog:
-  - raw identity string literals without named constants
-  - `/tmp/` paths without intent comments
-  - public API error types exposing `anyhow::Error`
-  - duplicated `CrateId` newtypes across workspace crates
-  - `clippy::for_kv_map` and similar structural for-loop anti-patterns
-  - `pub` visibility exceeding the documented contract surface
-  - raw `String` fields used for structured identifiers such as `boundary_id`,
-    sprint ids, owner ids, and planning keys
-- shared portability backlog in `sc-lint-portability`:
-  - Windows-only path literal parity with the current Unix-only path checks
-  - broader cross-platform environment-variable portability rules
-  - shell-portability checks for OS-specific shell and command assumptions
-  - structural `cfg(unix)` / `cfg(windows)` parity enforcement for production
-    code
+## Boundary sources
 
-Phase `D` planned rule families:
-
-- `SCB-INVENTORY-001`
-- `SCB-INVENTORY-002`
-- `SCB-INVENTORY-003`
-
-Planned canonical boundary layout:
+Canonical boundary TOML lives under [`boundaries/`](../../boundaries/), one
+directory per crate plus `planning.toml`. The same layout is the pattern for
+consumers:
 
 ```text
 boundaries/
@@ -402,18 +296,17 @@ boundaries/
   planning.toml
 ```
 
-That layout remains the generic long-term pattern. This repo now also uses the
-same canonical `boundaries/` root for its own current and planned tool
-surfaces.
+## Planned work
 
-Future documents that should also live here:
+- `sc-lint-version` and `sc-lint check interfaces` (see
+  [`version-adoption.md`](./version-adoption.md))
+- Phase D inventory-parity rules `SCB-INVENTORY-001` to `SCB-INVENTORY-003`
+  (see [`../sc-lint-boundary/boundary-enforcement-model.md`](../sc-lint-boundary/boundary-enforcement-model.md))
 
-- crate layout
-- rule inventory
-- deeper RDF/Oxygraph integration notes
-- release-1 acceptance notes
+The current plan is [`../project-plan.md`](../project-plan.md); the
+decision history is in [`roadmap.md`](./roadmap.md).
 
-Related architecture decisions:
+## Related architecture decisions
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
   — canonical TOML boundary source plus planning-aware inventory-parity
@@ -430,6 +323,8 @@ Related architecture decisions:
   — accepted observability boundary seams and future direct-link constraints
 - [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
   — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
+- [`./adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
+  — shared rule-neutral analyzer support
 
 Current user guides are the per-crate `README.md` files and the installed
 offline guides under `docs-bundle/`. Design and planning documentation remains

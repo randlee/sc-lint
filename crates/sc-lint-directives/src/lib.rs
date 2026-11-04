@@ -1,3 +1,10 @@
+//! Parsing and types for `#[sc_lint(...)]` directives and site allowances,
+//! shared by `sc-lint-attributes` and the `sc-lint` analyzers.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::fmt;
 use syn::Error;
 use syn::Ident;

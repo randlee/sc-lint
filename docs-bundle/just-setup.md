@@ -8,9 +8,13 @@ runner scripts or overwrite a consumer README.
 
 ```sh
 sc-lint init --just --check   # inspect drift without writing
-sc-lint init --just --dry-run # show managed paths without writing
+sc-lint init --just --dry-run # validate without writing; --json lists paths
 sc-lint init --just           # create or update managed files
 ```
+
+Human output for `--dry-run` is a one-line status (`init: ok`). Use
+`sc-lint --json init --just --dry-run` to see `created_files`,
+`managed_files`, and `preserved_files`.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an

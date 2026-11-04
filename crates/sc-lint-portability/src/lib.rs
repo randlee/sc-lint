@@ -1,3 +1,10 @@
+//! Portability analyzer for `sc-lint`: reports OS and platform assumptions as
+//! rules `PORT-001` to `PORT-010`. Run it as `sc-lint lint sc-portability`.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::path::Path;
 use std::path::PathBuf;
 
