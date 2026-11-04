@@ -25,11 +25,11 @@ Human output starts with `init: <status>`:
 Non-empty file lists follow, one line each, in this order: `Created:` (or
 `Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
 `--dry-run`), `Preserved:` and `Version-only stale:` (generated files from an
-earlier release). A refreshed file is also listed under `Version-only
-stale:`. A
-generated `sc-lint.toml` that differs only in the sc-lint version is kept,
-not rewritten. An unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed: it is
-rewritten with the current one and listed under `Refreshed:`, and `--check`
+earlier release). A refreshed prior-release file appears under `Refreshed:`
+(`Would refresh:` for `--dry-run`) and is not included in `Version-only stale:`.
+A generated `sc-lint.toml` that differs only in the sc-lint version is kept,
+not rewritten, and appears under `Version-only stale:`. An unedited 0.8.4
+`.sc-lint/bootstrap.py` is refreshed with the current one, and `--check`
 reports it as outdated. An unedited 0.8.4
 `Justfile` with its old managed header is accepted as current. Edits to any
 of these files make it user-owned, and init reports a conflict instead of
@@ -48,14 +48,14 @@ Upgrading an unedited 0.8.4 integration prints, for example:
 init: updated
 Refreshed: /work/repo/.sc-lint/bootstrap.py
 Preserved: /work/repo/sc-lint.toml, /work/repo/Justfile
-Version-only stale: /work/repo/sc-lint.toml, /work/repo/.sc-lint/bootstrap.py
+Version-only stale: /work/repo/sc-lint.toml
 ```
 
-`sc-lint --json init --just` reports the same lists as `created_files`,
-`refreshed_files`, `would_refresh_files`, `preserved_files` and
-`version_only_stale_files`, plus `managed_files`. Every list is always present
-as an array. A real run fills `refreshed_files` and leaves
-`would_refresh_files` empty; `--dry-run` does the reverse.
+`sc-lint --json init --just` reports `created_files`, `refreshed_files`,
+`preserved_files` and `version_only_stale_files`, plus `managed_files`. Every
+list is always present as an array. `refreshed_files` contains files that were
+refreshed on a real run or would be refreshed on `--dry-run`; `dry_run` and
+`status` distinguish the two cases.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an

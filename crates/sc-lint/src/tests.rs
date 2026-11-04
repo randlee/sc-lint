@@ -466,7 +466,6 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     let current = crate::config::run_consumer_init_at(root, request).expect("idempotent");
     assert_eq!(current["status"], "current");
     assert_eq!(current["refreshed_files"], json!([]));
-    assert_eq!(current["would_refresh_files"], json!([]));
     let checked = crate::config::run_consumer_init_at(
         root,
         ConsumerInitRequest {
@@ -2936,8 +2935,7 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
             json!({
                 "status": "would_update",
                 "created_files": ["sc-lint.toml"],
-                "refreshed_files": [],
-                "would_refresh_files": [".sc-lint/bootstrap.py"],
+                "refreshed_files": [".sc-lint/bootstrap.py"],
                 "preserved_files": ["README.md"],
                 "version_only_stale_files": [],
             }),
@@ -2956,7 +2954,6 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
                 "status": "updated",
                 "created_files": [],
                 "refreshed_files": [".sc-lint/bootstrap.py"],
-                "would_refresh_files": [],
                 "preserved_files": [],
                 "version_only_stale_files": [],
             }),
