@@ -362,7 +362,7 @@ def test_actions_artifact_and_release_asset_downloads_use_their_required_media_t
 
 def test_known_target_without_native_host_mapping_fails(monkeypatch):
     target = "x86_64-unknown-linux-gnu"
-    monkeypatch.delitem(native.NATIVE_RUNNERS, native.native_host(target))
+    monkeypatch.delitem(common.NATIVE_RUNNERS, native.native_host(target))
     with pytest.raises(ValueError, match="no native GitHub-hosted runner"):
         native.native_matrix(Assets(target).manifest_data)
 
@@ -385,10 +385,11 @@ def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
 
 
 class ReleaseRun(RunArtifact):
-    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3"):
+    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3", built=True):
         super().__init__("tool_1.2.3_x86_64-unknown-linux-gnu.tar.gz")
         self.conclusion = conclusion
         self.published = published
+        self.built = built
         self.tag = tag
         self.tag_endpoint = f"releases/tags/{urllib.parse.quote(tag, safe='')}"
         self.commit = "d" * 40
@@ -407,6 +408,12 @@ class ReleaseRun(RunArtifact):
         if endpoint == self.commit_endpoint:
             self.calls.append(endpoint)
             return {"sha": self.commit}
+        if endpoint.startswith("actions/workflows/"):
+            self.calls.append(endpoint)
+            return {"workflow_runs": [{"id": 9}] if self.built else []}
+        if endpoint == "actions/runs/42":
+            self.calls.append(endpoint)
+            return {"id": 42, "head_branch": self.tag}
         return super().json(endpoint)
 
     def manifest(self, tag):
@@ -449,7 +456,7 @@ def test_production_missing_assets_fails_instead_of_skipping(monkeypatch, tmp_pa
 
 def test_manual_dispatch_checks_the_release_even_if_no_run_id():
     client = ReleaseRun()
-    tag, _ = native.plan_release(client, {}, "v1.2.3", "")
+    tag, _ = native.plan_release(client, client.manifest_data, "v1.2.3", "")
     assert tag == "v1.2.3"
     assert not any("/jobs?" in call for call in client.calls)
 
@@ -492,22 +499,25 @@ def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path)
     manifest = tmp_path / "manifest.toml"
     manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
     output = tmp_path / "outputs"
-    assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
+    assert native.main(["plan", "--run-id", "42", "--commit", "d" * 40, "--manifest", str(manifest), "--output", str(output)]) == 0
     assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
 
 
-def test_plan_command_rejects_a_tag_that_names_another_commit(monkeypatch, tmp_path, capsys):
-    client = ReleaseRun()
+def test_prerelease_plan_rejects_a_tag_that_names_another_commit(monkeypatch, tmp_path, capsys):
+    client = ReleaseRun(tag="prerelease/v1.2.3")
     monkeypatch.setattr(native, "GitHub", lambda *args: client)
     manifest = tmp_path / "manifest.toml"
     manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
     output = tmp_path / "outputs"
 
-    status = native.main(["plan", "--run-id", "42", "--commit", "e" * 40, "--manifest", str(manifest), "--output", str(output)])
+    status = native.main([
+        "plan", "--run-id", "42", "--workflow", native.PRERELEASE_WORKFLOW, "--commit", "e" * 40,
+        "--manifest", str(manifest), "--output", str(output),
+    ])
 
     assert status == 1
     assert not output.exists()
-    assert f"names commit {'d' * 40}, not the commit {'e' * 40} the run verified" in capsys.readouterr().err
+    assert f"names commit {'d' * 40}, not the commit {'e' * 40} the run was given" in capsys.readouterr().err
 
 
 def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, tmp_path):
@@ -516,8 +526,8 @@ def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, t
     manifest.write_text("[project]\n")
     monkeypatch.chdir(tmp_path)
     output = tmp_path / "outputs"
-    assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
-    assert output.read_text() == 'verify=false\ntag=\ncommit=\nmatrix={"include":[]}\n'
+    assert native.main(["plan", "--run-id", "42", "--commit", "d" * 40, "--manifest", str(manifest), "--output", str(output)]) == 0
+    assert output.read_text() == 'verify=false\ntag=\ncommit=\ntargets=\nmatrix={"include":[]}\n'
 
 
 def test_release_job_api_name_matches_workflow():
@@ -548,11 +558,19 @@ def test_release_probe_errors_other_than_404_fail(conclusion):
 
 
 def test_release_version_accepts_release_and_prerelease_tags_only():
-    assert native.release_version("v1.2.3") == "1.2.3"
-    assert native.release_version("prerelease/v1.2.3") == "1.2.3"
+    manifest = {"prerelease": {"tag_prefix": "prerelease/v"}}
+    assert common.release_version("v1.2.3", manifest) == "1.2.3"
+    assert common.release_version("prerelease/v1.2.3", manifest) == "1.2.3"
     for bad in ("1.2.3", "prerelease/1.2.3", "prerelease/v1.2", "release/v1.2.3", "v1.2.3-rc1"):
         with pytest.raises(ValueError, match="invalid release tag"):
-            native.release_version(bad)
+            common.release_version(bad, manifest)
+
+
+def test_release_version_follows_the_manifest_prerelease_prefix():
+    manifest = {"prerelease": {"tag_prefix": "rc/v"}}
+    assert common.release_version("rc/v1.2.3", manifest) == "1.2.3"
+    with pytest.raises(ValueError, match="invalid release tag"):
+        common.release_version("prerelease/v1.2.3", manifest)
 
 
 def test_prerelease_run_plans_its_prerelease_tag_and_matrix():
@@ -617,9 +635,72 @@ def test_plan_command_selects_prerelease_run_and_rejects_unknown_workflow(monkey
     manifest = tmp_path / "manifest.toml"
     manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
     output = tmp_path / "outputs"
-    assert native.main(["plan", "--run-id", "42", "--workflow", "Prerelease Archive", "--manifest", str(manifest), "--output", str(output)]) == 0
+    assert native.main(["plan", "--run-id", "42", "--workflow", "Prerelease Archive", "--commit", "d" * 40, "--manifest", str(manifest), "--output", str(output)]) == 0
     assert output.read_text().startswith("verify=true\ntag=prerelease/v1.2.3\n")
-    assert native.main(["plan", "--run-id", "42", "--workflow", "Something Else", "--manifest", str(manifest), "--output", str(output)]) == 1
+    assert native.main(["plan", "--run-id", "42", "--workflow", "Something Else", "--commit", "d" * 40, "--manifest", str(manifest), "--output", str(output)]) == 1
+
+
+PLAN_MANIFEST = '[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n'
+
+
+def _plan(monkeypatch, client, tmp_path, *args):
+    monkeypatch.setattr(native, "GitHub", lambda *unused: client)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text(PLAN_MANIFEST, encoding="utf-8")
+    output = tmp_path / "outputs"
+    return native.main(["plan", *args, "--manifest", str(manifest), "--output", str(output)]), output
+
+
+def test_release_retry_binds_to_the_tag_commit_not_the_run_commit(monkeypatch, tmp_path):
+    # release.yml reuses an existing tag while building from main, so the run commit differs from the tag.
+    status, output = _plan(monkeypatch, ReleaseRun(), tmp_path, "--run-id", "42", "--commit", "f" * 40)
+    assert status == 0
+    assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
+
+
+def test_dispatch_binds_only_to_a_commit_with_a_successful_build(monkeypatch, tmp_path, capsys):
+    client = ReleaseRun(built=False)
+    status, output = _plan(monkeypatch, client, tmp_path, "--tag", "v1.2.3", "--commit", "d" * 40)
+    assert status == 1 and not output.exists()
+    assert "has no successful Prerelease Archive or Release run" in capsys.readouterr().err
+
+
+def test_dispatch_with_a_successful_build_plans_the_release(monkeypatch, tmp_path):
+    client = ReleaseRun()
+    status, output = _plan(monkeypatch, client, tmp_path, "--tag", "v1.2.3", "--commit", "d" * 40)
+    assert status == 0
+    assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
+    assert f"actions/workflows/prerelease-archive.yml/runs?head_sha={'d' * 40}&status=success&per_page=100" in client.calls
+
+
+def test_dispatch_rejects_a_tag_recut_to_another_commit(monkeypatch, tmp_path, capsys):
+    status, output = _plan(monkeypatch, ReleaseRun(), tmp_path, "--tag", "v1.2.3", "--commit", "e" * 40)
+    assert status == 1 and not output.exists()
+    assert f"names commit {'d' * 40}, not the commit {'e' * 40}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("commit", ["", "abc123", "G" * 40, "D" * 40])
+def test_plan_requires_a_full_lowercase_sha_commit(monkeypatch, tmp_path, capsys, commit):
+    status, output = _plan(monkeypatch, ReleaseRun(), tmp_path, "--run-id", "42", "--commit", commit)
+    assert status == 1 and not output.exists()
+    assert "plan requires --commit: the full 40-character commit SHA" in capsys.readouterr().err
+
+
+def test_prerelease_run_must_have_been_triggered_by_its_tag(monkeypatch, tmp_path, capsys):
+    client = ReleaseRun(tag="prerelease/v1.2.3")
+    original_json = client.json
+
+    def triggered_from_main(endpoint):
+        if endpoint == "actions/runs/42":
+            return {"id": 42, "head_branch": "main"}
+        return original_json(endpoint)
+
+    client.json = triggered_from_main
+    status, output = _plan(
+        monkeypatch, client, tmp_path, "--run-id", "42", "--workflow", native.PRERELEASE_WORKFLOW, "--commit", "d" * 40,
+    )
+    assert status == 1 and not output.exists()
+    assert "triggered from 'main', not its tag prerelease/v1.2.3" in capsys.readouterr().err
 
 
 def test_verify_records_each_passed_check_for_the_native_report(monkeypatch, tmp_path):

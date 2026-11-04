@@ -3,6 +3,7 @@
 The git tests run in a scrubbed environment: no GIT_* variables from the caller, no global or
 system config, a private HOME, unsigned commits, hooks disabled and fixed commit dates.
 """
+import ast
 import os
 import re
 import subprocess
@@ -26,6 +27,7 @@ CANDIDATE = "c" * 40
 TITLE = common.verify_run_title(TAG, VERIFIED)
 TARGETS = [row["target"] for row in native.native_matrix(tomllib.loads(MANIFEST.read_text(encoding="utf-8")))["include"]]
 PROVEN = {common.native_job(target): "success" for target in TARGETS} | {common.REPORT_JOB: "success"}
+DEFAULT_BRANCH = "main"
 
 
 @pytest.fixture(autouse=True)
@@ -41,8 +43,15 @@ def hermetic_git(monkeypatch, tmp_path):
     monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
 
 
-def run(run_id, title, *, conclusion="success", status="completed"):
-    return {"id": run_id, "display_title": title, "status": status, "conclusion": conclusion}
+VERIFY_PATH = ".github/workflows/release-native-verify.yml"
+
+
+def run(run_id, title, *, conclusion="success", status="completed", event="workflow_run", head_branch=TAG, path=VERIFY_PATH):
+    """A verify run as the workflow runs API reports it; a workflow_run from the tag push by default."""
+    return {
+        "id": run_id, "display_title": title, "status": status, "conclusion": conclusion,
+        "event": event, "head_branch": head_branch, "path": path,
+    }
 
 
 def page(*runs, total=None):
@@ -57,6 +66,9 @@ class FakeGitHub:
         self.release_published = release_published
         self.jobs = jobs or {}
         self.calls = []
+
+    def default_branch(self):
+        return DEFAULT_BRANCH
 
     def json(self, endpoint):
         self.calls.append(endpoint)
@@ -118,8 +130,24 @@ def test_failed_or_unfinished_matching_runs_fail_closed():
 
 
 def test_no_verify_runs_fails_closed():
-    with pytest.raises(gate.GateError, match="run the native matrix on that prerelease"):
+    with pytest.raises(gate.GateError, match=f"dispatch Release Native Verify with tag {TAG} and commit {VERIFIED}"):
         gate.find_verified_run(FakeGitHub(), TAG, VERIFIED, TARGETS)
+
+
+@pytest.mark.parametrize("override", [
+    {"path": ".github/workflows/other.yml"},
+    {"event": "pull_request"},
+    {"event": "workflow_dispatch", "head_branch": "feature/x"},
+])
+def test_only_the_verify_workflow_on_a_trusted_event_can_prove_a_publish(override):
+    client = FakeGitHub({1: page(run(7, TITLE, **override))})
+    with pytest.raises(gate.GateError, match="no successful"):
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+
+
+def test_a_dispatch_from_the_default_branch_proves_a_publish():
+    client = FakeGitHub({1: page(run(7, TITLE, event="workflow_dispatch", head_branch=DEFAULT_BRANCH))})
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
 
 
 def test_a_success_run_whose_native_jobs_were_skipped_proves_nothing():
@@ -217,6 +245,7 @@ def test_identical_commits_pass_with_no_changes():
     ([".github/scripts/wheel_contents.py"], ".github/scripts/wheel_contents.py"),
     ([".github/actions/install-linux-native-deps/action.yml"], ".github/actions/install-linux-native-deps/action.yml"),
     ([".github/actions/setup-python-release-build/action.yml"], ".github/actions/setup-python-release-build/action.yml"),
+    ([".cargo/config.toml"], ".cargo/config.toml"),
 ])
 def test_artifact_input_change_fails_naming_the_path(changed, offending):
     with pytest.raises(gate.GateError) as error:
@@ -258,23 +287,42 @@ def test_artifact_inputs_cover_every_manifest_declared_build_path():
     assert uncovered == []
 
 
+SCRIPT_REFERENCE = re.compile(r"\.github/(?:scripts|actions)/[A-Za-z0-9_./-]+")
+
+
+def imported_modules(source: str) -> set[str]:
+    """Top-level module names a Python source imports, including imports inside functions."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            names |= {alias.name.split(".")[0] for alias in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names.add(node.module.split(".")[0])
+    return names
+
+
 def build_script_closure() -> set[str]:
-    """The scripts and actions prerelease-archive.yml runs, plus the local scripts they import, transitively."""
-    workflow = (ROOT / ".github/workflows/prerelease-archive.yml").read_text(encoding="utf-8")
-    pending = set(re.findall(r"\.github/scripts/[A-Za-z0-9_.-]+", workflow))
-    pending |= {f".github/actions/{name}" for name in re.findall(r"\./\.github/actions/([A-Za-z0-9_-]+)", workflow)}
+    """The files prerelease-archive.yml runs, and every local file they reach.
+
+    Python sources contribute the local modules they import, lazy imports included. Shell
+    scripts, actions and the workflow contribute the .github/scripts and .github/actions paths
+    they name; an action's file is its action.yml. Only paths that exist are followed.
+    """
+    pending = {".github/workflows/prerelease-archive.yml"}
     covered: set[str] = set()
     while pending:
         path = pending.pop()
         if path in covered:
             continue
         covered.add(path)
-        source = ROOT / path
-        if path.endswith(".py") and source.is_file():
-            for module in re.findall(r"^(?:from|import) ([A-Za-z_][A-Za-z0-9_]*)", source.read_text(encoding="utf-8"), re.MULTILINE):
-                candidate = f".github/scripts/{module}.py"
-                if (ROOT / candidate).is_file():
-                    pending.add(candidate)
+        text = (ROOT / path).read_text(encoding="utf-8")
+        if path.endswith(".py"):
+            pending |= {f".github/scripts/{module}.py" for module in imported_modules(text)}
+        for reference in SCRIPT_REFERENCE.findall(text):
+            if reference.startswith(".github/actions/") and not reference.endswith((".yml", ".yaml")):
+                reference = f"{reference.rstrip('/')}/action.yml"
+            pending.add(reference)
+        pending = {candidate for candidate in pending if (ROOT / candidate).is_file() or candidate in covered}
     return covered
 
 
@@ -282,12 +330,18 @@ def test_every_script_and_action_the_archive_build_runs_is_an_artifact_input():
     covered = build_script_closure()
     assert ".github/scripts/release_stage.py" in covered
     assert ".github/scripts/wheel_contents.py" in covered
-    uncovered = []
-    for path in sorted(covered):
-        probe = f"{path}/action.yml" if path.startswith(".github/actions/") else path
-        if not gate.is_artifact_input(probe):
-            uncovered.append(path)
+    uncovered = [path for path in sorted(covered) if not gate.is_artifact_input(path)]
     assert uncovered == []
+
+
+def test_root_cargo_files_are_artifact_inputs():
+    for path in ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml"):
+        assert gate.is_artifact_input(path), path
+
+
+def test_closure_follows_imports_inside_functions_and_from_imports():
+    assert imported_modules("def build():\n    import release_registry\n") == {"release_registry"}
+    assert imported_modules("from release_stage import run\nimport json.tool\n") == {"release_stage", "json"}
 
 
 # Real git history: ancestry, renames and the manifest's build sections
@@ -367,19 +421,32 @@ def test_renaming_a_docs_file_into_an_artifact_directory_is_classified(tmp_path,
     assert gate.classify(paths, manifest_build_changed=False).artifact_inputs == ("crates/lib.rs",)
 
 
+def edit_manifest(text, old, new):
+    """Replace one line of the real manifest; the fixture must contain the line it edits."""
+    edited = text.replace(old, new, 1)
+    assert edited != text, f"manifest fixture has no {old!r} to edit"
+    return edited
+
+
 def test_manifest_edits_to_publish_only_sections_do_not_force_a_rerun(tmp_path, monkeypatch):
     repo = new_repo(tmp_path, monkeypatch)
     text = MANIFEST.read_text(encoding="utf-8")
     base = commit_file(repo, common.MANIFEST_PATH, text, "manifest")
     publish_only = commit_file(
-        repo, common.MANIFEST_PATH, text.replace('workflow = "pypi-publish.yml"', 'workflow = "pypi-publish-2.yml"', 1), "channel",
+        repo, common.MANIFEST_PATH, edit_manifest(text, 'workflow = "pypi-publish.yml"', 'workflow = "pypi-publish-2.yml"'),
+        "channel",
     )
     build_change = commit_file(
-        repo, common.MANIFEST_PATH, text.replace('os = "ubuntu-latest"', 'os = "ubuntu-24.04"', 1), "runner",
+        repo, common.MANIFEST_PATH, edit_manifest(text, 'os = "ubuntu-latest"', 'os = "ubuntu-24.04"'), "runner",
+    )
+    python_package = commit_file(
+        repo, common.MANIFEST_PATH, edit_manifest(text, "[[python_packages]]", '[[python_packages]]\nfixture_marker = "edit"'),
+        "python package",
     )
 
     assert gate.manifest_build_changed(base, publish_only) is False
     assert gate.manifest_build_changed(base, build_change) is True
+    assert gate.manifest_build_changed(base, python_package) is True
 
 
 # main(): output contract and fail-closed exits
@@ -494,8 +561,10 @@ def test_preflight_gates_publish_on_the_verified_native_matrix_run():
 
 def test_preflight_takes_the_prerelease_prefix_from_the_manifest():
     text = (ROOT / ".github/workflows/release-preflight.yml").read_text(encoding="utf-8")
-    assert '["prerelease"]["tag_prefix"]' in text
+    assert "release_native_verify.py prerelease-prefix --manifest release/publish-artifacts.toml" in text
     assert 'prerelease_tag="prerelease/' not in text
+    gate_step = text.split("id: native_matrix_gate", 1)[1].split("\n      - ", 1)[0]
+    assert "python3 -c" not in gate_step
 
 
 def test_verify_workflow_titles_each_run_with_its_tag_and_commit():

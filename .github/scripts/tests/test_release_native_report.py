@@ -224,6 +224,13 @@ def test_index_lists_runs_newest_first(tmp_path):
     assert (tmp_path / "site" / "index.html").read_text(encoding="utf-8") == "INDEX"
 
 
+@pytest.mark.parametrize("commit", ["", "abc123", "A" * 40, "a" * 39, "g" * 40])
+def test_commit_must_be_a_full_lowercase_sha(tmp_path, commit):
+    write_result(tmp_path / "results", X86, checks=[("native host", "pass")])
+    with pytest.raises(report.ReportError, match="must be a full 40-character SHA"):
+        build(tmp_path, expected=[X86], render=Recorder(), commit=commit)
+
+
 @pytest.mark.parametrize("run_id, tag", [("run-4", TAG), ("", TAG), ("4242", "prerelease/v1 bad")])
 def test_run_id_and_tag_must_name_a_report_directory(tmp_path, run_id, tag):
     write_result(tmp_path / "results", X86, checks=[("native host", "pass")])
@@ -241,12 +248,15 @@ def test_malformed_panel_fails_closed_with_a_report_error(tmp_path):
         build(tmp_path, expected=[X86], render=broken)
 
 
+HOSTILE = "</p><script>alert('x')</script><img src=x onerror=\"alert(1)\"> & \"more\""
+
+
 def test_hostile_text_is_escaped_by_the_real_renderer(tmp_path):
-    pytest.importorskip("sc_compose")
-    write_result(tmp_path / "results", X86, checks=[("native host", "pass")])
+    write_result(tmp_path / "results", X86, checks=[("native host", "pass")], error=HOSTILE)
     results_dir = tmp_path / "results"
     payload = json.loads((results_dir / f"{X86}.json").read_text(encoding="utf-8"))
-    payload["checks"][0]["detail"] = "<script>alert('x')</script> & more"
+    payload["checks"][0]["detail"] = HOSTILE
+    payload["checks"][0]["name"] = HOSTILE
     (results_dir / f"{X86}.json").write_text(json.dumps(payload), encoding="utf-8")
 
     output = build(
@@ -254,14 +264,18 @@ def test_hostile_text_is_escaped_by_the_real_renderer(tmp_path):
     )
 
     text = output.read_text(encoding="utf-8")
-    assert "<script>alert" not in text
+    assert "<script>" not in text
+    assert "<img" not in text
+    assert "onerror=\"" not in text
     assert "&lt;script&gt;alert" in text
+    assert "&lt;img src=x onerror=" in text
     assert "Overview" in text
-    assert f"<code>{X86}</code>" in (output.parent / "panels" / f"{X86}.xhtml").read_text(encoding="utf-8")
+    panel = (output.parent / "panels" / f"{X86}.xhtml").read_text(encoding="utf-8")
+    assert f"<code>{X86}</code>" in panel
+    assert "<script>" not in panel
 
 
 def test_real_templates_produce_well_formed_panels_and_a_tiled_report(tmp_path):
-    pytest.importorskip("sc_compose")
     write_result(tmp_path / "results", X86, checks=[("native host", "pass"), ("binary sc-lint", "pass")])
     write_result(tmp_path / "results", ARM, error="SHA256 mismatch")
 

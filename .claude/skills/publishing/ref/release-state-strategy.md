@@ -77,7 +77,7 @@ and prerelease sections never force a rerun. A change to an artifact input, or a
 `V` that is not an ancestor of `C`, fails the gate and names the offending paths;
 cut a new prerelease and rerun the native matrix.
 
-`publisher` preflight records the verify run id, the verified commit `V`, the
+`publisher` preflight prints the verify run id, the verified commit `V`, the
 artifact-input list, and the count of paths that need no rerun. A failure names
 the offending paths. The published-release run still verifies the published
 assets afterward.

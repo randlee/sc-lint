@@ -293,7 +293,7 @@ jobs:
         run: |
           set -euo pipefail
           # The manifest owns the prerelease tag prefix; the gate matches the run title against this tag.
-          prerelease_prefix="$(python3 -c 'import tomllib; print(tomllib.load(open("release/publish-artifacts.toml", "rb"))["prerelease"]["tag_prefix"], end="")')"
+          prerelease_prefix="$(python3 .github/scripts/release_native_verify.py prerelease-prefix --manifest release/publish-artifacts.toml)"
           prerelease_tag="${prerelease_prefix}${RELEASE_VERSION}"
           candidate_tag="release-candidate-${RELEASE_TAG}"
           prerelease_commit="$(git rev-parse --verify --quiet "${prerelease_tag}^{commit}")" \

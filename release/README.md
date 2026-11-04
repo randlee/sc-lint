@@ -32,19 +32,13 @@ Before `publisher` publishes `vX.Y.Z`, a prerelease must pass the native matrix:
    rejected. A run for an earlier commit of a re-cut tag does not match.
 4. The prerelease commit `V` must be an ancestor of the release-candidate commit
    `C`, and no artifact input may differ between `V` and `C`. Renames are checked
-   on both their old and new paths. The artifact inputs are `crates/`,
-   `bindings/`, `docs-bundle/`, `.github/actions/`, `Cargo.toml`, `Cargo.lock`,
-   `rust-toolchain.toml`, `build_release_target.sh`, `prerelease-archive.yml`, the
-   release scripts that the archive build runs and their local imports
-   (`release_artifacts.py`, `release_manifest.py`, `release_platforms.py`,
-   `release_python.py`, `release_registry.py`, `release_stage.py`,
-   `verify_release_arch.py`, `wheel_contents.py`), and the manifest's build
-   sections (`project`, `release_targets`, `crates`, `release_binaries`,
-   `python_distributions`). Docs, `site/`, the CHANGELOG, publish and channel
-   workflows, the native verifier and its tests, and the manifest's channel and
-   prerelease sections never require a rerun. The list is defined in
-   `.github/scripts/release_native_gate.py`, and its tests fail if a script the
-   archive build runs is not covered.
+   on both their old and new paths. The artifact inputs and the manifest sections
+   that count are defined in `.github/scripts/release_native_gate.py`
+   (`ARTIFACT_INPUT_DIRS`, `ARTIFACT_INPUT_PREFIXES`, `ARTIFACT_INPUT_FILES`,
+   `BUILD_MANIFEST_SECTIONS`); the gate's tests fail if a script the archive build
+   runs is not covered. Changes outside them, such as docs, `site/`, the CHANGELOG,
+   publish and channel workflows, the native verifier and its tests, and the
+   manifest's channel and prerelease sections, never require a rerun.
 
 `release-preflight.yml` enforces steps 3 and 4. On success it prints `V`, the
 verify run id, the artifact-input list (`none` when nothing changed), and how many

@@ -35,6 +35,7 @@ jobs:
       verify: ${{ steps.plan.outputs.verify }}
       tag: ${{ steps.plan.outputs.tag }}
       commit: ${{ steps.plan.outputs.commit }}
+      targets: ${{ steps.plan.outputs.targets }}
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
@@ -112,7 +113,7 @@ jobs:
       SOURCE_WORKFLOW: ${{ github.event.workflow_run.name }}
       SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
       RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-      MATRIX: ${{ needs.plan.outputs.matrix }}
+      TARGETS: ${{ needs.plan.outputs.targets }}
       COMMIT: ${{ needs.plan.outputs.commit }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
@@ -146,9 +147,8 @@ jobs:
           else
             trigger="workflow_run of ${SOURCE_WORKFLOW} run ${SOURCE_RUN_ID}"
           fi
-          targets="$(python3 -c 'import json, os; print(",".join(row["target"] for row in json.loads(os.environ["MATRIX"])["include"]))')"
           report="$("$RENDERER_PYTHON" .github/scripts/release_native_report.py \
-            --results-dir native-results --expected-targets "$targets" \
+            --results-dir native-results --expected-targets "$TARGETS" \
             --tag "$RELEASE_TAG" --source-workflow "${SOURCE_WORKFLOW:-workflow_dispatch}" --commit "$COMMIT" \
             --run-id "$GITHUB_RUN_ID" --run-url "$RUN_URL" \
             --trigger "$trigger" --site-root site/reports/release-native-verify)"

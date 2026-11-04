@@ -19,71 +19,11 @@ from pathlib import Path, PurePosixPath
 from verify_release_arch import EXPECTED, machine, verify as verify_wheel_arch
 from release_manifest import release_archive_name, release_archive_pattern
 from release_native_common import (
-    MANIFEST_PATH, RESULT_SCHEMA_VERSION, GitHub, GitHubError, quote_tag,
+    BUILD_WORKFLOW_FILES, MANIFEST_PATH, PRERELEASE_WORKFLOW, RELEASE_WORKFLOW, RESULT_SCHEMA_VERSION,
+    WIN_ARM64_TARGET, GitHub, GitHubError, is_full_sha, native_host, native_matrix, quote_tag, release_version,
+    wheel_specs,
 )
 from release_python import wheel_asset_pattern
-
-# This is host policy, not a release-target inventory. The manifest owns that inventory.
-NATIVE_RUNNERS = {
-    ("Linux", "x86_64"): "ubuntu-24.04",
-    ("Linux", "aarch64"): "ubuntu-24.04-arm",
-    ("Darwin", "x86_64"): "macos-15-intel",
-    ("Darwin", "aarch64"): "macos-15",
-    ("Windows", "x86_64"): "windows-latest",
-    ("Windows", "aarch64"): "windows-11-arm",
-}
-RELEASE_WORKFLOW = "Release"
-PRERELEASE_WORKFLOW = "Prerelease Archive"
-
-
-def release_version(tag: str) -> str:
-    match = re.fullmatch(r"(?:prerelease/)?v([0-9]+\.[0-9]+\.[0-9]+)", tag)
-    if match is None:
-        raise ValueError(f"invalid release tag {tag!r}; expected vMAJOR.MINOR.PATCH or prerelease/vMAJOR.MINOR.PATCH")
-    return match.group(1)
-
-
-def native_host(target: str) -> tuple[str, str]:
-    if target not in EXPECTED:
-        raise ValueError(f"{target}: no supported native GitHub-hosted runner/architecture verifier")
-    kind = EXPECTED[target][0]
-    return {"elf": "Linux", "macho": "Darwin", "pe": "Windows"}[kind], target.split("-", 1)[0]
-
-
-# Wheels are verified on Python 3.9 (the abi3-py39 floor); Windows ARM64 needs 3.11+.
-WHEEL_PYTHON = "3.9"
-WIN_ARM64_TARGET = "aarch64-pc-windows-msvc"
-WIN_ARM64_PYTHON = "3.11"
-
-
-def native_matrix(manifest: dict) -> dict:
-    rows = []
-    for entry in manifest.get("release_targets", []):
-        target = entry["target"]
-        host = native_host(target)
-        runner = NATIVE_RUNNERS.get(host)
-        if runner is None:
-            raise ValueError(f"{target}: no native GitHub-hosted runner for {host}")
-        if not wheel_specs(manifest, target):
-            raise ValueError(f"{target}: manifest declares no wheel to verify")
-        python_version = WIN_ARM64_PYTHON if target == WIN_ARM64_TARGET else WHEEL_PYTHON
-        rows.append({
-            "target": target, "runner": runner, "python_arch": "arm64" if host[1] == "aarch64" else "x64",
-            "python_version": python_version,
-        })
-    if not rows:
-        raise ValueError("release manifest declares no release targets")
-    if len({row["target"] for row in rows}) != len(rows):
-        raise ValueError("release manifest contains duplicate release targets")
-    return {"include": rows}
-
-
-def wheel_specs(manifest: dict, target: str) -> list[tuple[str, str]]:
-    return [
-        (distribution["name"].replace("-", "_"), wheel["platform"])
-        for distribution in manifest.get("python_distributions", [])
-        for wheel in distribution.get("wheels", []) if wheel["target"] == target
-    ]
 
 
 def tag_from_run(client: GitHub, manifest: dict, run_id: str, *, prerelease: bool = False) -> str:
@@ -139,11 +79,50 @@ def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | 
     return conclusion
 
 
-def resolve_tag_commit(client: GitHub, tag: str, verified_commit: str) -> str:
-    """Return the commit the tag names; a run-supplied commit must be that same commit."""
+def resolve_tag_commit(client: GitHub, tag: str, expected_commit: str) -> str:
+    """Return the commit the tag names; a non-empty expected commit must be that same commit."""
     commit = client.json(f"commits/{quote_tag(tag)}")["sha"]
-    if verified_commit and verified_commit != commit:
-        raise ValueError(f"{tag} names commit {commit}, not the commit {verified_commit} the run verified")
+    if expected_commit and expected_commit != commit:
+        raise ValueError(f"{tag} names commit {commit}, not the commit {expected_commit} the run was given")
+    return commit
+
+
+def require_built_commit(client: GitHub, commit: str) -> None:
+    """Fail unless a successful build run at commit published its release.
+
+    A tag re-cut to a commit whose build failed, or was never run, names assets that no
+    successful build at that commit produced, so a dispatched verification must not bind to it.
+    """
+    for workflow_file in BUILD_WORKFLOW_FILES:
+        data = client.json(f"actions/workflows/{workflow_file}/runs?head_sha={commit}&status=success&per_page=100")
+        for run in data.get("workflow_runs", []):
+            if run_release_conclusion(client, str(run["id"]), workflow_file) == "success":
+                return
+    raise ValueError(
+        f"{commit} has no successful Prerelease Archive or Release run that published its release; "
+        f"the tag must name a commit whose build succeeded"
+    )
+
+
+def require_source_branch(client: GitHub, run_id: str, tag: str) -> None:
+    """A prerelease run is triggered by its tag push, so its branch must be that tag."""
+    head_branch = client.json(f"actions/runs/{run_id}")["head_branch"]
+    if head_branch != tag:
+        raise ValueError(f"prerelease run {run_id} was triggered from {head_branch!r}, not its tag {tag}")
+
+
+def plan_commit(client: GitHub, tag: str, supplied: str, *, dispatch: bool, workflow: str) -> str:
+    """Return the commit a verification is bound to.
+
+    A dispatched or prerelease verification must bind to the commit the tag names, and a
+    dispatched one must also have a successful build there. A Release run keeps its tag's
+    commit even when it differs from the run's commit: release.yml reuses an existing,
+    verified tag when it retries a release.
+    """
+    binding = dispatch or workflow == PRERELEASE_WORKFLOW
+    commit = resolve_tag_commit(client, tag, supplied if binding else "")
+    if dispatch:
+        require_built_commit(client, commit)
     return commit
 
 
@@ -156,8 +135,11 @@ def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workf
     conclusion = "success" if tag else run_release_conclusion(client, run_id, workflow)
     if conclusion is None:
         return None
-    tag = tag or tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
-    release_version(tag)
+    if not tag:
+        tag = tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
+        if workflow == PRERELEASE_WORKFLOW:
+            require_source_branch(client, run_id, tag)
+    release_version(tag, manifest)
     try:
         client.json(f"releases/tags/{quote_tag(tag)}")
     except GitHubError as error:
@@ -191,7 +173,7 @@ def assert_wheel_python(target: str, python_version: tuple[int, int]) -> None:
 
 
 def required_assets(manifest: dict, target: str, tag: str, assets: list[dict]) -> tuple[str, list[str]]:
-    version = release_version(tag)
+    version = release_version(tag, manifest)
     entries = [entry for entry in manifest["release_targets"] if entry["target"] == target]
     if len(entries) != 1:
         raise ValueError(f"{target}: expected exactly one target in the tag's release manifest")
@@ -272,10 +254,10 @@ def verify_release(
     client: GitHub, tag: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command,
     checks: list[dict] | None = None,
 ) -> None:
-    version = release_version(tag)
+    manifest = client.manifest(tag)
+    version = release_version(tag, manifest)
     assert_native(target)
     record(checks, "native host", f"{target} on {native_host(target)[0]}")
-    manifest = client.manifest(tag)
     assets = client.json(f"releases/tags/{quote_tag(tag)}")["assets"]
     archive_name, wheel_names = required_assets(manifest, target, tag, assets)
     by_name = {entry["name"]: entry["id"] for entry in assets}
@@ -318,11 +300,11 @@ def verify_release(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("plan", "verify"))
+    parser.add_argument("command", choices=("plan", "verify", "prerelease-prefix"))
     parser.add_argument("--tag", default="")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--workflow", default="", help=f"workflow that produced --run-id: {RELEASE_WORKFLOW!r} (default) or {PRERELEASE_WORKFLOW!r}")
-    parser.add_argument("--commit", default="", help="commit the triggering run built; the tag must name this commit")
+    parser.add_argument("--commit", default="", help="full commit SHA the tag names; required by plan")
     parser.add_argument("--target")
     parser.add_argument("--wheel-python", help="interpreter the wheel is installed and run under (e.g. Python 3.9)")
     parser.add_argument("--manifest", type=Path, default=Path(MANIFEST_PATH))
@@ -330,18 +312,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--result", type=Path, help="verify: write the per-target JSON result for the native report")
     args = parser.parse_args(argv)
     try:
+        if args.command == "prerelease-prefix":
+            print(tomllib.loads(args.manifest.read_text(encoding="utf-8"))["prerelease"]["tag_prefix"], end="")
+            return 0
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         if args.command == "plan":
             local_manifest = tomllib.loads(args.manifest.read_text(encoding="utf-8"))
             workflow = args.workflow or RELEASE_WORKFLOW
             if workflow not in {RELEASE_WORKFLOW, PRERELEASE_WORKFLOW}:
                 raise ValueError(f"unsupported verification workflow {workflow!r}")
+            if not is_full_sha(args.commit):
+                raise ValueError("plan requires --commit: the full 40-character commit SHA the tag names")
             plan = plan_release(client, local_manifest, args.tag, args.run_id, workflow=workflow)
             tag, matrix = plan if plan is not None else ("", {"include": []})
-            commit = resolve_tag_commit(client, tag, args.commit) if plan is not None else ""
+            commit = plan_commit(client, tag, args.commit, dispatch=bool(args.tag), workflow=workflow) if plan is not None else ""
             enabled = "true" if plan is not None else "false"
+            targets = ",".join(row["target"] for row in matrix["include"])
             output = (
-                f"verify={enabled}\ntag={tag}\ncommit={commit}\n"
+                f"verify={enabled}\ntag={tag}\ncommit={commit}\ntargets={targets}\n"
                 f"matrix={json.dumps(matrix, separators=(',', ':'))}\n"
             )
             if args.output:

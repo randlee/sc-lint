@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from release_native_common import RESULT_SCHEMA_VERSION
+from release_native_common import RESULT_SCHEMA_VERSION, is_full_sha
 
 TARGET_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 TEMPLATE_DIR = "release/native-verify"
@@ -170,6 +170,8 @@ def build_report(
 ) -> Path:
     if not run_id.isdigit():
         raise ReportError(f"run id {run_id!r} must be numeric")
+    if not is_full_sha(commit):
+        raise ReportError(f"commit {commit!r} must be a full 40-character SHA")
     results = read_results(results_dir, expected_targets, tag)
     status = overall_status(results)
     generated = generated_at.astimezone(timezone.utc)

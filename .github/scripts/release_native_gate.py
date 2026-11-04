@@ -18,11 +18,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from release_native_common import (
-    MANIFEST_PATH, REPORT_JOB, GitHub, GitHubError, is_full_sha, native_job, quote_tag, verify_run_title,
+    MANIFEST_PATH, REPORT_JOB, GitHub, GitHubError, is_full_sha, native_job, native_matrix, quote_tag,
+    verify_run_title,
 )
-from release_native_verify import native_matrix
 
 VERIFY_WORKFLOW = "release-native-verify.yml"
+VERIFY_WORKFLOW_PATH = f".github/workflows/{VERIFY_WORKFLOW}"
 PAGE_SIZE = 100
 MAX_PAGES = 10
 
@@ -30,7 +31,8 @@ MAX_PAGES = 10
 # gate's tests derive the manifest's declared sources and the scripts and actions that
 # prerelease-archive.yml runs (with their local imports) and fail on any path not covered here.
 ARTIFACT_INPUT_DIRS = frozenset({"crates", "bindings", "docs-bundle"})
-ARTIFACT_INPUT_PREFIXES = (".github/actions/",)
+# .cargo/ holds build configuration (targets, linkers, rustflags) that changes the binaries.
+ARTIFACT_INPUT_PREFIXES = (".cargo/", ".github/actions/")
 ARTIFACT_INPUT_FILES = frozenset({
     "Cargo.toml",
     "Cargo.lock",
@@ -41,15 +43,18 @@ ARTIFACT_INPUT_FILES = frozenset({
     ".github/scripts/release_platforms.py",
     ".github/scripts/release_python.py",
     ".github/scripts/release_registry.py",
+    ".github/scripts/npm_release.py",
     ".github/scripts/release_stage.py",
     ".github/scripts/verify_release_arch.py",
+    ".github/scripts/worker_result.py",
     ".github/scripts/wheel_contents.py",
     ".github/workflows/prerelease-archive.yml",
 })
 # The manifest sections that describe the archives and wheels. Channel, prerelease and
 # python-package settings only drive publication, so editing them never forces a rerun.
 BUILD_MANIFEST_SECTIONS = (
-    "schema_version", "project", "release_targets", "crates", "release_binaries", "python_distributions",
+    "schema_version", "project", "release_targets", "crates", "release_binaries", "python_packages",
+    "python_distributions",
 )
 
 
@@ -120,6 +125,15 @@ def unproven_reason(jobs: dict[str, str | None], targets: list[str]) -> str | No
     return f"jobs did not all succeed: {', '.join(failing)}" if failing else None
 
 
+def trusted_verify_run(run: dict, default_branch: str) -> bool:
+    """Only the verify workflow file can prove a publish: run by a workflow_run, or dispatched from the default branch."""
+    if run.get("path") != VERIFY_WORKFLOW_PATH:
+        return False
+    if run.get("event") == "workflow_run":
+        return True
+    return run.get("event") == "workflow_dispatch" and run.get("head_branch") == default_branch
+
+
 def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str]) -> int:
     """Return the id of the newest successful verify run that proved the native matrix for tag at commit.
 
@@ -128,8 +142,11 @@ def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str])
     skipped, so the required jobs must each have succeeded.
     """
     title = verify_run_title(tag, commit)
+    default_branch = client.default_branch()
     rejected = []
     for run in _verify_runs(client):
+        if not trusted_verify_run(run, default_branch):
+            continue
         if run.get("display_title") != title or run.get("status") != "completed" or run.get("conclusion") != "success":
             continue
         reason = unproven_reason(_jobs_by_name(client, int(run["id"])), targets)
@@ -139,7 +156,7 @@ def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str])
     detail = f" (rejected: {'; '.join(rejected)})" if rejected else ""
     raise GateError(
         f"no successful Release Native Verify run exists for {tag} at {commit}; "
-        f"run the native matrix on that prerelease{detail}"
+        f"dispatch Release Native Verify with tag {tag} and commit {commit}{detail}"
     )
 
 
@@ -200,6 +217,11 @@ def git_show(commit: str, path: str) -> str | None:
 
 
 def manifest_build_changed(base: str, head: str) -> bool:
+    """Whether a build section of the manifest differs between base and head.
+
+    Trade-off: each section is compared whole, so a field inside a build section that does not
+    reach the archives still forces a rerun. The gate can over-trigger a rerun but never miss one.
+    """
     return manifest_build_view(git_show(base, MANIFEST_PATH)) != manifest_build_view(git_show(head, MANIFEST_PATH))
 
 
