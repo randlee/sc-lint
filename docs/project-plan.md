@@ -427,8 +427,9 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
   version-bump PR #842
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
-The REQ-CLI-022 prior-release refresh exception (2026-11-04) is Pending
-Rand.
+The REQ-CLI-022 prior-release refresh exception and the ADR-022 runtime
+site-allowance amendment (#640) are Accepted (Rand, 2026-11-04:
+"req-cli-022 approved adr-022 approved").
 REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker
 ruling, which Rand accepted on 2026-11-03. Open issues #783, #832 and #835
 are not addressed by 0.8.5 and are deferred to 0.8.6.

@@ -385,7 +385,8 @@ specialized backend tools and mixed Rust/Python implementations.
   reported as version-only stale. Any other difference is a conflict.
   `--check` reports a file that would be refreshed as
   `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
-  lint-085.56 and lint-085.61; Pending Rand.)
+  lint-085.56 and lint-085.61; Accepted — Rand 2026-11-04
+  ("req-cli-022 approved").)
   E.6 owns optional CI workflow generation because it depends on the reusable
   release-verified Action rather than a source-checkout fallback.
 
