@@ -6,10 +6,11 @@ mod matches;
 mod state;
 use crate::RuleId;
 use crate::api::{Api, lookup};
+use crate::imports::{Imports, ModuleScoped, qualified};
+use crate::position::SourcePosition;
 use crate::scope::production;
-use bindings::{Imports, ValueKind, type_kind};
+use bindings::{ValueKind, type_kind};
 use std::collections::{BTreeMap, BTreeSet};
-use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -28,32 +29,19 @@ impl PracticeRule {
             Self::MutexAcrossAwait => RuleId::ScbRuntime007,
         }
     }
-    pub(crate) fn explanation(self) -> (&'static str, &'static str) {
+    pub(crate) fn recovery(self) -> &'static str {
         match self {
-            Self::ThreadSleepUntil => (
-                "blocking_thread_sleep_until",
-                "use controlled deadlines or synchronization instead",
-            ),
-            Self::TokioSleep => (
-                "tokio_timer_sleep",
-                "use yield_now or event-driven synchronization instead of sleeping",
-            ),
-            Self::BlockOn => (
-                "blocking_executor_entry",
-                "await the future on the existing runtime instead",
-            ),
-            Self::MutexAcrossAwait => (
-                "mutex_guard_across_await",
-                "drop the guard or end its scope before awaiting",
-            ),
+            Self::ThreadSleepUntil => "use controlled deadlines or synchronization instead",
+            Self::TokioSleep => "use yield_now or event-driven synchronization instead of sleeping",
+            Self::BlockOn => "await the future on the existing runtime instead",
+            Self::MutexAcrossAwait => "drop the guard or end its scope before awaiting",
         }
     }
 }
 
 pub(crate) struct Site {
     pub(crate) rule: PracticeRule,
-    pub(crate) line: usize,
-    pub(crate) column: usize,
+    pub(crate) position: SourcePosition,
     pub(crate) function: String,
     pub(crate) detail: String,
 }
@@ -82,11 +70,11 @@ struct Scanner {
 }
 
 pub(crate) fn find(file: &syn::File) -> Vec<Site> {
-    let imports = Imports::collect(file);
+    let mut imports = Imports::collect(file);
     let mut never = flow::NeverFunctions::default();
     never.visit_file(file);
     let mut fields = Fields {
-        imports: Imports::collect(file),
+        imports: &mut imports,
         fields: BTreeMap::new(),
         module: String::new(),
     };
@@ -108,19 +96,12 @@ pub(crate) fn find(file: &syn::File) -> Vec<Site> {
     scanner.sites
 }
 
-struct Fields {
-    imports: Imports,
+struct Fields<'a> {
+    imports: &'a mut Imports,
     fields: BTreeMap<String, BTreeMap<String, ValueKind>>,
     module: String,
 }
 
-fn qualified(module: &str, name: &str) -> String {
-    if module.is_empty() {
-        name.to_owned()
-    } else {
-        format!("{module}::{name}")
-    }
-}
 fn type_owner(module: &str, path: &str) -> String {
     if let Some(path) = path.strip_prefix("crate::") {
         return path.to_owned();
@@ -137,7 +118,7 @@ fn type_owner(module: &str, path: &str) -> String {
     qualified(module, path)
 }
 
-impl<'ast> Visit<'ast> for Fields {
+impl<'ast> Visit<'ast> for Fields<'_> {
     fn visit_block(&mut self, block: &'ast syn::Block) {
         self.imports.push_block(block);
         syn::visit::visit_block(self, block);
@@ -149,22 +130,16 @@ impl<'ast> Visit<'ast> for Fields {
             self.fields
                 .entry(self.module.clone())
                 .or_default()
-                .insert(item.ident.to_string(), type_kind(&item.ty, &self.imports));
+                .insert(item.ident.to_string(), type_kind(&item.ty, self.imports));
         }
     }
 
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        if production(&item.attrs, Some(item.ident == "tests"))
-            && let Some((_, items)) = &item.content
-        {
-            let module = qualified(&self.module, &item.ident.to_string());
-            let old_module = std::mem::replace(&mut self.module, module);
-            self.imports.push_items(items, false);
-            syn::visit::visit_item_mod(self, item);
-            self.imports.pop();
-            self.module = old_module;
+        if production(&item.attrs, Some(item.ident == "tests")) {
+            self.with_module(item, |this| syn::visit::visit_item_mod(this, item));
         }
     }
+
     fn visit_item_struct(&mut self, item: &'ast syn::ItemStruct) {
         if !production(&item.attrs, None) {
             return;
@@ -174,7 +149,7 @@ impl<'ast> Visit<'ast> for Fields {
                 self.fields
                     .entry(qualified(&self.module, &item.ident.to_string()))
                     .or_default()
-                    .insert(name.to_string(), type_kind(&field.ty, &self.imports));
+                    .insert(name.to_string(), type_kind(&field.ty, self.imports));
             }
         }
         syn::visit::visit_item_struct(self, item);
@@ -182,12 +157,23 @@ impl<'ast> Visit<'ast> for Fields {
 }
 
 impl Scanner {
+    fn report_live_guards(&mut self, expr: &syn::Expr) {
+        if self.asynchronous {
+            for index in 0..self.bindings.len() {
+                if self.bindings[index].guard {
+                    let detail = format!(
+                        "std::sync::Mutex guard `{}` is live across .await",
+                        self.bindings[index].name
+                    );
+                    self.record(PracticeRule::MutexAcrossAwait, expr, detail);
+                }
+            }
+        }
+    }
     fn record(&mut self, rule: PracticeRule, expr: &syn::Expr, detail: impl Into<String>) {
-        let start = expr.span().start();
         self.sites.push(Site {
             rule,
-            line: start.line,
-            column: start.column,
+            position: SourcePosition::start(expr),
             function: self.function.clone(),
             detail: detail.into(),
         });
@@ -225,11 +211,8 @@ impl Scanner {
                 {
                     return binding.kind;
                 }
-                let resolved = self.imports.resolve(&path.path);
-                let (module, name) = resolved
-                    .rsplit_once("::")
-                    .unwrap_or((&self.module, &resolved));
-                let module = module.strip_prefix("crate::").unwrap_or(module);
+                let resolved = type_owner(&self.module, &self.imports.resolve(&path.path));
+                let (module, name) = resolved.rsplit_once("::").unwrap_or(("", &resolved));
                 self.fields
                     .get(module)
                     .and_then(|fields| fields.get(name))
@@ -382,17 +365,11 @@ impl<'ast> Visit<'ast> for Scanner {
         }
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        if production(&item.attrs, Some(item.ident == "tests"))
-            && let Some((_, items)) = &item.content
-        {
-            let module = qualified(&self.module, &item.ident.to_string());
-            let old_module = std::mem::replace(&mut self.module, module);
-            self.imports.push_items(items, false);
-            syn::visit::visit_item_mod(self, item);
-            self.imports.pop();
-            self.module = old_module;
+        if production(&item.attrs, Some(item.ident == "tests")) {
+            self.with_module(item, |this| syn::visit::visit_item_mod(this, item));
         }
     }
+
     fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
         if !production(&item.attrs, None) {
             return;
@@ -485,17 +462,7 @@ impl<'ast> Visit<'ast> for Scanner {
             }
             syn::Expr::Await(awaited) => {
                 self.visit_expr(&awaited.base);
-                if self.asynchronous {
-                    for index in 0..self.bindings.len() {
-                        if self.bindings[index].guard {
-                            let detail = format!(
-                                "std::sync::Mutex guard `{}` is live across .await",
-                                self.bindings[index].name
-                            );
-                            self.record(PracticeRule::MutexAcrossAwait, expr, detail);
-                        }
-                    }
-                }
+                self.report_live_guards(expr);
             }
             syn::Expr::Block(block) if block.label.is_some() => {
                 self.conditional(|this| this.visit_block(&block.block))
@@ -556,5 +523,16 @@ fn expression_attrs(expr: &syn::Expr) -> &[syn::Attribute] {
         syn::Expr::While(expr) => &expr.attrs,
         syn::Expr::ForLoop(expr) => &expr.attrs,
         _ => &[],
+    }
+}
+
+impl ModuleScoped for Scanner {
+    fn module_scope(&mut self) -> (&mut Imports, &mut String) {
+        (&mut self.imports, &mut self.module)
+    }
+}
+impl ModuleScoped for Fields<'_> {
+    fn module_scope(&mut self) -> (&mut Imports, &mut String) {
+        (&mut *self.imports, &mut self.module)
     }
 }

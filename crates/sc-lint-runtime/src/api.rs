@@ -52,7 +52,7 @@ impl Entry {
 const PATHS: &[Entry] = &[
     Entry::direct("std", Api::Std),
     Entry::direct("std::thread", Api::Thread),
-    Entry::direct("std::thread::sleep", Api::ThreadSleep),
+    Entry::glob("std::thread::sleep", Api::ThreadSleep),
     Entry::glob("std::thread::sleep_until", Api::ThreadSleepUntil),
     Entry::glob("std::sync::Mutex", Api::Mutex),
     Entry::glob("std::sync::MutexGuard", Api::MutexGuard),
@@ -121,8 +121,4 @@ pub(crate) fn canonical_path(path: &syn::Path) -> Option<&'static str> {
                     .all(|(name, part)| part.ident == name)
         })
         .map(|entry| entry.path)
-}
-
-pub(crate) fn lookup_path(path: &syn::Path) -> Option<Api> {
-    canonical_path(path).and_then(lookup)
 }

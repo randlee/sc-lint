@@ -40,7 +40,6 @@ roots = [
   "WorkspaceMetadata",
   "WorkspacePackageInfo",
   "attr_is_cfg_test",
-  "attr_is_test",
   "classify_scope",
   "count_scanned_crates_with_metadata",
   "discover_source_files",

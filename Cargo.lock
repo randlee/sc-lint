@@ -1083,6 +1083,7 @@ dependencies = [
 name = "sc-lint-directives"
 version = "0.8.5"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn 3.0.9",
 ]

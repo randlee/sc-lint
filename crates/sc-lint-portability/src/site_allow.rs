@@ -70,7 +70,7 @@ impl SiteAllowVisitor<'_> {
                 continue;
             }
             let line = attr.span().start().line;
-            let parsed = match attr.parse_args::<AttributeInput>() {
+            let parsed = match AttributeInput::parse_attribute(attr) {
                 Ok(parsed) => parsed,
                 Err(error) => {
                     // Boundary directives retain their existing diagnostics; only site syntax
@@ -79,7 +79,7 @@ impl SiteAllowVisitor<'_> {
                     {
                         continue;
                     }
-                    self.fail(line, DirectiveError::from_diagnostic(&error.to_string()));
+                    self.fail(line, error);
                     return;
                 }
             };

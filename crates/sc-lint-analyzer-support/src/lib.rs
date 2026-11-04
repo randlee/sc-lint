@@ -37,7 +37,8 @@ pub use source_scan::TargetName;
 pub use source_scan::WorkspaceMetadata;
 pub use source_scan::WorkspacePackageInfo;
 pub use source_scan::attr_is_cfg_test;
-pub use source_scan::attr_is_test;
+#[cfg(test)]
+use source_scan::attr_is_test;
 pub use source_scan::classify_scope;
 pub use source_scan::count_scanned_crates_with_metadata;
 pub use source_scan::discover_source_files;

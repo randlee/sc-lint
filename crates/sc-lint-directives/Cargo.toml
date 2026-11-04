@@ -18,6 +18,7 @@ name = "sc_lint_directives"
 path = "src/lib.rs"
 
 [dependencies]
+proc-macro2 = { workspace = true }
 syn = { version = "3.0.9", features = ["full", "parsing"] }
 
 [dev-dependencies]
