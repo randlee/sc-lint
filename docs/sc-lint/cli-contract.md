@@ -366,7 +366,10 @@ Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
 - `sc-lint init --just` writes the generated config, Justfile, and bootstrap
-  helper only when each path is missing or product-managed. Its CLI `--json`
+  helper only when each path is missing or product-managed. A managed path
+  that is a symbolic link is refreshed through its target (a temporary file
+  beside the target, fsynced and renamed over it) and the link is kept; a
+  dangling link is `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer.

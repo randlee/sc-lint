@@ -246,9 +246,11 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   current, and an unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed with
   the current one and reported with status `updated` and a `Refreshed:` line
   (`--check` reports it as outdated). The refresh writes a temporary file in
-  the same directory and renames it over the old one, keeping the existing
-  permissions, so a failed write leaves the previous file intact (lint-085.61,
-  lint-085.64). An edited `Justfile` or
+  the same directory, fsyncs it, renames it over the old one and, on Unix, fsyncs the
+  directory, keeping the existing permissions, so a failed write leaves the
+  previous file intact. A managed file that is a symbolic link is refreshed
+  through its target and the link is kept; a dangling link is reported as a
+  conflict (lint-085.61, lint-085.64, lint-085.68). An edited `Justfile` or
   `bootstrap.py` stays user-owned and is reported as a conflict. A
   `sc-lint.toml` counts as version-only stale only when the version value is
   a well-formed minimum version, so a key inserted after it makes the file a

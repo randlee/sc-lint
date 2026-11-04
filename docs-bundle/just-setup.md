@@ -60,7 +60,10 @@ distinguish the two cases.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an
-overwrite.
+overwrite. A managed path that is a symbolic link is classified by its
+target's content and refreshed by writing through to the target, so the link
+itself is kept; a dangling link is a conflict
+(`CLI.SC_LINT_INTEGRATION_CONFLICT`).
 The installer also rejects unresolved template variables before writing;
 details are in [Best practices](./best-practices.md#template-rendering).
 
