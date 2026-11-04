@@ -18,6 +18,24 @@ The crate provides one canonical parse model for supported source directives.
   portability rule currently supported by this site allowance is `PORT-010`;
   other `PORT-*` ids are well-formed syntax but return
   `PORTABILITY.UNKNOWN_RULE` from the portability analyzer.
+- `REQ-PRODUCT-004E` (Accepted, Rand 2026-11-03: "004E approved (as long as
+  consumer can opt out w/ reason)") applies the same site-allowance model to
+  the runtime analyzer: `#[sc_lint(allow(SCB-RUNTIME-00N), reason = "...")]`
+  on a function or method exempts that function from the named runtime
+  rules, without cascading into nested functions. Every known
+  `SCB-RUNTIME-*` id is accepted. A well-formed `SCB-RUNTIME-*` id the
+  runtime analyzer does not know fails with
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` and recovery "use a known runtime rule
+  id". Ids owned by another analyzer are left to that analyzer. ADR-022
+  decision 4 names only `PORT-010`; this requirement is the decision record
+  for the runtime extension.
+- Shared helpers for analyzers that consume site allowances:
+  `is_sc_lint_attribute` recognizes `#[sc_lint(...)]` and
+  `#[sc_lint_attributes::sc_lint(...)]`; `unknown_owned_rule` returns the
+  first id that carries an analyzer's prefix but is missing from its catalog;
+  `DirectiveError::from_diagnostic` turns a site-allowance parse diagnostic
+  message into a typed `DirectiveError` with its `DIRECTIVE.SITE_ALLOW.*`
+  code and recovery text.
 
 ## Scope Rules
 

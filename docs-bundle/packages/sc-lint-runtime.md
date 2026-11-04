@@ -79,8 +79,9 @@ calls do not contribute to an if/match guard join.
 They do not expand macros or perform Rust type/borrow checking. Known false
 negatives include indirect calls, reexports/crate renames, type aliases,
 external return types, unrecognized receivers, and guards moved through other
-bindings/containers/captures. File-flattened imports/type/static names and unproved
-control-flow exits can cause conservative false positives. In particular,
+bindings/containers/captures. Imports resolve by lexical module and function
+scope. File-flattened type/static names and unproved control-flow exits can
+cause conservative false positives. In particular,
 `consume(g); other().await` and `loop { drop(g); break; } other().await` may
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
 proved. Rule 003's legacy resolver does not recognize renamed `self` imports
@@ -108,9 +109,10 @@ fn checks_behavior() {
 }
 ```
 
-The file-level marker classifies the separate file as test code and exempts
-rules 004–007. The parent module's `cfg(test)` attribute alone does not
-propagate into it.
+The file-level marker makes the whole file test code for every runtime rule,
+`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`tests/`. The parent module's `cfg(test)` attribute alone does not propagate
+into it.
 
 ## Finding interpretation and CI
 

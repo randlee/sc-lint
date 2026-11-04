@@ -361,10 +361,13 @@ Allowed shared support:
 For release `0.2.x`, this means:
 
 - `sc-lint-boundary` and `sc-lint-attributes` may depend on
-  `sc-lint-directives` for shared directive parsing/types, and
-  `sc-lint-portability` and `sc-lint-runtime` may depend on
-  `sc-lint-directives` for the shared site-allowance directive model (ADR-022 decision 4). `sc-lint-portability`
-  and `sc-lint-runtime` may depend on
+  `sc-lint-directives` for shared directive parsing/types
+- `sc-lint-portability` may depend on `sc-lint-directives` for the shared
+  site-allowance directive model (ADR-022 decision 4, `PORT-010`), and
+  `sc-lint-runtime` may depend on it for the same model applied to
+  `SCB-RUNTIME-*` per-function opt-outs (REQ-PRODUCT-004E, Accepted Rand
+  2026-11-03)
+- `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
@@ -679,7 +682,10 @@ Consumer-proven rule families already shipped in dedicated product crates:
 - `sc-lint-portability`: `PORT-004`, `PORT-005`
 - `sc-lint-runtime` (shipped through 0.8.4): `SCB-RUNTIME-001`,
   `SCB-RUNTIME-002`, `SCB-RUNTIME-003`. The 0.8.5 work adds 004–007 to the
-  current inventory above; its requirement remains Pending Rand acceptance.
+  current inventory above. Their product requirement, REQ-PRODUCT-004E, is
+  Accepted (Rand, 2026-11-03). The detailed crate requirement REQ-RUNTIME-001
+  is Pending Rand acceptance, except the separate-file `#![cfg(test)]` marker,
+  which Rand accepted on 2026-11-03.
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer

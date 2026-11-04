@@ -184,8 +184,9 @@ This is not type checking or borrow checking. Known false negatives include
 macro-generated calls, indirect function pointers, reexports and Cargo crate
 renames, type aliases, types returned by other functions, unrecognized receiver
 fields/chains, and guards moved through other bindings, containers or deferred
-captures. `use` bindings and struct names are flattened per file; local name
-shadowing can cause false positives. Cross-function ownership transfer and
+captures. `use` bindings resolve by lexical module and function scope, so an
+import in one module does not change findings in another; struct names are
+flattened per file, and local name shadowing can cause false positives. Cross-function ownership transfer and
 control-flow exits are not proved; consumed guards or branch/loop exits may
 produce conservative findings. In particular, `consume(g); other().await`
 and `loop { drop(g); break; } other().await` may still report rule 007;
@@ -220,8 +221,10 @@ fn checks_behavior() {
 }
 ```
 
-The file-level marker exempts rules 004–007. A parent module's `cfg(test)`
-attribute alone does not propagate into the separate file.
+The file-level marker makes the whole file test code for every runtime rule,
+`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`tests/`. A parent module's `cfg(test)` attribute alone does not propagate into
+the separate file.
 
 If a future exception model is added, it must be backend-owned and documented
 explicitly before users rely on it.

@@ -411,10 +411,11 @@ Current A.2 implementation notes:
 Current A.3 Python-adapter notes:
 
 - the adapter schema is `sc-lint-python-v1`
-- Python-backed commands use dedicated scripts under `.just/`
+- Python-backed commands run modules of the `sc_lint` package
+  (`bindings/sc-lint-py/python/sc_lint/`)
 - the CLI validates the adapter payload before exposing any result
-- Python tool config remains consumer-neutral and repo-local through
-  `.just/lint-config.toml`
+- Python tool config is consumer-neutral: each helper reads its table from
+  `sc-lint.toml` first, with per-table fallback to `.just/lint-config.toml`
 
 ## Output Model
 

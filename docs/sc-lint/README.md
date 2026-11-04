@@ -185,7 +185,9 @@ crate README points back to `sc-lint`.
 - `sc-lint-portability` — OS and platform portability rules `PORT-001` to
   `PORT-010`.
 - `sc-lint-runtime` — std and Tokio runtime rules `SCB-RUNTIME-001` to
-  `SCB-RUNTIME-007`.
+  `SCB-RUNTIME-007`. The product requirement REQ-PRODUCT-004E is Accepted; the detailed
+  REQ-RUNTIME-001 ([`../sc-lint-runtime/requirements.md`](../sc-lint-runtime/requirements.md))
+  is Pending except the accepted `#![cfg(test)]` marker ruling.
 - `sc-lint-directives` — shared parsing of `#[sc_lint(...)]` directives and
   site allowances.
 - `sc-lint-attributes` — the no-op `#[sc_lint(...)]` proc-macro attribute; it

@@ -68,6 +68,10 @@ their governing docs, boundaries, and planned sprint work.
 - role:
   - shared rule-neutral AST source discovery, scope classification, and
     text-report rendering support for analyzer crates
+  - shared analyzer configuration parsing (ADR-013 amendments)
+  - since 0.8.5: the shared `AnalyzeOptions` input, repository-relative
+    source-path normalization, root-prefix stripping and `is_test_only`
+    test-attribute recognition; these fit ADR-013 without amendment
   - has no rule family, binary, or user-facing lint target
 - governing docs:
   - `docs/architecture.md`
