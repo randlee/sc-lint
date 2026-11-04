@@ -49,6 +49,17 @@ feature; record why in the bead. A function may stay long only as a flat,
 ordered checklist with no shared mutable state, named in the baseline with a
 one-line reason in the commit message.
 
+## CI Scope
+
+- Documentation-only pull requests skip the runtime matrix. The classifier is
+  `.github/scripts/ci_scope.py`; its non-runtime paths are the only exemptions.
+- Non-runtime: `site/reports/**`, `docs/**` except `docs/sc-lint/**`, `.beads/**`,
+  `.atm-bd/**` and `.triage/**`. Rand, 2026-11-04: "I would exempt site/reports/**".
+- Runtime: everything else, including `README.md`, `AGENTS.md`, `CHANGELOG.md`,
+  `.claude/**`, `site/` outside `site/reports/`, and any file a test or lint reads.
+  A test checks the last rule against the repository's reads.
+- Pushes to `develop` and `main` always run the full runtime matrix.
+
 ## Plan Naming
 
 | Thing | Form | Example |

@@ -27,8 +27,8 @@ on:
 
 # One live run per ref: a new push to a PR branch cancels the queued/running
 # run for the superseded commit instead of stacking a full matrix behind it.
-# Pushes to develop/main are never cancelled (every landed commit gets a run,
-# classified by its own change set like a PR).
+# Pushes to develop/main are never cancelled and always run the full matrix:
+# the scope gate reports runtime=true for every push, so every landed commit is verified.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -44,22 +44,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ci_scope.py owns the range rules: pull requests compare with their base,
+      # and pushes or unreadable ranges run the matrix.
       - id: scope
         shell: bash
-        run: |
-          # Pull requests compare with their base; pushes compare with the
-          # previous head. Unknown ranges exercise runtime.
-          case "${{ github.event_name }}" in
-            pull_request) range_start="${{ github.event.pull_request.base.sha }}" ;;
-            push)         range_start="${{ github.event.before }}" ;;
-            *)            range_start="" ;;
-          esac
-          if [[ -z "$range_start" || "$range_start" =~ ^0+$ ]] || ! git cat-file -e "$range_start^{commit}" 2>/dev/null; then
-            echo "runtime=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          python .github/scripts/ci_scope.py "$range_start" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python .github/scripts/ci_scope.py --event "$EVENT_NAME" --base "$BASE_SHA" --head "$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
   # The maintainer jobs retain source_venv's local wheel because consumer
   # lifecycle tests require an offline native artifact on every platform. This
@@ -73,58 +66,69 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     # Documentation-only changes keep the required check names but run the
     # skip step on ubuntu instead of waiting for a macOS/Windows runner slot.
-    runs-on: ${{ needs.ci-scope.outputs.runtime == 'true' && matrix.os || 'ubuntu-latest' }}
+    runs-on: ${{ needs.ci-scope.outputs.runtime != 'false' && matrix.os || 'ubuntu-latest' }}
     steps:
       - name: Documentation-only lint skip
-        if: ${{ needs.ci-scope.outputs.runtime != 'true' }}
-        run: echo "Lint is intentionally skipped for documentation-only changes."
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
+        run: echo "Just lint is intentionally skipped for documentation-only changes; codespell still runs."
 
       - uses: actions/checkout@v5
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+
+      - name: Documentation-only Python
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Documentation-only spell check
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
+        run: |
+          python -m pip install codespell
+          codespell
 
       - name: Install Rust toolchain
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.1"
           components: clippy, rustfmt
 
       - name: Install Python
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
       - name: Install just
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: cargo install just --locked
 
       - name: Install cargo-deny
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny@0.20.2
 
       - name: Install cargo-shear
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-shear@1.13.3
 
       - name: Install cargo-binstall
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: taiki-e/install-action@cargo-binstall
 
       - name: Install cargo-modules
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: cargo binstall cargo-modules@0.26.0 --no-confirm
 
       - name: Install codespell
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: python -m pip install codespell
 
       - name: Run just lint
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: just lint
 
   test:
@@ -136,65 +140,65 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     # Documentation-only changes keep the required check names but run the
     # skip step on ubuntu instead of waiting for a macOS/Windows runner slot.
-    runs-on: ${{ needs.ci-scope.outputs.runtime == 'true' && matrix.os || 'ubuntu-latest' }}
+    runs-on: ${{ needs.ci-scope.outputs.runtime != 'false' && matrix.os || 'ubuntu-latest' }}
     steps:
       - name: Documentation-only runtime skip
-        if: ${{ needs.ci-scope.outputs.runtime != 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
         run: echo "Runtime tests are intentionally skipped for documentation-only changes."
 
       - uses: actions/checkout@v5
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
 
       - name: Install Rust toolchain
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.1"
           components: clippy, rustfmt
 
       - name: Install just
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: cargo install just --locked
 
       - name: Install Python
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
       - name: Cache cargo registry
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo index
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo build
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run just setup
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: just setup
 
       - name: Run just test
-        if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: just test
 
   adoption:
     name: Adoption kit (${{ matrix.os }})
     needs: [ci-scope]
-    if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+    if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
     strategy:
       fail-fast: false
       matrix:
@@ -224,7 +228,7 @@ jobs:
 
   wheel-runtime:
     needs: [ci-scope]
-    if: ${{ needs.ci-scope.outputs.runtime == 'true' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}
+    if: ${{ needs.ci-scope.outputs.runtime != 'false' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}
     name: Wheel runtime (Python ${{ matrix.python }})
     strategy:
       fail-fast: false
@@ -278,7 +282,7 @@ jobs:
     # declared destinations. Then run the consumer recipes without source files.
     name: Release smoke (${{ matrix.os }})
     needs: [ci-scope]
-    if: ${{ needs.ci-scope.outputs.runtime == 'true' }}
+    if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
     strategy:
       fail-fast: false
       matrix:
