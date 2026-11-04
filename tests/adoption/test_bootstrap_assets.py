@@ -209,3 +209,87 @@ def test_just_reports_bootstrap_install_failure(product_artifacts: ProductArtifa
     result = run_subprocess(["just", "lint"], cwd=consumer, env=environment, text=True, capture_output=True, check=False, timeout=300)
     assert result.returncode == 4, result.stdout + result.stderr
     assert "CLI.SC_LINT_PYTHON_UNAVAILABLE" in result.stderr
+
+
+@pytest.mark.parametrize("operation", ["lint", "test", "exec"])
+def test_child_helpers_use_managed_python_ahead_of_controlled_host_path(tmp_path, monkeypatch, operation):
+    import json
+    import venv
+
+    bootstrap = load_bootstrap()
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    config = consumer / "sc-lint.toml"
+    config.write_text('[tool.sc-lint]\nminimum_version = "0.8.4"\n')
+    managed = consumer / ".sc-lint/venv"
+    venv.EnvBuilder(with_pip=False).create(managed)
+    model = bootstrap.Bootstrap(str(config))
+    package_root = json.loads(subprocess.check_output(
+        [str(model.python), "-c", "import json,sysconfig;print(json.dumps(sysconfig.get_path('purelib')))"], text=True,
+    ))
+    package = Path(package_root) / "sc_lint"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "controlled_probe.py").write_text("import sys; print(sys.prefix)\n")
+    archive_bin = consumer / "archive/bin"
+    archive_bin.mkdir(parents=True)
+    binary = archive_bin / ("sc-lint.exe" if os.name == "nt" else "sc-lint")
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    host_scripts = Path(sys._base_executable).parent
+    monkeypatch.setenv("PATH", str(host_scripts) + os.pathsep + os.defpath)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.delenv("PYTHONHOME", raising=False)
+    monkeypatch.setenv("SC_LINT_BIN", str(binary))
+    monkeypatch.chdir(consumer)
+    monkeypatch.setattr(bootstrap.Bootstrap, "ensure", lambda self, flags: setattr(self, "binary", str(binary)) or 0)
+    monkeypatch.setattr(bootstrap.Bootstrap, "provision_venv", lambda self, mode: 0)
+    python = "python" if os.name == "nt" else "python3"
+    helper = [python, "-m", "sc_lint.controlled_probe"]
+    observed = []
+    launch = bootstrap.run
+
+    def execute(command, **options):
+        assert os.environ["PATH"].split(os.pathsep)[:2] == [str(archive_bin), str(model.python.parent)]
+        # Model the product executing its configured row; exec runs it directly.
+        argv = helper if str(command[0]) == str(binary) else command
+        import tempfile
+        with tempfile.TemporaryFile(mode="w+") as stdout, tempfile.TemporaryFile(mode="w+") as stderr:
+            status = launch(argv, text=True, stdout=stdout, stderr=stderr, timeout=30)
+            stdout.seek(0)
+            stderr.seek(0)
+            result = subprocess.CompletedProcess(argv, status, stdout.read(), stderr.read())
+        observed.append(result)
+        return result.returncode
+
+    monkeypatch.setattr(bootstrap, "run", execute)
+    argv = [operation, "--config", str(config)] + (["--", *helper] if operation == "exec" else [])
+    status = bootstrap.main(argv)
+    assert status == 0, [(result.args, result.returncode, result.stdout, result.stderr) for result in observed]
+    assert len(observed) == 1
+    assert Path(observed[0].stdout.strip()).resolve() == managed.resolve(), observed[0].stderr
+
+
+def test_run_resolves_command_before_spawning(monkeypatch):
+    bootstrap = load_bootstrap()
+    observed = []
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda command: "/managed/python" if command == "python" else None)
+    monkeypatch.setattr(bootstrap.subprocess, "run", lambda argv, **options: observed.append(argv) or subprocess.CompletedProcess(argv, 0))
+    assert bootstrap.run(["python", "-m", "probe"]) == 0
+    assert observed == [["/managed/python", "-m", "probe"]]
+
+
+def test_exec_activates_without_setup_model(tmp_path, monkeypatch):
+    bootstrap = load_bootstrap()
+    binary = tmp_path / ("sc-lint.exe" if os.name == "nt" else "sc-lint")
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    monkeypatch.setenv("SC_LINT_BIN", str(binary))
+    monkeypatch.setattr(bootstrap, "Bootstrap", lambda *args: pytest.fail("exec must not construct setup state"))
+    monkeypatch.setattr(bootstrap, "run", lambda command: 0)
+    original_path = os.environ.get("PATH", "")
+    monkeypatch.setenv("PATH", original_path)
+    assert bootstrap.main(["exec", "--", "probe"]) == 0
+    assert os.environ["PATH"] == os.pathsep.join([
+        str(binary.parent), str(bootstrap.venv_scripts("sc-lint.toml")), original_path,
+    ])

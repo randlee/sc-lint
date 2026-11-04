@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 import zipfile
 from release_platforms import PLATFORMS
+from wheel_contents import validate_consumer_wheel
 
 
 def machine(data: bytes) -> tuple[str, int]:
@@ -102,6 +103,7 @@ def verify(path: Path, target: str, manifest: Path | None = None) -> None:
         return
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as wheel:
+            validate_consumer_wheel(wheel.namelist())
             extensions = [name for name in wheel.namelist() if name.endswith((".so", ".pyd"))]
             if len(extensions) != 1:
                 raise ValueError(f"{path}: expected one native extension, found {extensions}")

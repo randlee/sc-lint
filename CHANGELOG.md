@@ -11,6 +11,19 @@ All notable changes to sc-lint are documented here.
   held across `.await` (`SCB-RUNTIME-004`–`007`, #640). Test code is exempt;
   function/method allows require a non-empty reason. `yield_now` stays legal.
 
+### Fixed
+
+- Published Python wheels exclude repository-only contract, lifecycle,
+  orchestration and release tests; release verification rejects leaked tests.
+- The reusable GitHub Action selects Linux and Windows ARM64 releases as well
+  as the existing x86_64 and macOS targets.
+- The adoption kit renders consumer helper-policy tables, logging/artifact
+  settings and `default_lint_profile` from its managed input without drift.
+- Bootstrap lint, test and exec commands put the managed venv scripts on
+  child PATH after the archive bin directory and ahead of host interpreters.
+- Clarify that Python helper policies retain per-table fallback to
+  `.just/lint-config.toml`; the native CLI and analyzers use `sc-lint.toml`.
+
 ## [0.8.4] — 2026-11-01
 
 ### Added

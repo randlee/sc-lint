@@ -45,7 +45,7 @@ Justfile managed import block
 README.sc-lint.md
 ```
 
-`.sc-lint/install.json` stores the selected input in canonical JSON form;
+`.sc-lint/install.json` stores normalized JSON while preserving declaration order;
 `.sc-lint/installed.json` records digests for installed kit files. The vendored
 `plugins/sc-lint/install.py` is the consumer-side installer for later checks
 and updates.
@@ -100,8 +100,15 @@ The installer input describes consumer facts, not imperative setup code:
 `minimum_version` is a SemVer floor. `profiles` contains named, ordered lint
 profiles. `ci` records the intended platform matrix. `analyzers` records each
 choice with an explicit enablement reason; derive it from observed async-runtime
-and target-platform facts. Analyzers are the sole repository-specific *policy*
-input. `profiles`, `ci`, and `test` are consumer-owned recipe declarations,
+and target-platform facts. Optional `line_counts`, `identities`, `version_sync`,
+`cargo_shear`, `logging` and `artifacts` objects render root policy tables.
+`default_lint_profile` selects the default under `[tool.sc-lint]`; it can name
+an entry in `lint_profiles`. The owning CLI/backend validates each policy.
+Keep these settings in `.sc-lint/install.json` and reinstall; editing the
+managed `sc-lint.toml` directly creates drift. Reinstalling the same input is
+idempotent. For example, `"identities": {"forbidden_literals": ["example"]}`
+renders `[identities]` with that list. Null values are not TOML values and are
+rejected. `profiles`, `ci`, and `test` are consumer-owned recipe declarations,
 not policy. `test` optionally declares ordered test layers. The optional
 `justfile` object accepts `windows_shell`, a boolean that defaults to `true`;
 set it to `false` to omit the kit's `set windows-shell` line. A consumer-owned

@@ -9,11 +9,25 @@ read the binary and wheel set passed on the command line, never the shared
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def environment_unchanged():
+    # Autouse setup precedes test fixtures, so their cleanup (including
+    # monkeypatch.undo) finishes before this comparison.
+    before = dict(os.environ)
+    with patch.dict(os.environ):
+        yield
+        changed = sorted(key for key in before.keys() | os.environ.keys()
+                         if key != "PYTEST_CURRENT_TEST" and before.get(key) != os.environ.get(key))
+        assert not changed, f"test leaked environment variables: {changed}"
 
 
 @dataclass(frozen=True)
