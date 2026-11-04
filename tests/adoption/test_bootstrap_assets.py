@@ -169,6 +169,50 @@ def test_old_python_fails_before_importing_the_bootstrap() -> None:
     assert "CLI.SC_LINT_PYTHON_UNAVAILABLE" in result.stderr
 
 
+# Finding 10 (lint-085.54): with no override, APPDATA, XDG_DATA_HOME or home, every
+# copy must fail with one coded line and no traceback. The home lookup is forced to
+# raise in a child process, so the test reads no real home directory.
+NO_HOME_PROBE = (
+    "import pathlib,runpy,sys\n"
+    "def no_home(cls):\n"
+    "    raise RuntimeError('Could not determine home directory.')\n"
+    "pathlib.Path.home = classmethod(no_home)\n"
+    "sys.argv = sys.argv[1:]\n"
+    "runpy.run_path(sys.argv[0], run_name='__main__')\n"
+)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        ASSET,
+        ROOT / ".sc-lint/bootstrap.py",
+        ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py",
+    ],
+    ids=["asset", "repo-copy", "adoption-copy"],
+)
+def test_no_home_without_override_fails_with_one_coded_line(script: Path) -> None:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"SC_LINT_INSTALL_DIR", "SC_LINT_BIN", "APPDATA", "XDG_DATA_HOME"}
+    }
+    result = run_subprocess(
+        [sys.executable, "-c", NO_HOME_PROBE, str(script), "exec", "--", "sc-lint", "version"],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 4, result.stderr
+    assert result.stdout == ""
+    assert "Traceback" not in result.stderr
+    lines = result.stderr.splitlines()
+    assert len(lines) == 1, result.stderr
+    assert "CLI.SC_LINT_INSTALL_PERMISSION_DENIED" in lines[0]
+    assert "SC_LINT_INSTALL_DIR" in lines[0]
+
+
 def build_fake_product(tmp_path: Path) -> Path:
     """A stand-in binary: compatible with any config, exits SC_LINT_TEST_EXIT on `lint`."""
     source = tmp_path / "fake.rs"
