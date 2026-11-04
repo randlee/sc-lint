@@ -172,10 +172,12 @@ def test_old_python_fails_before_importing_the_bootstrap() -> None:
 # Finding 10 (lint-085.54): with no override, APPDATA, XDG_DATA_HOME or home, every
 # copy must fail with one coded line and no traceback. The home lookup is forced to
 # raise in a child process, so the test reads no real home directory.
+# Path.home() raises RuntimeError when no home can be determined and KeyError on
+# Python 3.9 when the user has no passwd entry (QA round 4, finding 8).
 NO_HOME_PROBE = (
     "import pathlib,runpy,sys\n"
     "def no_home(cls):\n"
-    "    raise RuntimeError('Could not determine home directory.')\n"
+    "    raise {error}\n"
     "pathlib.Path.home = classmethod(no_home)\n"
     "sys.argv = sys.argv[1:]\n"
     "runpy.run_path(sys.argv[0], run_name='__main__')\n"
@@ -183,22 +185,25 @@ NO_HOME_PROBE = (
 
 
 @pytest.mark.parametrize(
-    "script",
+    ("script", "error"),
     [
-        ASSET,
-        ROOT / ".sc-lint/bootstrap.py",
-        ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py",
+        (ASSET, "RuntimeError('Could not determine home directory.')"),
+        (ROOT / ".sc-lint/bootstrap.py", "RuntimeError('Could not determine home directory.')"),
+        (ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", "RuntimeError('Could not determine home directory.')"),
+        (ASSET, "KeyError('getpwuid(): uid not found')"),
+        (ROOT / ".sc-lint/bootstrap.py", "KeyError('getpwuid(): uid not found')"),
+        (ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", "KeyError('getpwuid(): uid not found')"),
     ],
-    ids=["asset", "repo-copy", "adoption-copy"],
+    ids=["asset-runtime", "repo-copy-runtime", "adoption-copy-runtime", "asset-keyerror", "repo-copy-keyerror", "adoption-copy-keyerror"],
 )
-def test_no_home_without_override_fails_with_one_coded_line(script: Path) -> None:
+def test_no_home_without_override_fails_with_one_coded_line(script: Path, error: str) -> None:
     environment = {
         key: value
         for key, value in os.environ.items()
         if key not in {"SC_LINT_INSTALL_DIR", "SC_LINT_BIN", "APPDATA", "XDG_DATA_HOME"}
     }
     result = run_subprocess(
-        [sys.executable, "-c", NO_HOME_PROBE, str(script), "exec", "--", "sc-lint", "version"],
+        [sys.executable, "-c", NO_HOME_PROBE.format(error=error), str(script), "exec", "--", "sc-lint", "version"],
         env=environment,
         text=True,
         capture_output=True,
