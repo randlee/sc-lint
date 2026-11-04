@@ -289,9 +289,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.meta.outputs.release_version }}
         run: |
           set -euo pipefail
-          prerelease_tag="prerelease/${RELEASE_TAG}"
+          # The manifest owns the prerelease tag prefix; the gate matches the run title against this tag.
+          prerelease_prefix="$(python3 -c 'import tomllib; print(tomllib.load(open("release/publish-artifacts.toml", "rb"))["prerelease"]["tag_prefix"], end="")')"
+          prerelease_tag="${prerelease_prefix}${RELEASE_VERSION}"
           candidate_tag="release-candidate-${RELEASE_TAG}"
           prerelease_commit="$(git rev-parse --verify --quiet "${prerelease_tag}^{commit}")" \
             || { echo "${prerelease_tag} is not present; build and verify a prerelease from an ancestor of the candidate first." >&2; exit 1; }

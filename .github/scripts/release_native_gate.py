@@ -1,40 +1,56 @@
-"""Gate a publish on a successful native matrix run for a verified prerelease.
+"""Gate a publish on a native matrix run that proved a verified prerelease.
 
-A Release Native Verify run must have succeeded for the candidate's prerelease tag.
-The verified prerelease commit V must be an ancestor of the release candidate commit C,
-and no artifact input may differ between V and C. Changes outside the artifact inputs
-(docs, site, CHANGELOG, publish and channel workflows, verifier scripts and tests) never
-require a rerun. Fail closed otherwise and name the offending paths.
+A Release Native Verify run gates the publish only when it ran for the prerelease tag at
+its commit V: its title names both, every native job and the report job concluded success.
+V must be an ancestor of the release candidate commit C, and no artifact input may differ
+between V and C. Changes outside the artifact inputs (docs, site, CHANGELOG, publish and
+channel workflows, verifier scripts and tests, and the manifest's publish-only sections)
+never require a rerun. Fail closed otherwise and name the offending paths.
 """
 from __future__ import annotations
 
 import argparse
 import os
-import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from release_native_verify import GitHub, GitHubError
+from release_native_common import (
+    MANIFEST_PATH, REPORT_JOB, GitHub, GitHubError, is_full_sha, native_job, quote_tag, verify_run_title,
+)
+from release_native_verify import native_matrix
 
 VERIFY_WORKFLOW = "release-native-verify.yml"
 PAGE_SIZE = 100
 MAX_PAGES = 10
 
-# Paths whose content changes the released archives or wheels, or how they are built.
-# Keep in step with release/publish-artifacts.toml; tests check manifest coverage.
+# Paths whose content changes the released archives or wheels, or how they are built. The
+# gate's tests derive the manifest's declared sources and the scripts and actions that
+# prerelease-archive.yml runs (with their local imports) and fail on any path not covered here.
 ARTIFACT_INPUT_DIRS = frozenset({"crates", "bindings", "docs-bundle"})
+ARTIFACT_INPUT_PREFIXES = (".github/actions/",)
 ARTIFACT_INPUT_FILES = frozenset({
     "Cargo.toml",
     "Cargo.lock",
     "rust-toolchain.toml",
-    "release/publish-artifacts.toml",
     ".github/scripts/build_release_target.sh",
     ".github/scripts/release_artifacts.py",
+    ".github/scripts/release_manifest.py",
+    ".github/scripts/release_platforms.py",
     ".github/scripts/release_python.py",
+    ".github/scripts/release_registry.py",
+    ".github/scripts/release_stage.py",
+    ".github/scripts/verify_release_arch.py",
+    ".github/scripts/wheel_contents.py",
     ".github/workflows/prerelease-archive.yml",
 })
+# The manifest sections that describe the archives and wheels. Channel, prerelease and
+# python-package settings only drive publication, so editing them never forces a rerun.
+BUILD_MANIFEST_SECTIONS = (
+    "schema_version", "project", "release_targets", "crates", "release_binaries", "python_distributions",
+)
 
 
 class GateError(ValueError):
@@ -50,18 +66,27 @@ class Diff:
 
 
 def is_artifact_input(path: str) -> bool:
-    return path in ARTIFACT_INPUT_FILES or path.split("/", 1)[0] in ARTIFACT_INPUT_DIRS
+    return (
+        path in ARTIFACT_INPUT_FILES
+        or path.startswith(ARTIFACT_INPUT_PREFIXES)
+        or path.split("/", 1)[0] in ARTIFACT_INPUT_DIRS
+    )
 
 
-def classify(paths: list[str]) -> Diff:
-    inputs = tuple(sorted(path for path in paths if is_artifact_input(path)))
-    other = tuple(sorted(path for path in paths if not is_artifact_input(path)))
+def classify(paths: list[str], *, manifest_build_changed: bool) -> Diff:
+    def artifact(path: str) -> bool:
+        if path == MANIFEST_PATH:
+            return manifest_build_changed
+        return is_artifact_input(path)
+
+    inputs = tuple(sorted(path for path in paths if artifact(path)))
+    other = tuple(sorted(path for path in paths if not artifact(path)))
     return Diff(artifact_inputs=inputs, other=other)
 
 
-def verify_run_title(tag: str) -> str:
-    # release-native-verify.yml sets run-name to "Release Native Verify <tag>".
-    return f"Release Native Verify {tag}"
+def manifest_build_view(text: str | None) -> dict:
+    data = tomllib.loads(text) if text is not None else {}
+    return {key: data.get(key) for key in BUILD_MANIFEST_SECTIONS}
 
 
 def _verify_runs(client: GitHub):
@@ -74,27 +99,66 @@ def _verify_runs(client: GitHub):
         page += 1
 
 
-def find_verified_run(client: GitHub, tag: str) -> int:
-    """Return the id of the newest successful verify run for the prerelease tag."""
-    title = verify_run_title(tag)
+def _jobs_by_name(client: GitHub, run_id: int) -> dict[str, str | None]:
+    jobs: dict[str, str | None] = {}
+    page = 1
+    while True:
+        data = client.json(f"actions/runs/{run_id}/jobs?filter=latest&per_page={PAGE_SIZE}&page={page}")
+        for job in data.get("jobs", []):
+            if job["name"] in jobs:
+                raise GateError(f"run {run_id}: duplicate job name {job['name']!r}")
+            jobs[job["name"]] = job.get("conclusion")
+        if page * PAGE_SIZE >= data.get("total_count", 0):
+            return jobs
+        page += 1
+
+
+def unproven_reason(jobs: dict[str, str | None], targets: list[str]) -> str | None:
+    """Name the required jobs that did not succeed; None when every native job and the report passed."""
+    required = [native_job(target) for target in targets] + [REPORT_JOB]
+    failing = [f"{name} ({jobs.get(name) or 'absent'})" for name in required if jobs.get(name) != "success"]
+    return f"jobs did not all succeed: {', '.join(failing)}" if failing else None
+
+
+def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str]) -> int:
+    """Return the id of the newest successful verify run that proved the native matrix for tag at commit.
+
+    The title binds the run to the tag and commit, so a run for an earlier build of a re-cut
+    tag cannot match. A run concluding success still proves nothing when its native jobs were
+    skipped, so the required jobs must each have succeeded.
+    """
+    title = verify_run_title(tag, commit)
+    rejected = []
     for run in _verify_runs(client):
-        if run.get("display_title") == title and run.get("status") == "completed" and run.get("conclusion") == "success":
+        if run.get("display_title") != title or run.get("status") != "completed" or run.get("conclusion") != "success":
+            continue
+        reason = unproven_reason(_jobs_by_name(client, int(run["id"])), targets)
+        if reason is None:
             return int(run["id"])
-    raise GateError(f"no successful Release Native Verify run exists for {tag}; run the native matrix on that prerelease")
+        rejected.append(f"run {run['id']}: {reason}")
+    detail = f" (rejected: {'; '.join(rejected)})" if rejected else ""
+    raise GateError(
+        f"no successful Release Native Verify run exists for {tag} at {commit}; "
+        f"run the native matrix on that prerelease{detail}"
+    )
 
 
 def check_prerelease_release(client: GitHub, tag: str) -> None:
     """The prerelease must be published, not only tagged."""
     try:
-        client.json(f"releases/tags/{tag.replace('/', '%2F')}")
+        client.json(f"releases/tags/{quote_tag(tag)}")
     except GitHubError as error:
         raise GateError(f"{tag} has no published prerelease (HTTP {error.status})") from error
 
 
+def require_full_shas(tag: str, *commits: str) -> None:
+    if not all(is_full_sha(commit) for commit in commits):
+        raise GateError(f"{tag}: commit identities must be full 40-character SHAs")
+
+
 def evaluate(tag: str, verified_commit: str, candidate_commit: str, *, is_ancestor: bool, diff: Diff) -> None:
     """Fail closed unless V is an ancestor of C and no artifact input changed between them."""
-    if not re.fullmatch(r"[0-9a-f]{40}", verified_commit) or not re.fullmatch(r"[0-9a-f]{40}", candidate_commit):
-        raise GateError(f"{tag}: commit identities must be full 40-character SHAs")
+    require_full_shas(tag, verified_commit, candidate_commit)
     if not is_ancestor:
         raise GateError(
             f"{tag} is built from {verified_commit}, which is not an ancestor of the release candidate "
@@ -119,13 +183,24 @@ def git_is_ancestor(ancestor: str, descendant: str) -> bool:
 
 
 def git_changed_paths(base: str, head: str) -> list[str]:
+    """Every path that differs, with renames split into a delete and an add so both sides are classified."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", "-z", base, head],
+        ["git", "diff", "--name-only", "--no-renames", "-z", base, head],
         capture_output=True, text=True, check=False,
     )
     if result.returncode != 0:
         raise GateError(f"git diff failed: {result.stderr.strip()}")
     return [path for path in result.stdout.split("\0") if path]
+
+
+def git_show(commit: str, path: str) -> str | None:
+    """The file's text at a commit, or None when it does not exist there."""
+    result = subprocess.run(["git", "show", f"{commit}:{path}"], capture_output=True, text=True, check=False)
+    return result.stdout if result.returncode == 0 else None
+
+
+def manifest_build_changed(base: str, head: str) -> bool:
+    return manifest_build_view(git_show(base, MANIFEST_PATH)) != manifest_build_view(git_show(head, MANIFEST_PATH))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -136,20 +211,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, help="GITHUB_OUTPUT file to receive the verified run and commit")
     args = parser.parse_args(argv)
     try:
+        require_full_shas(args.tag, args.prerelease_commit, args.candidate_commit)
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         check_prerelease_release(client, args.tag)
-        run_id = find_verified_run(client, args.tag)
-        if not re.fullmatch(r"[0-9a-f]{40}", args.prerelease_commit) or not re.fullmatch(r"[0-9a-f]{40}", args.candidate_commit):
-            raise GateError(f"{args.tag}: commit identities must be full 40-character SHAs")
+        targets = [row["target"] for row in native_matrix(client.manifest(args.tag))["include"]]
+        run_id = find_verified_run(client, args.tag, args.prerelease_commit, targets)
         is_ancestor = git_is_ancestor(args.prerelease_commit, args.candidate_commit)
-        diff = classify(git_changed_paths(args.prerelease_commit, args.candidate_commit)) if is_ancestor else Diff()
+        paths = git_changed_paths(args.prerelease_commit, args.candidate_commit) if is_ancestor else []
+        diff = classify(paths, manifest_build_changed=MANIFEST_PATH in paths and manifest_build_changed(
+            args.prerelease_commit, args.candidate_commit,
+        ))
         evaluate(args.tag, args.prerelease_commit, args.candidate_commit, is_ancestor=is_ancestor, diff=diff)
     except (GateError, GitHubError, ValueError) as error:
         print(f"release-native-gate: {error}", file=sys.stderr)
         return 1
     print(f"Native matrix verified for {args.tag}: Release Native Verify run {run_id} on commit {args.prerelease_commit}")
-    print(f"Changed since verified commit, artifact inputs: {', '.join(diff.artifact_inputs) or 'none'}")
-    print(f"Changed since verified commit, no rerun needed: {len(diff.other)} paths")
+    print(f"Artifact inputs changed since the verified commit: {', '.join(diff.artifact_inputs) or 'none'}")
+    print(f"Paths changed since the verified commit that need no rerun: {len(diff.other)}")
     if args.output:
         with args.output.open("a", encoding="utf-8") as handle:
             handle.write(f"native_verify_run_id={run_id}\n")

@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import release_native_common as common
 import release_native_verify as native
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -71,6 +72,7 @@ class Assets:
                     "x86_64-pc-windows-msvc": "win_amd64", "aarch64-pc-windows-msvc": "win_arm64"}[target]
         self.manifest_data = {
             "project": {"archive_prefix": "tool", "name": "sc-lint"},
+            "prerelease": {"tag_prefix": "prerelease/v"},
             "release_targets": [{"target": target, "archive": extension}],
             "release_binaries": [{"name": "one"}, {"name": "two"}],
             "python_distributions": [{"name": "sc-lint", "wheels": [{"target": target, "platform": platform}]}],
@@ -258,7 +260,7 @@ def test_unavailable_or_misnamed_run_artifact_fails():
 
 def test_redirect_does_not_forward_github_token_to_asset_host():
     request = urllib.request.Request("https://api.github.com/repos/owner/repo/releases/assets/1", headers={"Authorization": "Bearer test-token"})
-    redirected = native.StripRedirectCredentials().redirect_request(request, None, 302, "Found", {}, "https://release-assets.githubusercontent.com/asset")
+    redirected = common.StripRedirectCredentials().redirect_request(request, None, 302, "Found", {}, "https://release-assets.githubusercontent.com/asset")
     assert redirected.get_header("Authorization") is None
 
 
@@ -389,6 +391,8 @@ class ReleaseRun(RunArtifact):
         self.published = published
         self.tag = tag
         self.tag_endpoint = f"releases/tags/{urllib.parse.quote(tag, safe='')}"
+        self.commit = "d" * 40
+        self.commit_endpoint = f"commits/{urllib.parse.quote(tag, safe='')}"
         self.manifest_data = Assets("x86_64-unknown-linux-gnu").manifest_data
 
     def json(self, endpoint):
@@ -400,6 +404,9 @@ class ReleaseRun(RunArtifact):
             if not self.published:
                 raise native.GitHubError(endpoint, 404)
             return {"assets": []}
+        if endpoint == self.commit_endpoint:
+            self.calls.append(endpoint)
+            return {"sha": self.commit}
         return super().json(endpoint)
 
     def manifest(self, tag):
@@ -483,10 +490,24 @@ def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path)
     monkeypatch.setattr(client, "json", jobs_with_failed_publish)
     monkeypatch.setattr(native, "GitHub", lambda *args: client)
     manifest = tmp_path / "manifest.toml"
-    manifest.write_text('[project]\narchive_prefix="tool"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
+    manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
     output = tmp_path / "outputs"
     assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
-    assert output.read_text().startswith("verify=true\ntag=v1.2.3\n")
+    assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
+
+
+def test_plan_command_rejects_a_tag_that_names_another_commit(monkeypatch, tmp_path, capsys):
+    client = ReleaseRun()
+    monkeypatch.setattr(native, "GitHub", lambda *args: client)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
+    output = tmp_path / "outputs"
+
+    status = native.main(["plan", "--run-id", "42", "--commit", "e" * 40, "--manifest", str(manifest), "--output", str(output)])
+
+    assert status == 1
+    assert not output.exists()
+    assert f"names commit {'d' * 40}, not the commit {'e' * 40} the run verified" in capsys.readouterr().err
 
 
 def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, tmp_path):
@@ -496,7 +517,7 @@ def test_plan_command_writes_disabled_outputs_for_skipped_release(monkeypatch, t
     monkeypatch.chdir(tmp_path)
     output = tmp_path / "outputs"
     assert native.main(["plan", "--run-id", "42", "--manifest", str(manifest), "--output", str(output)]) == 0
-    assert output.read_text() == 'verify=false\ntag=\nmatrix={"include":[]}\n'
+    assert output.read_text() == 'verify=false\ntag=\ncommit=\nmatrix={"include":[]}\n'
 
 
 def test_release_job_api_name_matches_workflow():
@@ -594,7 +615,7 @@ def test_plan_command_selects_prerelease_run_and_rejects_unknown_workflow(monkey
     client = ReleaseRun(tag="prerelease/v1.2.3")
     monkeypatch.setattr(native, "GitHub", lambda *args: client)
     manifest = tmp_path / "manifest.toml"
-    manifest.write_text('[project]\narchive_prefix="tool"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
+    manifest.write_text('[project]\narchive_prefix="tool"\n[prerelease]\ntag_prefix="prerelease/v"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
     output = tmp_path / "outputs"
     assert native.main(["plan", "--run-id", "42", "--workflow", "Prerelease Archive", "--manifest", str(manifest), "--output", str(output)]) == 0
     assert output.read_text().startswith("verify=true\ntag=prerelease/v1.2.3\n")

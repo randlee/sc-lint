@@ -48,12 +48,15 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
 - Release native verification runs on pre-release builds as well as published
   releases. `Release Native Verify` verifies each `prerelease/vX.Y.Z` archive
   and cp39-abi3 wheel on its native target before publication. Release
-  preflight requires a successful native verify on a pre-release whose commit
-  is an ancestor of the release candidate, and no artifact input may have
-  changed since. Documentation, CHANGELOG, publish-workflow and verifier
-  changes never force a rerun (#847). Each target writes a JSON result, and
-  the results are tiled into one HTML report under
-  `site/reports/release-native-verify/` (lint-085.75).
+  preflight requires a native verify run that proved the pre-release at its
+  commit: every native job and the report job succeeded for that tag and
+  commit. The pre-release commit must be an ancestor of the release candidate,
+  and no artifact input may have changed since. Documentation, CHANGELOG,
+  publish-workflow and verifier changes never force a rerun (#847). Each target
+  writes a JSON result, and the results are tiled into one HTML report per run.
+  The report is a workflow artifact (`native-verify-report`); it is committed to
+  `site/reports/release-native-verify/` manually until lint-085.77 automates
+  that commit (lint-085.75).
 
 ### Changed
 

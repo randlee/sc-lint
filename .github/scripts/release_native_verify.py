@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import io
 import json
@@ -14,14 +13,14 @@ import sys
 import tarfile
 import tempfile
 import tomllib
-import urllib.error
-import urllib.parse
-import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 
 from verify_release_arch import EXPECTED, machine, verify as verify_wheel_arch
 from release_manifest import release_archive_name, release_archive_pattern
+from release_native_common import (
+    MANIFEST_PATH, RESULT_SCHEMA_VERSION, GitHub, GitHubError, quote_tag,
+)
 from release_python import wheel_asset_pattern
 
 # This is host policy, not a release-target inventory. The manifest owns that inventory.
@@ -33,11 +32,8 @@ NATIVE_RUNNERS = {
     ("Windows", "x86_64"): "windows-latest",
     ("Windows", "aarch64"): "windows-11-arm",
 }
-MANIFEST_PATH = "release/publish-artifacts.toml"
 RELEASE_WORKFLOW = "Release"
 PRERELEASE_WORKFLOW = "Prerelease Archive"
-PRERELEASE_TAG_PREFIX = "prerelease/v"
-RESULT_SCHEMA_VERSION = 1
 
 
 def release_version(tag: str) -> str:
@@ -90,50 +86,6 @@ def wheel_specs(manifest: dict, target: str) -> list[tuple[str, str]]:
     ]
 
 
-class StripRedirectCredentials(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
-        if redirected is not None and urllib.parse.urlsplit(req.full_url).netloc != urllib.parse.urlsplit(newurl).netloc:
-            redirected.remove_header("Authorization")
-        return redirected
-
-
-class GitHubError(ValueError):
-    def __init__(self, endpoint: str, status: int):
-        self.status = status
-        super().__init__(f"GitHub {endpoint}: HTTP {status}; required release asset or run artifact is unavailable")
-
-
-class GitHub:
-    def __init__(self, repository: str, token: str):
-        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
-            raise ValueError("GITHUB_REPOSITORY must be owner/repository")
-        self.repository = repository
-        self.token = token
-        self.opener = urllib.request.build_opener(StripRedirectCredentials())
-
-    def get(self, endpoint: str, *, binary: bool = False) -> bytes:
-        request = urllib.request.Request(
-            f"https://api.github.com/repos/{self.repository}/{endpoint}",
-            headers={"Authorization": f"Bearer {self.token}", "User-Agent": "sc-lint-native-release-verifier",
-                     # Actions artifact ZIP downloads require the API media type before redirecting.
-                     "Accept": "application/octet-stream" if binary and endpoint.startswith("releases/assets/") else "application/vnd.github+json",
-                     "X-GitHub-Api-Version": "2022-11-28"},
-        )
-        try:
-            with self.opener.open(request, timeout=60) as response:
-                return response.read()
-        except urllib.error.HTTPError as error:
-            raise GitHubError(endpoint, error.code) from error
-
-    def json(self, endpoint: str) -> dict:
-        return json.loads(self.get(endpoint))
-
-    def manifest(self, tag: str) -> dict:
-        entry = self.json(f"contents/{MANIFEST_PATH}?ref={urllib.parse.quote(tag, safe='')}")
-        return tomllib.loads(base64.b64decode(entry["content"]).decode("utf-8"))
-
-
 def tag_from_run(client: GitHub, manifest: dict, run_id: str, *, prerelease: bool = False) -> str:
     if not run_id.isdecimal():
         raise ValueError("automatic verification requires the triggering Release run id")
@@ -157,7 +109,8 @@ def tag_from_run(client: GitHub, manifest: dict, run_id: str, *, prerelease: boo
         versions = [match[1] for name in archive.namelist() if (match := pattern.fullmatch(PurePosixPath(name).name))]
     if len(versions) != 1:
         raise ValueError(f"Release run {run_id}: archive artifact must identify exactly one release version")
-    return (PRERELEASE_TAG_PREFIX if prerelease else "v") + versions[0]
+    prefix = manifest["prerelease"]["tag_prefix"] if prerelease else "v"
+    return prefix + versions[0]
 
 
 def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | None:
@@ -186,6 +139,14 @@ def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | 
     return conclusion
 
 
+def resolve_tag_commit(client: GitHub, tag: str, verified_commit: str) -> str:
+    """Return the commit the tag names; a run-supplied commit must be that same commit."""
+    commit = client.json(f"commits/{quote_tag(tag)}")["sha"]
+    if verified_commit and verified_commit != commit:
+        raise ValueError(f"{tag} names commit {commit}, not the commit {verified_commit} the run verified")
+    return commit
+
+
 def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workflow: str = RELEASE_WORKFLOW) -> tuple[str, dict] | None:
     """Select the published release, or prerelease, whose native matrix must run.
 
@@ -198,7 +159,7 @@ def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workf
     tag = tag or tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
     release_version(tag)
     try:
-        client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")
+        client.json(f"releases/tags/{quote_tag(tag)}")
     except GitHubError as error:
         if error.status != 404 or conclusion == "success":
             raise
@@ -315,7 +276,7 @@ def verify_release(
     assert_native(target)
     record(checks, "native host", f"{target} on {native_host(target)[0]}")
     manifest = client.manifest(tag)
-    assets = client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")["assets"]
+    assets = client.json(f"releases/tags/{quote_tag(tag)}")["assets"]
     archive_name, wheel_names = required_assets(manifest, target, tag, assets)
     by_name = {entry["name"]: entry["id"] for entry in assets}
     checksums = checksum_entries(client.get(f"releases/assets/{by_name['checksums.txt']}", binary=True))
@@ -361,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tag", default="")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--workflow", default="", help=f"workflow that produced --run-id: {RELEASE_WORKFLOW!r} (default) or {PRERELEASE_WORKFLOW!r}")
+    parser.add_argument("--commit", default="", help="commit the triggering run built; the tag must name this commit")
     parser.add_argument("--target")
     parser.add_argument("--wheel-python", help="interpreter the wheel is installed and run under (e.g. Python 3.9)")
     parser.add_argument("--manifest", type=Path, default=Path(MANIFEST_PATH))
@@ -376,8 +338,12 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"unsupported verification workflow {workflow!r}")
             plan = plan_release(client, local_manifest, args.tag, args.run_id, workflow=workflow)
             tag, matrix = plan if plan is not None else ("", {"include": []})
+            commit = resolve_tag_commit(client, tag, args.commit) if plan is not None else ""
             enabled = "true" if plan is not None else "false"
-            output = f"verify={enabled}\ntag={tag}\nmatrix={json.dumps(matrix, separators=(',', ':'))}\n"
+            output = (
+                f"verify={enabled}\ntag={tag}\ncommit={commit}\n"
+                f"matrix={json.dumps(matrix, separators=(',', ':'))}\n"
+            )
             if args.output:
                 with args.output.open("a", encoding="utf-8") as handle:
                     handle.write(output)

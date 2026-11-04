@@ -426,6 +426,33 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
   `lint-085.69`, fix `lint-085.70`, QA `lint-085.71`), merged through the
   version-bump PR #842
 
+Pre-release native verification (lint-085.75 to lint-085.80, PR #847 and
+PR #850):
+
+- `lint-085.75`: `Prerelease Archive` triggers `Release Native Verify` for
+  `prerelease/vX.Y.Z`; the verify run titles the tag and commit it verifies.
+  `release_native_gate.py` accepts it only when every native job and the report
+  job succeeded, the pre-release commit is an ancestor of the candidate, and no
+  artifact input changed. Each target writes a JSON result, and sc-compose
+  renders the results into one tiled report per run. Acceptance: a `success` run
+  with skipped native jobs is rejected; a run for an earlier build of a re-cut
+  tag is rejected; renames are classified on both paths.
+- `lint-085.76`: CHANGELOG entry for the pre-release native gate. Acceptance:
+  the entry describes only what the workflow does, and it states that the report
+  is a workflow artifact committed to `site/` manually.
+- `lint-085.77`: automated commit of the native report to
+  `site/reports/release-native-verify/` (deferred; Rand: "do it manually today").
+  Acceptance: the report reaches `site/` without a manual commit.
+- `lint-085.78`: QA of PR #847 (`lint-085.75`), round 1 findings filed.
+- `lint-085.79`: CI standard triggers and docs-only scope matching atm-core
+  (PR #850). Acceptance: a change set limited to docs, `site/reports/**` or other
+  non-runtime paths skips the runtime matrix; any crate, binding or build change
+  runs it.
+- `lint-085.80`: fixes for the 15 round 1 findings on PR #847. Acceptance: each
+  finding has a deterministic test or a documented resolution, and the artifact
+  input list is covered by a test against the scripts and actions that
+  `prerelease-archive.yml` runs.
+
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 The REQ-CLI-022 prior-release refresh exception and the ADR-022 runtime
 site-allowance amendment (#640) are Accepted (Rand, 2026-11-04:

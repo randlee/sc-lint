@@ -16,7 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-RESULT_SCHEMA_VERSION = 1
+from release_native_common import RESULT_SCHEMA_VERSION
+
+TARGET_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 TEMPLATE_DIR = "release/native-verify"
 REPORT_ROOT = Path("site/reports/release-native-verify")
 REPORT_TITLE = "Release native verification"
@@ -89,21 +91,25 @@ def missing_result(target: str, tag: str) -> dict:
 
 
 def read_results(results_dir: Path, expected_targets: list[str], tag: str) -> list[dict]:
-    """Load every target's result; an expected target without JSON is reported as a failure."""
-    if not results_dir.is_dir():
-        raise ReportError(f"results directory {results_dir} does not exist; no native job produced results")
+    """Load every expected target's result. An absent directory or missing result is a failing panel."""
+    if not results_dir.is_dir() and not expected_targets:
+        raise ReportError(f"results directory {results_dir} does not exist and no targets were expected")
+    paths = sorted(results_dir.glob("*.json")) if results_dir.is_dir() else []
     loaded: dict[str, dict] = {}
-    for path in sorted(results_dir.glob("*.json")):
+    for path in paths:
         try:
             result = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise ReportError(f"{path.name}: unreadable result: {error}") from error
         validate_result(result, path.name)
-        if result["target"] in loaded:
-            raise ReportError(f"{path.name}: duplicate result for target {result['target']}")
-        loaded[result["target"]] = result
-    ordered = [loaded.pop(target) if target in loaded else missing_result(target, tag) for target in expected_targets]
-    ordered += [loaded[target] for target in sorted(loaded)]
+        target = result["target"]
+        # A target becomes a panel file name, so it must be a plain name the matrix declared.
+        if not TARGET_PATTERN.fullmatch(target) or target not in expected_targets:
+            raise ReportError(f"{path.name}: target {target!r} is not one of the expected native targets")
+        if target in loaded:
+            raise ReportError(f"{path.name}: duplicate result for target {target}")
+        loaded[target] = result
+    ordered = [loaded[target] if target in loaded else missing_result(target, tag) for target in expected_targets]
     return [with_status(result) for result in ordered]
 
 
@@ -139,15 +145,12 @@ def tag_slug(tag: str) -> str:
     return tag.replace("/", "-")
 
 
-def write_index(site_root: Path, *, render: Render) -> None:
+def write_index(site_root: Path, *, render: Render, generated_at: str) -> None:
     runs = []
     for sidecar in site_root.glob("*/index.json"):
         runs.append(json.loads(sidecar.read_text(encoding="utf-8")))
     runs.sort(key=lambda run: run["generated_at"], reverse=True)
-    index_html = render(f"{TEMPLATE_DIR}/index.html.j2", {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "runs": runs,
-    })
+    index_html = render(f"{TEMPLATE_DIR}/index.html.j2", {"generated_at": generated_at, "runs": runs})
     (site_root / "index.html").write_text(index_html, encoding="utf-8")
 
 
@@ -156,6 +159,7 @@ def build_report(
     results_dir: Path,
     expected_targets: list[str],
     tag: str,
+    source_workflow: str,
     commit: str,
     run_id: str,
     run_url: str,
@@ -183,6 +187,7 @@ def build_report(
 
     overview = [
         {"label": "Tag", "value": tag},
+        {"label": "Workflow", "value": source_workflow},
         {"label": "Commit", "value": commit},
         {"label": "Triggered by", "value": trigger},
         {"label": "Verify run", "value": f"{run_id} {run_url}".strip()},
@@ -212,7 +217,7 @@ def build_report(
         "targets": [result["target"] for result in results],
     }
     (run_dir / "index.json").write_text(json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    write_index(site_root, render=render)
+    write_index(site_root, render=render, generated_at=generated_text)
     return run_dir / "index.html"
 
 
@@ -222,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results-dir", type=Path, required=True, help="directory holding one JSON result per target")
     parser.add_argument("--expected-targets", default="", help="comma-separated targets the matrix ran")
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--commit", required=True, help="commit the run was triggered from")
+    parser.add_argument("--source-workflow", required=True, help="workflow whose completion triggered the verify run")
+    parser.add_argument("--commit", required=True, help="commit the tag names, as resolved by the verify plan")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--run-url", default="")
     parser.add_argument("--trigger", required=True, help="how the run was triggered, for the report overview")
@@ -239,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             results_dir=args.results_dir,
             expected_targets=[target for target in args.expected_targets.split(",") if target],
             tag=args.tag,
+            source_workflow=args.source_workflow,
             commit=args.commit,
             run_id=args.run_id,
             run_url=args.run_url,

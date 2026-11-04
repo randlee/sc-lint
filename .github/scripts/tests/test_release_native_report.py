@@ -60,6 +60,7 @@ def build(tmp_path, *, expected, render, generated=GENERATED, **overrides):
         "results_dir": tmp_path / "results",
         "expected_targets": expected,
         "tag": TAG,
+        "source_workflow": "Prerelease Archive",
         "commit": COMMIT,
         "run_id": "4242",
         "run_url": "https://github.com/randlee/sc-lint/actions/runs/4242",
@@ -106,12 +107,31 @@ def test_no_results_at_all_is_a_failing_report():
     assert report.overall_status([]) == "FAIL"
 
 
-def test_unexpected_targets_are_still_reported_after_the_expected_ones(tmp_path):
+def test_targets_outside_the_expected_matrix_are_rejected(tmp_path):
     write_result(tmp_path / "results", X86, checks=[("native host", "pass")])
     write_result(tmp_path / "results", "extra-target", checks=[("native host", "pass")])
-    results = report.read_results(tmp_path / "results", [X86], TAG)
 
-    assert [result["target"] for result in results] == [X86, "extra-target"]
+    with pytest.raises(report.ReportError, match="is not one of the expected native targets"):
+        report.read_results(tmp_path / "results", [X86], TAG)
+
+
+def test_target_names_must_be_plain_file_name_segments(tmp_path):
+    write_result(tmp_path / "results", "bad name", checks=[("native host", "pass")])
+
+    with pytest.raises(report.ReportError, match="is not one of the expected native targets"):
+        report.read_results(tmp_path / "results", ["bad name"], TAG)
+
+
+def test_absent_results_directory_fails_every_expected_target(tmp_path):
+    results = report.read_results(tmp_path / "absent", [X86, ARM], TAG)
+
+    assert [result["status"] for result in results] == ["FAIL", "FAIL"]
+    assert report.overall_status(results) == "FAIL"
+
+
+def test_absent_results_directory_without_expected_targets_is_an_error(tmp_path):
+    with pytest.raises(report.ReportError, match="does not exist and no targets were expected"):
+        report.read_results(tmp_path / "absent", [], TAG)
 
 
 @pytest.mark.parametrize("mutate, message", [
@@ -147,7 +167,7 @@ def test_duplicate_target_result_is_rejected(tmp_path):
         (tmp_path / "results" / f"{X86}.json").read_text(encoding="utf-8"), encoding="utf-8"
     )
     with pytest.raises(report.ReportError, match="duplicate result"):
-        report.read_results(tmp_path / "results", [], TAG)
+        report.read_results(tmp_path / "results", [X86], TAG)
 
 
 def test_one_panel_per_target_is_tiled_into_one_report_with_an_overview(tmp_path):
@@ -166,6 +186,7 @@ def test_one_panel_per_target_is_tiled_into_one_report_with_an_overview(tmp_path
     assert f'class="native-panel-fail"' in report_variables["panels_html"]
     overview = {row["label"]: row["value"] for row in report_variables["overview"]}
     assert overview["Tag"] == TAG
+    assert overview["Workflow"] == "Prerelease Archive"
     assert overview["Commit"] == COMMIT
     assert overview["Triggered by"] == "workflow_run of Prerelease Archive run 4241"
     assert overview["Verify run"] == "4242 https://github.com/randlee/sc-lint/actions/runs/4242"
@@ -195,6 +216,7 @@ def test_index_lists_runs_newest_first(tmp_path):
     build(tmp_path, expected=[X86], render=recorder, generated=LATER, run_id="4300")
 
     index_variables = recorder.last("index.html.j2")
+    assert index_variables["generated_at"] == LATER.isoformat(timespec="seconds")
     assert [run["generated_at"] for run in index_variables["runs"]] == [
         LATER.isoformat(timespec="seconds"),
         GENERATED.isoformat(timespec="seconds"),
@@ -259,7 +281,7 @@ def test_real_templates_produce_well_formed_panels_and_a_tiled_report(tmp_path):
 def test_cli_fails_cleanly_for_a_missing_results_directory(tmp_path, capsys):
     status = report.main([
         "--results-dir", str(tmp_path / "absent"), "--tag", TAG, "--commit", COMMIT,
-        "--run-id", "4242", "--trigger", "workflow_dispatch", "--root", str(ROOT),
+        "--run-id", "4242", "--source-workflow", "workflow_dispatch", "--trigger", "workflow_dispatch", "--root", str(ROOT),
         "--site-root", str(tmp_path / "site"),
     ])
     assert status == 1

@@ -61,19 +61,25 @@ release-candidate commit must pass the native matrix. `Prerelease Archive` build
 the archives and cp39-abi3 wheels for `prerelease/vX.Y.Z`; `Release Native Verify`
 then runs the same native matrix it runs for a published release (each release
 target, the wheel installed and run on Python 3.9, and 3.11 on win_arm64). The
-gate is satisfied only by a verify run that concludes `success`.
+gate is satisfied only by a verify run whose title names the prerelease tag and
+its commit `V`, whose native jobs and report job all concluded `success`. A run
+that concludes `success` with skipped native jobs does not count.
 
 Preflight does not demand a rerun for every commit. It passes when the verified
 prerelease commit `V` is an ancestor of the candidate `C` and the `V..C` diff
-touches no artifact input. Artifact inputs are the declared list in
-`.github/scripts/release_native_gate.py`. Changes to docs, `site/`, the CHANGELOG,
-publish or channel workflows, preflight or verify scripts, and tests never force a
-rerun. A change to an artifact input, or a `V` that is not an ancestor of `C`,
-fails the gate and names the offending paths; cut a new prerelease and rerun the
-native matrix.
+touches no artifact input. The artifact inputs are the list in
+`.github/scripts/release_native_gate.py`: the crates, bindings and docs-bundle
+trees, the actions the archive build uses, the root Cargo files, the build and
+release scripts it runs with their local imports, `prerelease-archive.yml`, and
+the manifest's build sections. Changes to docs, `site/`, the CHANGELOG, publish or
+channel workflows, the native verifier and its tests, and the manifest's channel
+and prerelease sections never force a rerun. A change to an artifact input, or a
+`V` that is not an ancestor of `C`, fails the gate and names the offending paths;
+cut a new prerelease and rerun the native matrix.
 
-`publisher` preflight records the verify run id, the verified commit `V`, and
-the classified diff. The published-release run still verifies the published
+`publisher` preflight records the verify run id, the verified commit `V`, the
+artifact-input list, and the count of paths that need no rerun. A failure names
+the offending paths. The published-release run still verifies the published
 assets afterward.
 
 Each verify target writes a JSON result, and the verify run renders it into a
