@@ -108,7 +108,17 @@ def default_install_directory(environ, home_directory, windows):
 
 def managed_path():
     windows = os.name == "nt"
-    directory = default_install_directory(os.environ, Path.home, windows)
+    try:
+        directory = default_install_directory(os.environ, Path.home, windows)
+    except RuntimeError:
+        # Path.home() raises RuntimeError when no home can be determined; the
+        # native installer reports the same condition with this code.
+        fail(
+            "sc-lint install directory is unavailable: neither SC_LINT_INSTALL_DIR, APPDATA, "
+            "XDG_DATA_HOME nor a home directory was available; set SC_LINT_INSTALL_DIR to a "
+            "writable directory and rerun (CLI.SC_LINT_INSTALL_PERMISSION_DENIED)",
+            4,
+        )
     return directory / ("sc-lint.exe" if windows else "sc-lint")
 
 
