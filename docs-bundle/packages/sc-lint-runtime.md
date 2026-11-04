@@ -94,8 +94,23 @@ name, so `drop(name)` releases the tracked resource. Blocking lock-result
 rest and or-patterns retain their scrutinee resources. Dropping a nested
 `ref` binding does not release the scrutinee-held guard.
 Known `!` declarations are matched by unambiguous file-local names.
-Unresolved callable return types are not assumed to diverge. Out-of-line
-`#[cfg(test)]` parent-module context is not propagated to a separate file.
+Unresolved callable return types are not assumed to diverge. For an out-of-line
+`#[cfg(test)] mod checks;` in `src/lib.rs`, put `#![cfg(test)]` at the top of
+`src/checks.rs`:
+
+```rust
+// src/checks.rs
+#![cfg(test)]
+
+#[test]
+fn checks_behavior() {
+    assert_eq!(2 + 2, 4);
+}
+```
+
+The file-level marker classifies the separate file as test code and exempts
+rules 004–007. The parent module's `cfg(test)` attribute alone does not
+propagate into it.
 
 ## Finding interpretation and CI
 

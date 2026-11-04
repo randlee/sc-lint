@@ -107,6 +107,40 @@ fn tests_are_exempt_in_attributes_modules_files_and_methods() {
 }
 
 #[test]
+fn out_of_line_test_module_marker_exempts_all_new_rules() {
+    let source = r#"
+fn timer() { std::thread::sleep_until(deadline); }
+async fn task(m: &std::sync::Mutex<()>) {
+    tokio::time::sleep(duration).await;
+    futures::executor::block_on(async {});
+    let guard = m.lock().unwrap();
+    future.await;
+}
+"#;
+    let fixture = tokio_fixture("#[cfg(test)] mod checks;", TOKIO);
+    fixture.write("crates/example/src/checks.rs", source);
+    assert_eq!(
+        rule_ids(&analyze_workspace(&analyze_options(&fixture)).unwrap()),
+        vec![
+            RuleId::ScbRuntime004,
+            RuleId::ScbRuntime005,
+            RuleId::ScbRuntime006,
+            RuleId::ScbRuntime007,
+        ]
+    );
+    fixture.write(
+        "crates/example/src/checks.rs",
+        &format!("#![cfg(test)]\n{source}"),
+    );
+    assert!(
+        analyze_workspace(&analyze_options(&fixture))
+            .unwrap()
+            .findings
+            .is_empty()
+    );
+}
+
+#[test]
 fn reasoned_local_allows_cover_each_rule_and_do_not_leak_to_other_rules() {
     for (rule, body) in [
         ("SCB-RUNTIME-003", "std::thread::sleep(());"),

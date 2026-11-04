@@ -195,11 +195,22 @@ conditions are not evaluated.
 
 Runtime source discovery scans Rust files under production target source roots.
 It does not resolve Rust module declarations when deciding whether a file is
-test-only. An out-of-line `#[cfg(test)] mod checks;` declared in `src/lib.rs`
-therefore does not mark `src/checks.rs` as a test file; blocking sleeps in that
-file may be reported as production code. Keep test modules inline or place
-them under a Cargo test target until module-aware source classification is
-available.
+test-only. For an out-of-line `#[cfg(test)] mod checks;` declared in
+`src/lib.rs`, put the inner attribute `#![cfg(test)]` at the top of
+`src/checks.rs` so that the separate file is classified as test code:
+
+```rust
+// src/checks.rs
+#![cfg(test)]
+
+#[test]
+fn checks_behavior() {
+    assert_eq!(2 + 2, 4);
+}
+```
+
+The file-level marker exempts rules 004–007. A parent module's `cfg(test)`
+attribute alone does not propagate into the separate file.
 
 If a future exception model is added, it must be backend-owned and documented
 explicitly before users rely on it.
