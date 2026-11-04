@@ -1,124 +1,205 @@
-use crate::api::{Api, known_glob_path, lookup};
+use crate::api::{Api, canonical_path, known_glob_path, lookup};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
-use syn::visit::Visit;
+use std::fmt::Write;
+
+#[derive(Default)]
+struct ImportScope {
+    aliases: BTreeMap<String, String>,
+    globs: Vec<String>,
+    inherit: bool,
+}
 
 #[derive(Default)]
 pub(super) struct Imports {
-    aliases: BTreeMap<String, Vec<String>>,
-    globs: Vec<Vec<String>>,
+    scopes: Vec<ImportScope>,
 }
 
 impl Imports {
     pub(super) fn collect(file: &syn::File) -> Self {
         let mut imports = Self::default();
-        imports.visit_file(file);
+        imports.push_items(&file.items, false);
         imports
     }
 
-    pub(super) fn resolve(&self, path: &syn::Path) -> Vec<String> {
-        self.expand(
-            path.segments
-                .iter()
-                .map(|part| part.ident.to_string())
-                .collect(),
-        )
+    pub(super) fn push_items<'a>(
+        &mut self,
+        items: impl IntoIterator<Item = &'a syn::Item>,
+        inherit: bool,
+    ) {
+        let mut scope = ImportScope {
+            inherit,
+            ..ImportScope::default()
+        };
+        for item in items {
+            if let syn::Item::Use(item) = item
+                && super::production(&item.attrs, None)
+            {
+                crate::imports::visit_use_tree(&item.tree, &mut |import| match import {
+                    crate::imports::Import::Name { mut path, rename } => {
+                        if path.last().is_some_and(|name| name == "self") {
+                            path.pop();
+                        }
+                        if let Some(name) = rename.or_else(|| path.last().cloned()) {
+                            let path = path.join("::");
+                            let path =
+                                if !inherit && let Some(parent) = path.strip_prefix("super::") {
+                                    self.expand_aliases(parent.to_owned())
+                                } else if path.starts_with("crate::")
+                                    || (inherit && path.starts_with("super::"))
+                                {
+                                    self.expand_aliases(path)
+                                } else {
+                                    path
+                                };
+                            scope.aliases.insert(name, path);
+                        }
+                    }
+                    crate::imports::Import::Glob(path) => {
+                        let inherited = match path.as_slice() {
+                            [prefix] if prefix == "super" => {
+                                self.scopes.iter().rev().find(|scope| !scope.inherit)
+                            }
+                            [prefix] if prefix == "crate" => self.scopes.first(),
+                            _ => None,
+                        };
+                        if let Some(inherited) = inherited {
+                            for (name, path) in &inherited.aliases {
+                                scope
+                                    .aliases
+                                    .entry(name.clone())
+                                    .or_insert_with(|| self.expand_aliases(path.clone()));
+                            }
+                            scope.globs.extend(inherited.globs.iter().cloned());
+                        } else if !path.is_empty() {
+                            scope.globs.push(path.join("::"));
+                        }
+                    }
+                });
+            }
+        }
+        self.scopes.push(scope);
     }
 
-    fn expand_aliases(&self, mut path: Vec<String>) -> Vec<String> {
-        for _ in 0..=self.aliases.len() {
-            let Some(prefix) = path.first().and_then(|name| self.aliases.get(name)) else {
+    pub(super) fn push_block(&mut self, block: &syn::Block) {
+        self.push_items(
+            block.stmts.iter().filter_map(|stmt| match stmt {
+                syn::Stmt::Item(item) => Some(item),
+                _ => None,
+            }),
+            true,
+        );
+    }
+
+    pub(super) fn pop(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn visible(&self) -> impl Iterator<Item = &ImportScope> {
+        let mut active = true;
+        self.scopes.iter().rev().take_while(move |scope| {
+            let include = active;
+            active = scope.inherit;
+            include
+        })
+    }
+
+    pub(super) fn resolve(&self, path: &syn::Path) -> Cow<'static, str> {
+        let shadowed = path.segments.first().is_some_and(|first| {
+            self.visible().any(|scope| {
+                scope
+                    .aliases
+                    .keys()
+                    .any(|name| first.ident == name.as_str())
+            })
+        });
+        if !shadowed && let Some(canonical) = canonical_path(path) {
+            return Cow::Borrowed(canonical);
+        }
+        let mut text = String::new();
+        for part in &path.segments {
+            if !text.is_empty() {
+                text.push_str("::");
+            }
+            write!(&mut text, "{}", part.ident).expect("writing to String cannot fail");
+        }
+        let path = self.expand_aliases(text);
+        for scope in self.visible() {
+            for glob in &scope.globs {
+                let candidate = self.expand_aliases(format!("{glob}::{path}"));
+                if known_glob_path(&candidate)
+                    || candidate
+                        .rsplit_once("::")
+                        .is_some_and(|(parent, _)| known_glob_path(parent))
+                {
+                    return Cow::Owned(candidate);
+                }
+            }
+        }
+        Cow::Owned(path)
+    }
+
+    fn scoped_alias(&self, path: &str) -> Option<String> {
+        let (scope, path) = if let Some(path) = path.strip_prefix("crate::") {
+            (self.scopes.first()?, path)
+        } else if let Some(path) = path.strip_prefix("self::") {
+            (self.scopes.iter().rev().find(|scope| !scope.inherit)?, path)
+        } else {
+            let mut count = 0;
+            let mut rest = path;
+            while let Some(path) = rest.strip_prefix("super::") {
+                count += 1;
+                rest = path;
+            }
+            if count == 0 {
+                return None;
+            }
+            (
+                self.scopes
+                    .iter()
+                    .rev()
+                    .filter(|scope| !scope.inherit)
+                    .nth(count)?,
+                rest,
+            )
+        };
+        let (name, rest) = path.split_once("::").unwrap_or((path, ""));
+        let prefix = scope.aliases.get(name)?;
+        Some(if rest.is_empty() {
+            prefix.clone()
+        } else {
+            format!("{prefix}::{rest}")
+        })
+    }
+
+    fn expand_aliases(&self, mut path: String) -> String {
+        let limit = self
+            .scopes
+            .iter()
+            .map(|scope| scope.aliases.len())
+            .sum::<usize>();
+        for _ in 0..=limit {
+            if let Some(expanded) = self.scoped_alias(&path) {
+                if expanded == path {
+                    break;
+                }
+                path = expanded;
+                continue;
+            }
+            let (first, rest) = path.split_once("::").unwrap_or((&path, ""));
+            let Some(prefix) = self.visible().find_map(|scope| scope.aliases.get(first)) else {
                 break;
             };
-            if prefix.first() == path.first() {
+            if prefix.split("::").next() == Some(first) {
                 break;
             }
-            path = prefix.iter().chain(path.iter().skip(1)).cloned().collect();
+            path = if rest.is_empty() {
+                prefix.clone()
+            } else {
+                format!("{prefix}::{rest}")
+            };
         }
         path
-    }
-
-    fn expand(&self, path: Vec<String>) -> Vec<String> {
-        let path = self.expand_aliases(path);
-        if !path.is_empty() {
-            for glob in &self.globs {
-                let mut candidate = glob.clone();
-                candidate.extend(path.iter().cloned());
-                let candidate = self.expand_aliases(candidate);
-                if known_glob_path(&candidate)
-                    || (candidate.len() > 1 && known_glob_path(&candidate[..candidate.len() - 1]))
-                {
-                    return candidate;
-                }
-            }
-        }
-        path
-    }
-
-    fn tree(&mut self, tree: &syn::UseTree) {
-        crate::imports::visit_use_tree(tree, &mut |import| match import {
-            crate::imports::Import::Name { mut path, rename } => {
-                if path.last().is_some_and(|name| name == "self") {
-                    path.pop();
-                }
-                if let Some(name) = rename.or_else(|| path.last().cloned()) {
-                    self.aliases.insert(name, path);
-                }
-            }
-            crate::imports::Import::Glob(path) => {
-                if !path.is_empty() {
-                    self.globs.push(path);
-                }
-            }
-        });
-    }
-}
-
-impl<'ast> Visit<'ast> for Imports {
-    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_item_fn(self, item);
-        }
-    }
-    fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_impl_item_fn(self, item);
-        }
-    }
-    fn visit_trait_item_fn(&mut self, item: &'ast syn::TraitItemFn) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_trait_item_fn(self, item);
-        }
-    }
-    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_item_impl(self, item);
-        }
-    }
-    fn visit_item_trait(&mut self, item: &'ast syn::ItemTrait) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_item_trait(self, item);
-        }
-    }
-    fn visit_item_const(&mut self, item: &'ast syn::ItemConst) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_item_const(self, item);
-        }
-    }
-    fn visit_item_static(&mut self, item: &'ast syn::ItemStatic) {
-        if super::production(&item.attrs, None) {
-            syn::visit::visit_item_static(self, item);
-        }
-    }
-
-    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
-        if super::production(&item.attrs, None) {
-            self.tree(&item.tree);
-        }
-    }
-    fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        if super::production(&item.attrs, Some(item.ident == "tests")) {
-            syn::visit::visit_item_mod(self, item);
-        }
     }
 }
 
@@ -143,14 +224,15 @@ pub(super) fn type_kind(ty: &syn::Type, imports: &Imports) -> ValueKind {
         syn::Type::Reference(reference) => type_kind(&reference.elem, imports),
         syn::Type::Paren(paren) => type_kind(&paren.elem, imports),
         syn::Type::Path(path) => {
-            let resolved = imports.resolve(&path.path).join("::");
+            let resolved = imports.resolve(&path.path);
             match lookup(&resolved) {
                 Some(Api::Mutex) => ValueKind::Mutex,
                 Some(Api::MutexGuard) => ValueKind::Guard,
                 Some(Api::Runtime) => ValueKind::Runtime,
                 Some(Api::Handle) => ValueKind::Handle,
                 Some(Api::Builder) => ValueKind::Builder,
-                _ => wrapped_kind(path, imports),
+                Some(Api::Owner) => wrapped_kind(path, imports),
+                _ => ValueKind::Other,
             }
         }
         _ => ValueKind::Other,
@@ -158,11 +240,6 @@ pub(super) fn type_kind(ty: &syn::Type, imports: &Imports) -> ValueKind {
 }
 
 fn wrapped_kind(path: &syn::TypePath, imports: &Imports) -> ValueKind {
-    // Common ownership wrappers preserve the identity of their contained value.
-    let name = imports.resolve(&path.path).join("::");
-    if lookup(&name) != Some(Api::Owner) {
-        return ValueKind::Other;
-    }
     if let Some(segment) = path.path.segments.last()
         && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
     {

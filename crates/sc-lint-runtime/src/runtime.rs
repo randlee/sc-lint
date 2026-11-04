@@ -24,18 +24,17 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
-use crate::scope::ScopeKind;
-use crate::scope::classify_scope;
-use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageDependencyKind;
 use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::PackageTargetKind;
 use sc_lint_analyzer_support::RepoRelativePath;
+use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::WorkspaceMetadata;
+use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-pub(super) use sc_lint_analyzer_support::repo_relative_source_path;
+use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone)]
@@ -51,10 +50,36 @@ struct RuntimeFinding {
     node_label: String,
 }
 
+fn node_label(file: &FileContext, function: &str) -> String {
+    format!("crate::{}::{}::{function}", file.package, file.target)
+}
+
+impl RuntimeFinding {
+    fn new(
+        file: &FileContext,
+        rule_id: RuleId,
+        kind: &'static str,
+        message: impl Into<String>,
+        position: (usize, usize),
+        function: &str,
+    ) -> Self {
+        Self {
+            rule_id,
+            kind,
+            message: message.into(),
+            source_path: file.source_path.clone(),
+            line: position.0,
+            column: position.1,
+            package: file.package.clone(),
+            target: file.target.clone(),
+            node_label: node_label(file, function),
+        }
+    }
+}
+
 pub(crate) fn analyze_runtime_liveness(
     root: &Path,
     workspace: &WorkspaceMetadata,
-    _settings: &AnalyzerSettings,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let source_files = discover_source_files_with_metadata(workspace)?;
     let sleep_scope = SleepScope::from_workspace(workspace);
@@ -122,7 +147,7 @@ fn analyze_file(
         )
     })?;
 
-    if file_context.is_test_file || !crate::practices::production(&parsed.attrs, None) {
+    if file_context.is_test_file || !crate::scope::production(&parsed.attrs, None) {
         return Ok(Vec::new());
     }
     let allowances =
@@ -158,44 +183,30 @@ fn blocking_sleep_finding(
     file_context: &FileContext,
     site: crate::sleep::SleepSite,
 ) -> RuntimeFinding {
-    RuntimeFinding {
-        rule_id: RuleId::ScbRuntime003,
-        kind: "blocking_thread_sleep_in_tokio_package",
-        message: format!(
+    RuntimeFinding::new(
+        file_context,
+        RuleId::ScbRuntime003,
+        "blocking_thread_sleep_in_tokio_package",
+        format!(
             "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `{}`; use event-driven synchronization or `yield_now` instead",
             file_context.package
         ),
-        source_path: file_context.source_path.clone(),
-        line: site.line,
-        column: site.column,
-        package: file_context.package.clone(),
-        target: file_context.target.clone(),
-        node_label: format!(
-            "crate::{}::{}::{}",
-            file_context.package,
-            file_context.target,
-            site.enclosing_fn.unwrap_or_else(|| "<module>".into())
-        ),
-    }
+        (site.line, site.column),
+        site.enclosing_fn.as_deref().unwrap_or("<module>"),
+    )
 }
 
 fn practice_finding(file: &FileContext, site: crate::practices::Site) -> RuntimeFinding {
     let (kind, recovery) = site.rule.explanation();
     let rule_id = site.rule.id();
-    RuntimeFinding {
+    RuntimeFinding::new(
+        file,
         rule_id,
         kind,
-        message: format!("{} {}; {}", rule_id.as_str(), site.detail, recovery),
-        source_path: file.source_path.clone(),
-        line: site.line,
-        column: site.column,
-        package: file.package.clone(),
-        target: file.target.clone(),
-        node_label: format!(
-            "crate::{}::{}::{}",
-            file.package, file.target, site.function
-        ),
-    }
+        format!("{} {}; {}", rule_id.as_str(), site.detail, recovery),
+        (site.line, site.column),
+        &site.function,
+    )
 }
 
 #[derive(Default)]
@@ -231,7 +242,6 @@ impl SleepScope {
 
     fn includes(&self, file: &FileContext) -> bool {
         !file.is_test_file
-            && self.excluded_roots.contains_key(&file.package)
             && self
                 .excluded_roots
                 .get(&file.package)
@@ -241,7 +251,7 @@ impl SleepScope {
 
 fn package_declares_tokio(package: &sc_lint_analyzer_support::WorkspacePackageInfo) -> bool {
     package.dependencies.iter().any(|dependency| {
-        dependency.name == "tokio"
+        dependency.name.as_str() == "tokio"
             && matches!(
                 dependency.kind,
                 PackageDependencyKind::Normal | PackageDependencyKind::Build
@@ -401,50 +411,28 @@ impl<'a> RuntimeCollector<'a> {
         }
         // This is an AST approximation over `.wait(...)` calls and does not
         // attempt receiver type resolution before flagging the pattern.
-        self.findings.push(RuntimeFinding {
-            rule_id: RuleId::ScbRuntime001,
-            kind: "condvar_wait_without_timeout",
-            message: "SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult".to_string(),
-            source_path: self.file_context.source_path.clone(),
-            line: span_start_line(method_call.span()),
-            column: method_call.span().start().column,
-            package: self.file_context.package.clone(),
-            target: self.file_context.target.clone(),
-            node_label: format!(
-                "crate::{}::{}::{}",
-                self.file_context.package, self.file_context.target, label
-            ),
-        });
+        self.findings.push(RuntimeFinding::new(self.file_context, RuleId::ScbRuntime001, "condvar_wait_without_timeout",
+            "SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult",
+            (span_start_line(method_call.span()), method_call.span().start().column), label));
     }
 
     fn check_discarded_timeout_wait(&mut self, expr: &Expr, label: &str) {
         if !contains_timeout_wait_call(expr) {
             return;
         }
-        self.findings.push(RuntimeFinding {
-            rule_id: RuleId::ScbRuntime002,
-            kind: "discarded_wait_timeout_result",
-            message: "SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding".to_string(),
-            source_path: self.file_context.source_path.clone(),
-            line: span_start_line(expr.span()),
-            column: expr.span().start().column,
-            package: self.file_context.package.clone(),
-            target: self.file_context.target.clone(),
-            node_label: format!(
-                "crate::{}::{}::{}",
-                self.file_context.package, self.file_context.target, label
-            ),
-        });
+        self.findings.push(RuntimeFinding::new(self.file_context, RuleId::ScbRuntime002, "discarded_wait_timeout_result",
+            "SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding",
+            (span_start_line(expr.span()), expr.span().start().column), label));
     }
 }
 
 fn contains_timeout_wait_call(expr: &Expr) -> bool {
     match expr {
         Expr::MethodCall(method_call) => {
-            matches!(
-                method_call.method.to_string().as_str(),
-                "wait_timeout" | "wait_timeout_while"
-            ) || contains_timeout_wait_call(&method_call.receiver)
+            ["wait_timeout", "wait_timeout_while"]
+                .iter()
+                .any(|name| method_call.method == *name)
+                || contains_timeout_wait_call(&method_call.receiver)
                 || method_call.args.iter().any(contains_timeout_wait_call)
         }
         Expr::Try(expr_try) => contains_timeout_wait_call(&expr_try.expr),

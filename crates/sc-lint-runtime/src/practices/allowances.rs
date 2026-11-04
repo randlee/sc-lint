@@ -3,38 +3,84 @@ use sc_lint_directives::{
     AttributeInput, Directive, DirectiveError, is_sc_lint_attribute, unknown_owned_rule,
 };
 use std::collections::BTreeMap;
+use std::fmt;
+use std::sync::OnceLock;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("{code} at line {line}: {cause}; recovery: {recovery}", cause = .directive.cause(), recovery = .directive.recovery())]
+pub(crate) struct AllowanceDiagnostic {
+    pub(crate) code: &'static str,
+    pub(crate) line: usize,
+    pub(crate) column: usize,
+    #[source]
+    pub(crate) directive: DirectiveError,
+}
+
+#[derive(Debug)]
+pub(crate) struct AllowanceErrors {
+    pub(crate) diagnostics: Vec<AllowanceDiagnostic>,
+}
+impl fmt::Display for AllowanceErrors {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (index, diagnostic) in self.diagnostics.iter().enumerate() {
+            if index != 0 {
+                writeln!(formatter)?;
+            }
+            write!(formatter, "{diagnostic}")?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for AllowanceErrors {}
+
+fn known_rules() -> &'static [&'static str] {
+    static KNOWN: OnceLock<Vec<&'static str>> = OnceLock::new();
+    KNOWN.get_or_init(|| {
+        crate::RUNTIME_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect()
+    })
+}
 
 type Position = (usize, usize);
 struct Entry {
     start: Position,
     end: Position,
-    rules: Vec<String>,
+    rules: Vec<RuleId>,
 }
 #[derive(Default)]
 pub(crate) struct Allowances {
     entries: Vec<Entry>,
-    parsed: BTreeMap<Position, Vec<String>>,
-    errors: Vec<(Position, String)>,
+    parsed: BTreeMap<Position, Vec<RuleId>>,
+    errors: Vec<AllowanceDiagnostic>,
 }
 
 impl Allowances {
-    pub(crate) fn collect(file: &syn::File) -> anyhow::Result<Self> {
+    pub(crate) fn collect(file: &syn::File) -> Result<Self, AllowanceErrors> {
         let mut result = Self::default();
         result.visit_file(file);
         if !result.errors.is_empty() {
-            result.errors.sort_by_key(|(position, _)| *position);
-            return Err(anyhow::anyhow!(
-                result
-                    .errors
-                    .iter()
-                    .map(|(_, error)| error.as_str())
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ));
+            result
+                .errors
+                .sort_by_key(|error| (error.line, error.column));
+            return Err(AllowanceErrors {
+                diagnostics: result.errors,
+            });
         }
         Ok(result)
+    }
+    fn diagnostic(&mut self, position: Position, directive: DirectiveError) {
+        self.errors.push(AllowanceDiagnostic {
+            code: directive.code(),
+            line: position.0,
+            column: position.1,
+            directive,
+        });
     }
     pub(crate) fn allows(&self, rule: RuleId, line: usize, column: usize) -> bool {
         let point = (line, column);
@@ -42,15 +88,15 @@ impl Allowances {
             .iter()
             .rev()
             .find(|entry| entry.start <= point && point < entry.end)
-            .is_some_and(|entry| entry.rules.iter().any(|id| id == rule.as_str()))
+            .is_some_and(|entry| entry.rules.contains(&rule))
     }
-    fn rules(&mut self, attrs: &[syn::Attribute]) -> Vec<String> {
+    fn rules(&mut self, attrs: &[syn::Attribute]) -> Vec<RuleId> {
         attrs
             .iter()
             .flat_map(|attr| self.attribute_rules(attr))
             .collect()
     }
-    fn attribute_rules(&mut self, attr: &syn::Attribute) -> Vec<String> {
+    fn attribute_rules(&mut self, attr: &syn::Attribute) -> Vec<RuleId> {
         if !is_sc_lint_attribute(attr) {
             return Vec::new();
         }
@@ -64,34 +110,27 @@ impl Allowances {
             Ok(input) => {
                 for directive in input.directives {
                     if let Directive::SiteAllow { rules: ids, .. } = directive {
-                        let known = crate::RUNTIME_CATALOG
-                            .rules
-                            .iter()
-                            .map(|rule| rule.as_str())
-                            .collect::<Vec<_>>();
-                        if let Some(rule) = unknown_owned_rule(&ids, "SCB-RUNTIME-", &known) {
-                            self.errors.push((position, format!("DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE at line {}: {}; recovery: use a known runtime rule id", start.line, rule)));
+                        if let Some(rule) = unknown_owned_rule(&ids, "SCB-RUNTIME-", known_rules())
+                        {
+                            self.diagnostic(
+                                position,
+                                DirectiveError::new(
+                                    "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE",
+                                    rule.as_str(),
+                                    "use a known runtime rule id",
+                                ),
+                            );
                         }
                         rules.extend(
                             ids.iter()
-                                .filter(|rule| rule.as_str().starts_with("SCB-RUNTIME-"))
-                                .map(|rule| rule.as_str().to_owned()),
+                                .filter_map(|rule| RuleId::from_known(rule.as_str())),
                         );
                     }
                 }
             }
             Err(error) => {
                 let error = DirectiveError::from_diagnostic(&error.to_string());
-                self.errors.push((
-                    position,
-                    format!(
-                        "{} at line {}: {}; recovery: {}",
-                        error.code(),
-                        start.line,
-                        error.cause(),
-                        error.recovery()
-                    ),
-                ));
+                self.diagnostic(position, error);
             }
         }
         self.parsed.insert(position, rules.clone());

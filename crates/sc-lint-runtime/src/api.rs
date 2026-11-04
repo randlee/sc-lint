@@ -105,7 +105,24 @@ pub(crate) fn lookup(path: &str) -> Option<Api> {
         .map(|entry| entry.api)
 }
 
-pub(crate) fn known_glob_path(path: &[String]) -> bool {
-    let path = path.join("::");
+pub(crate) fn known_glob_path(path: &str) -> bool {
     PATHS.iter().any(|entry| entry.glob && entry.path == path)
+}
+
+pub(crate) fn canonical_path(path: &syn::Path) -> Option<&'static str> {
+    PATHS
+        .iter()
+        .find(|entry| {
+            entry.path.split("::").count() == path.segments.len()
+                && entry
+                    .path
+                    .split("::")
+                    .zip(&path.segments)
+                    .all(|(name, part)| part.ident == name)
+        })
+        .map(|entry| entry.path)
+}
+
+pub(crate) fn lookup_path(path: &syn::Path) -> Option<Api> {
+    canonical_path(path).and_then(lookup)
 }

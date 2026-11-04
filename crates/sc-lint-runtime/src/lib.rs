@@ -83,6 +83,20 @@ pub enum RuleId {
 }
 
 impl RuleId {
+    pub(crate) const ALL: [Self; 7] = [
+        Self::ScbRuntime001,
+        Self::ScbRuntime002,
+        Self::ScbRuntime003,
+        Self::ScbRuntime004,
+        Self::ScbRuntime005,
+        Self::ScbRuntime006,
+        Self::ScbRuntime007,
+    ];
+
+    pub(crate) fn from_known(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|rule| rule.as_str() == value)
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ScbRuntime001 => "SCB-RUNTIME-001",
@@ -159,10 +173,12 @@ fn analyze_workspace_configured_with_metadata_loader(
                 root: options.root.clone(),
                 source: source.into(),
             })?;
-        let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &settings)
-            .map_err(|source| RuntimeError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
+        let findings =
+            runtime::analyze_runtime_liveness(&options.root, &workspace).map_err(|source| {
+                RuntimeError::AnalyzeFindings {
+                    root: options.root.clone(),
+                    source: source.into(),
+                }
             })?;
         let scanned_crates =
             sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);

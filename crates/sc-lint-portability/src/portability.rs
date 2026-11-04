@@ -40,9 +40,8 @@ use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-pub(super) use sc_lint_analyzer_support::repo_relative_source_path;
+use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
 use sc_lint_schema::AllowedFinding;
 
@@ -223,10 +222,6 @@ pub(crate) fn analyze_portability(
         .expect("relative source path preserves AllowedFinding invariants");
     }
     Ok((convert_findings(root, findings)?, allowed))
-}
-
-pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
-    count_crates(workspace)
 }
 
 struct PortabilityCollector<'a> {

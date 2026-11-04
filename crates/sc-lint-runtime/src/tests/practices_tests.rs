@@ -428,7 +428,9 @@ fn known_never_associated_and_self_methods_do_not_contribute_to_joins() {
         let source = format!(
             "struct S;impl S{{fn stop(&self)->!{{panic!()}}async fn f(&self,m:&std::sync::Mutex<()>){{let g=m.lock().unwrap();let v=if condition{{drop(g);1}}else{{{exit}}};other(v).await;}}}}"
         );
-        assert!(report(&source, false).findings.is_empty(), "{source}");
+        for source in [source.clone(), format!("mod nested {{{source}}}")] {
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
     }
 }
 
@@ -744,4 +746,140 @@ fn or_patterns_preserve_named_and_borrowed_guard_ownership() {
             "{source}"
         );
     }
+}
+
+#[test]
+fn module_and_function_aliases_do_not_collide_in_either_declaration_order() {
+    let imports = "use std::thread::sleep_until as tick; use tokio::time::sleep as nap; use futures::executor::block_on as run; use std::sync::Mutex as Lock;";
+    let ordinary = "use custom::{tick, nap, run, Lock};";
+    let body = "tick(()); nap(()); run(async {}); let m=Lock::new(()); let guard=m.lock().unwrap(); future.await;";
+    for (checked, plain) in [
+        (
+            format!("mod a {{ {imports} async fn checked(){{{body}}} }}"),
+            format!("mod b {{ {ordinary} async fn plain(){{{body}}} }}"),
+        ),
+        (
+            format!("async fn checked(){{{imports}{body}}}"),
+            format!("async fn plain(){{{ordinary}{body}}}"),
+        ),
+    ] {
+        for source in [format!("{checked}{plain}"), format!("{plain}{checked}")] {
+            let found = report(&source, true);
+            assert_eq!(
+                rule_ids(&found),
+                vec![
+                    RuleId::ScbRuntime004,
+                    RuleId::ScbRuntime005,
+                    RuleId::ScbRuntime006,
+                    RuleId::ScbRuntime007
+                ],
+                "{source}"
+            );
+            assert!(
+                found.findings.iter().all(|finding| finding
+                    .node_ids
+                    .iter()
+                    .all(|id| id.as_str().ends_with("::checked"))),
+                "{source}"
+            );
+        }
+    }
+}
+
+#[test]
+fn file_test_marker_exempts_legacy_runtime_rules_too() {
+    let source = "fn f(cv: &Condvar) { cv.wait(guard); cv.wait_timeout(guard, duration); std::thread::sleep(duration); }";
+    assert_eq!(
+        rule_ids(&report(source, true)),
+        vec![
+            RuleId::ScbRuntime001,
+            RuleId::ScbRuntime002,
+            RuleId::ScbRuntime003
+        ]
+    );
+    assert!(
+        report(&format!("#![cfg(test)]\n{source}"), true)
+            .findings
+            .is_empty()
+    );
+}
+
+#[test]
+fn allowance_diagnostics_retain_typed_codes_and_source_positions() {
+    let source: syn::File = syn::parse_str("#[sc_lint(allow(SCB-RUNTIME-999), reason=\"test\")] fn f() {}\n#[sc_lint(allow(SCB-RUNTIME-005))] fn g() {}") .unwrap();
+    let errors = crate::practices::allowances::Allowances::collect(&source)
+        .err()
+        .unwrap();
+    assert_eq!(errors.diagnostics.len(), 2);
+    assert_eq!(errors.diagnostics[0].line, 1);
+    assert_eq!(
+        errors.diagnostics[0].code,
+        "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE"
+    );
+    assert_eq!(errors.diagnostics[1].line, 2);
+    assert_eq!(
+        errors.diagnostics[1].code,
+        "DIRECTIVE.SITE_ALLOW.MISSING_REASON"
+    );
+    assert!(
+        errors
+            .to_string()
+            .contains("recovery: use a known runtime rule id")
+    );
+}
+
+#[test]
+fn qualified_impls_resolve_fields_in_the_declaring_module_only() {
+    let declaration = "mod a { pub struct S { pub m: std::sync::Mutex<()> } }";
+    let ordinary = "mod b { pub struct S { pub m: Custom } } impl b::S { async fn ordinary(&self){let g=self.m.lock().unwrap();future.await;} }";
+    for owner in ["a::S", "crate::a::S"] {
+        for source in [
+            format!(
+                "{declaration}{ordinary} impl {owner} {{async fn checked(&self){{let g=self.m.lock().unwrap();future.await;}}}}"
+            ),
+            format!(
+                "{ordinary}{declaration} impl {owner} {{async fn checked(&self){{let g=self.m.lock().unwrap();future.await;}}}}"
+            ),
+        ] {
+            let found = report(&source, false);
+            assert_eq!(rule_ids(&found), vec![RuleId::ScbRuntime007], "{source}");
+            assert!(
+                found.findings[0].node_ids[0]
+                    .as_str()
+                    .ends_with("::checked")
+            );
+        }
+    }
+}
+
+#[test]
+fn explicit_parent_imports_keep_runtime_aliases_available_in_child_modules() {
+    let imports = "use std::thread::sleep_until as tick; use tokio::time::sleep as nap; use futures::executor::block_on as run; use std::sync::Mutex as Lock;";
+    let body = "tick(());nap(());run(async{});let m=Lock::new(());let guard=m.lock().unwrap();future.await;";
+    for inherited in [
+        "use super::*;",
+        "use super::{tick, nap, run, Lock};",
+        "use crate::{tick, nap, run, Lock};",
+    ] {
+        let source = format!("{imports} mod child {{{inherited} async fn checked(){{{body}}}}}");
+        assert_eq!(
+            rule_ids(&report(&source, true)),
+            vec![
+                RuleId::ScbRuntime004,
+                RuleId::ScbRuntime005,
+                RuleId::ScbRuntime006,
+                RuleId::ScbRuntime007
+            ],
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn parent_aliases_keep_their_definition_scope_across_nested_modules() {
+    let source = "use tokio::time::sleep as nap; mod a { use super::nap; mod b { use super::*; async fn f(){nap(()).await;} } }";
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime005]
+    );
 }

@@ -8,6 +8,7 @@ pub(super) struct NeverFunctions {
     pub(super) names: BTreeSet<String>,
     ordinary: BTreeSet<String>,
     owner: String,
+    module: String,
 }
 impl NeverFunctions {
     fn record(&mut self, name: String, output: &syn::ReturnType) {
@@ -28,11 +29,9 @@ impl<'ast> Visit<'ast> for NeverFunctions {
         }
         let owner = self.owner.clone();
         if let syn::Type::Path(path) = &*item.self_ty {
-            self.owner = path
-                .path
-                .segments
-                .last()
-                .map_or_else(String::new, |part| part.ident.to_string());
+            self.owner = path.path.segments.last().map_or_else(String::new, |part| {
+                super::qualified(&self.module, &part.ident.to_string())
+            });
         }
         syn::visit::visit_item_impl(self, item);
         self.owner = owner;
@@ -52,12 +51,18 @@ impl<'ast> Visit<'ast> for NeverFunctions {
         if !super::production(&item.attrs, None) {
             return;
         }
-        self.record(item.sig.ident.to_string(), &item.sig.output);
+        self.record(
+            super::qualified(&self.module, &item.sig.ident.to_string()),
+            &item.sig.output,
+        );
         syn::visit::visit_item_fn(self, item);
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
         if super::production(&item.attrs, Some(item.ident == "tests")) {
+            let module = super::qualified(&self.module, &item.ident.to_string());
+            let previous = std::mem::replace(&mut self.module, module);
             syn::visit::visit_item_mod(self, item);
+            self.module = previous;
         }
     }
 }
@@ -134,7 +139,7 @@ impl Scanner {
     }
     fn never_macro(&self, mac: &syn::Macro) -> bool {
         matches!(
-            self.imports.resolve(&mac.path).join("::").as_str(),
+            self.imports.resolve(&mac.path).as_ref(),
             "panic"
                 | "unreachable"
                 | "todo"
@@ -167,7 +172,7 @@ impl Scanner {
         };
         let resolved = self.imports.resolve(&path.path);
         if matches!(
-            resolved.join("::").as_str(),
+            resolved.as_ref(),
             "std::process::exit" | "std::process::abort"
         ) {
             return true;
@@ -179,20 +184,15 @@ impl Scanner {
         {
             return false;
         }
-        if resolved.len() == 2 {
-            let owner = if resolved[0] == "Self" {
-                &self.owner
-            } else {
-                &resolved[0]
-            };
+        if let Some(("Self", name)) = resolved.split_once("::") {
             return self
                 .never_functions
-                .contains(&format!("{}::{}", owner, resolved[1]));
+                .contains(&format!("{}::{name}", self.owner));
         }
-        resolved.len() == 1
-            && resolved
-                .last()
-                .is_some_and(|name| self.never_functions.contains(name))
+        let qualified = resolved
+            .strip_prefix("crate::")
+            .map_or_else(|| super::qualified(&self.module, &resolved), str::to_owned);
+        self.never_functions.contains(&qualified)
     }
 }
 

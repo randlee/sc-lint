@@ -4,7 +4,7 @@ owner_crate_path = "sc_lint_analyzer_support"
 name = "ScLintAnalyzerSupport"
 
 [public]
-facade = "discover_source_files, load_analyzer_settings"
+facade = "AnalyzeOptions, WorkspaceMetadata, RepoRelativePath, repo_relative_source_path, relative_path_under_root, discover_source_files, load_analyzer_settings"
 
 [implementation]
 type = "FileContext"
@@ -14,23 +14,44 @@ constructor = "none"
 
 [composition]
 roots = [
-  "FileContext",
-  "PackageName",
-  "TargetName",
-  "ScopeKind",
-  "is_test_only",
-  "discover_source_files",
-  "count_scanned_crates",
-  "render_findings_report",
-  "RuleCatalog",
-  "AnalyzerSettings",
+  "AnalyzeOptions",
   "AnalyzerConfigError",
+  "AnalyzerName",
+  "AnalyzerSettings",
+  "CatalogRuleId",
+  "RuleCatalog",
+  "analyzer_settings_from",
   "load_analyzer_settings",
   "read_config_document",
-  "analyzer_settings_from",
-  "relative_slash_path",
-  "RepoRelativePath",
   "RelativePathError",
+  "RepoRelativePath",
+  "RepoRelativeSourcePathError",
+  "relative_path_under_root",
+  "repo_relative_source_path",
+  "render_findings_report",
+  "FileContext",
+  "PackageDependency",
+  "PackageDependencyKind",
+  "PackageName",
+  "PackageTarget",
+  "PackageTargetKind",
+  "ScopeKind",
+  "TargetName",
+  "WorkspaceMetadata",
+  "WorkspacePackageInfo",
+  "attr_is_cfg_test",
+  "attr_is_test",
+  "classify_scope",
+  "count_scanned_crates_with_metadata",
+  "discover_source_files",
+  "discover_source_files_with_metadata",
+  "is_test_only",
+  "item_attrs",
+  "item_identifier",
+  "item_name_hint_is_tests",
+  "load_workspace_metadata",
+  "relative_slash_path",
+  "span_start_line",
 ]
 
 [dependencies]
