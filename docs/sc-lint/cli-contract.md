@@ -295,7 +295,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
-| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
+| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `default_lint_profile`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
@@ -388,8 +388,10 @@ Cargo manifest, or analyzer package:
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
-  "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
-  bool}]}`, sorted by name.
+  "platforms": [...], "cwd": <string|null>, "env_keys": [...],
+  "env_path_keys": [...], "after_all": bool}]}`, sorted by name. `env_keys`
+  and `env_path_keys` list the names of the selector's `env` and `env_paths`
+  entries, never their values.
 
 Human-readable `sc-lint test --list` output contains one selector per line,
 sorted by name, in this form:
@@ -449,9 +451,9 @@ backend binary (`sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`)
 and the `sc-lint-docs` bundle resolve from a supported installed layout,
 including the published archive's `bin/` and manifest-declared bundle paths;
 `false` for source builds under `target/`. The `full` and
-`ci` lint profiles re-enter the running executable for their `sc-boundary` and
-`sc-portability` steps, so a released archive runs every kit recipe with no
-source-tree helper (issue #84).
+`ci` lint profiles re-enter the running executable for their `sc-boundary`,
+`sc-portability`, and `sc-runtime` steps, so a released archive runs every kit
+recipe with no source-tree helper (issue #84).
 
 `sc-lint compatibility check` loads the requirement once and runs
 `sc-lint --json version` against the PATH installation (or `--binary <path>`).
@@ -471,7 +473,7 @@ The preflight failure codes are stable:
 | `CLI.SC_LINT_VERSION_TOO_OLD` | Run `just setup` to install or upgrade the required version. |
 
 Every one of these errors includes `cause`, `suggested_action`, and
-`docs: "sc-lint docs setup"`; its details include the required version and
+`docs: "sc-lint docs just-setup"`; its details include the required version and
 available observed version/path.
 
 Compatibility preflight uses `config` only for the repository requirement.
@@ -603,8 +605,11 @@ Directive codes and recoveries are:
 | `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
 
 `PORTABILITY.UNKNOWN_RULE` identifies an unsupported portability rule id and
-provides the source path, line, cause, and recovery. Site allowances currently
-support only `PORT-010`; use that id or remove the allowance.
+provides the source path, line, cause, and recovery. Portability site
+allowances support only `PORT-010`; use that id or remove the allowance.
+Runtime site allowances accept any `SCB-RUNTIME-*` id the runtime analyzer
+knows; an unknown runtime id is `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`, recovered
+by using a known runtime rule id.
 
 ### Python adapter backend
 

@@ -1,3 +1,15 @@
+//! `sc-lint` is a Rust lint tool for repository policy enforcement.
+//!
+//! It runs boundary, portability and runtime analyzers plus consumer-declared
+//! lint and test steps from `sc-lint.toml`, and reports results through a
+//! stable JSON-first machine contract. Most users install the `sc-lint`
+//! binary; `sc-lint docs` prints the offline user manual.
+//!
+//! The library target backs the `sc-lint` binary. The supported machine
+//! interface is the CLI and its JSON contract (ADR-006).
+//!
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 mod cli;
 mod command;
 mod compatibility;

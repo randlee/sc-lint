@@ -322,7 +322,7 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-018`
   Compatibility failures must use stable error codes and include a cause,
-  `just setup`/installer recovery guidance, and the `sc-lint docs setup`
+  `just setup`/installer recovery guidance, and the `sc-lint docs just-setup`
   reference. When available, the JSON details and human message must identify
   the configured minimum version, observed version, binary path, and
   configuration path.

@@ -1,4 +1,9 @@
-//! Shared, rule-neutral support for `sc-lint` AST analyzer crates.
+//! Shared, rule-neutral support for `sc-lint` AST analyzer crates: analysis
+//! options, analyzer configuration, source discovery and relative paths.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
 
 mod analyze_options;
 mod analyzer_config;

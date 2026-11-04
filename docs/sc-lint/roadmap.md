@@ -443,8 +443,8 @@ The next planned boundary-enforcement work after that is:
 
 These are documented in:
 
-- [`boundary-enforcement-model.md`](./boundary-enforcement-model.md)
-- [`boundary-toml-migration.md`](./boundary-toml-migration.md)
+- [`boundary-enforcement-model.md`](../sc-lint-boundary/boundary-enforcement-model.md)
+- [`boundary-toml-migration.md`](../sc-lint-boundary/boundary-toml-migration.md)
 
 Current direction for both items:
 

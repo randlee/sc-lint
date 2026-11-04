@@ -1,3 +1,11 @@
+//! Runtime analyzer for `sc-lint`: reports blocking waits, sleeps, executor
+//! entry and `Mutex` guards held across `.await` as rules `SCB-RUNTIME-001` to
+//! `SCB-RUNTIME-007`. Run it as `sc-lint lint sc-runtime`.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::path::Path;
 use std::path::PathBuf;
 

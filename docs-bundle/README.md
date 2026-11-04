@@ -29,6 +29,7 @@ Every published package has a guide, including library-only packages:
 - [sc-lint-runtime](./packages/sc-lint-runtime.md)
 - [sc-lint-schema](./packages/sc-lint-schema.md)
 
-Use `sc-lint docs` to list this bundle, `sc-lint docs just-setup` to print a
-guide, and `sc-lint docs --path` when an automation tool needs the installed
-bundle directory.
+Use `sc-lint docs` to print this overview, `sc-lint docs <guide>` (for example
+`sc-lint docs just-setup`) to print a guide, `sc-lint docs --help` to list the
+guide names, and `sc-lint docs --path` when an automation tool needs the
+installed bundle directory.

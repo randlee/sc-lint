@@ -26,9 +26,14 @@ boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 `.sc-lint/venv` next to the config file
 and installs `sc-lint==<minimum_version>` into it:
 
-- `setup --check` exits 4 (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is
-  missing or older than `minimum_version`; `--dry-run` prints what it would
-  install.
+- `upgrade --check` probes without changing anything: it exits 4
+  (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is missing or older than
+  `minimum_version`. `setup --dry-run` prints what it would install
+  (`setup: would install sc-lint==<version> into <venv>`) and exits 0.
+- `setup --check` is not a working probe in 0.8.5. The bootstrap usage line
+  lists `[--check]` for setup, but the bootstrap forwards it to
+  `sc-lint setup`, which rejects it with `CLI.USAGE_ERROR` (exit 2). Use
+  `upgrade --check` instead.
 - `SC_LINT_WHEEL_DIR=<dir>` installs offline with
   `pip install --no-index --find-links <dir>`; the directory must also hold
   the wheel's dependencies (currently `codespell`).
