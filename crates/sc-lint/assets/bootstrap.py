@@ -3,8 +3,8 @@
 
 import sys
 
-if sys.version_info < (3, 11):
-    print("setup: Python 3.11 or newer is required (CLI.SC_LINT_PYTHON_UNAVAILABLE)", file=sys.stderr)
+if sys.version_info < (3, 9):
+    print("setup: Python 3.9 or newer is required (CLI.SC_LINT_PYTHON_UNAVAILABLE)", file=sys.stderr)
     sys.exit(1)
 
 import hashlib
@@ -15,7 +15,6 @@ import platform
 import re
 import shutil
 import subprocess
-import sysconfig
 import tarfile
 import tempfile
 import urllib.error
@@ -192,8 +191,7 @@ def venv_directory(config):
 
 
 def venv_scripts(config):
-    directory = venv_directory(config)
-    return Path(sysconfig.get_path("scripts", scheme="venv", vars={"base": str(directory), "platbase": str(directory)}))
+    return venv_directory(config) / ("Scripts" if os.name == "nt" else "bin")
 
 
 def activate(binary, config):

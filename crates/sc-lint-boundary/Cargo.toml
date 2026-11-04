@@ -31,7 +31,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }
 quote = "1.0.47"
 rayon.workspace = true
-toml = "1.1.8"
+toml.workspace = true
 thiserror = "2.0.21"
 
 [dev-dependencies]

@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
-import tomllib
+from sc_lint import _toml
 
 from sc_lint.lint_common import CONFIG_TABLE_MISSING
 from sc_lint.lint_common import ConfigError
@@ -278,8 +278,8 @@ def load_cargo_shear_workspace_metadata(
 
     root_manifest_path = resolved_root / "Cargo.toml"
     try:
-        root_manifest = tomllib.loads(root_manifest_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as error:
+        root_manifest = _toml.loads(root_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, _toml.TOMLDecodeError) as error:
         raise CargoShearMetadataError(f"could not read workspace root Cargo.toml: {error}") from error
 
     # A virtual workspace has no package name of its own. Only that root may
@@ -415,7 +415,7 @@ def trybuild_consumed(
         return {}
     try:
         crate_map = package_to_crate_dir(repo_root)
-    except (OSError, tomllib.TOMLDecodeError):
+    except (OSError, _toml.TOMLDecodeError):
         return {}
     consumed: dict[tuple[int, str], str] = {}
     for section_index, section in enumerate(sections):

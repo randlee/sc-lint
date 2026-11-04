@@ -8,7 +8,7 @@ import json
 import shutil
 import subprocess
 import sys
-import tomllib
+from sc_lint import _toml
 from pathlib import Path
 
 from sc_lint.lint_common import render_table
@@ -19,7 +19,7 @@ VERSION_MODES = {"current", "latest"}
 
 
 def workspace_version(repo_root: Path) -> str:
-    manifest = tomllib.loads((repo_root / "Cargo.toml").read_text(encoding="utf-8"))
+    manifest = _toml.loads((repo_root / "Cargo.toml").read_text(encoding="utf-8"))
     version = manifest.get("workspace", {}).get("package", {}).get("version")
     if not isinstance(version, str) or not version:
         raise SystemExit("workspace version missing from Cargo.toml")

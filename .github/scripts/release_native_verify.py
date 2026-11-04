@@ -49,6 +49,12 @@ def native_host(target: str) -> tuple[str, str]:
     return {"elf": "Linux", "macho": "Darwin", "pe": "Windows"}[kind], target.split("-", 1)[0]
 
 
+# Wheels are verified on Python 3.9 (the abi3-py39 floor); Windows ARM64 needs 3.11+.
+WHEEL_PYTHON = "3.9"
+WIN_ARM64_TARGET = "aarch64-pc-windows-msvc"
+WIN_ARM64_PYTHON = "3.11"
+
+
 def native_matrix(manifest: dict) -> dict:
     rows = []
     for entry in manifest.get("release_targets", []):
@@ -59,7 +65,11 @@ def native_matrix(manifest: dict) -> dict:
             raise ValueError(f"{target}: no native GitHub-hosted runner for {host}")
         if not wheel_specs(manifest, target):
             raise ValueError(f"{target}: manifest declares no wheel to verify")
-        rows.append({"target": target, "runner": runner, "python_arch": "arm64" if host[1] == "aarch64" else "x64"})
+        python_version = WIN_ARM64_PYTHON if target == WIN_ARM64_TARGET else WHEEL_PYTHON
+        rows.append({
+            "target": target, "runner": runner, "python_arch": "arm64" if host[1] == "aarch64" else "x64",
+            "python_version": python_version,
+        })
     if not rows:
         raise ValueError("release manifest declares no release targets")
     if len({row["target"] for row in rows}) != len(rows):
@@ -194,8 +204,10 @@ def assert_native(target: str) -> None:
     print(f"Native host: {actual}; target: {target}; Python: {sys.version}", flush=True)
     if actual != expected:
         raise ValueError(f"{target}: native runner required; expected {expected}, got {actual}")
-    if sys.version_info < (3, 11):
-        raise ValueError("wheel verification requires Python 3.11 or newer, including win_arm64")
+    if sys.version_info < (3, 9):
+        raise ValueError("wheel verification requires Python 3.9 or newer")
+    if target == WIN_ARM64_TARGET and sys.version_info < (3, 11):
+        raise ValueError("wheel verification on win_arm64 requires Python 3.11 or newer")
 
 
 def required_assets(manifest: dict, target: str, tag: str, assets: list[dict]) -> tuple[str, list[str]]:

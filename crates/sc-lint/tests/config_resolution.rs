@@ -16,9 +16,10 @@ use tempfile::TempDir;
 const EXIT_CONFIG: i32 = 3;
 const PACKAGE_DIR: &str = "bindings/sc-lint-py/python/sc_lint";
 // The same support files the logging_integration.rs WorkspaceFixture copies.
-const PACKAGE_FILES: [&str; 8] = [
+const PACKAGE_FILES: [&str; 9] = [
     "__init__.py",
     "_binary.py",
+    "_toml.py",
     "lint_common.py",
     "python_adapter.py",
     "view_common.py",

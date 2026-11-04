@@ -56,6 +56,13 @@ CC1D496_USAGE_TOKENS = ("setup", "lint", "test", "upgrade", "exec", "--config sc
     "[selector]", "[host|all|linux|macos|windows]", "-- <argv...>")
 
 
+# Pinned rather than sys.stdlib_module_names, which is missing on Python 3.9.
+BOOTSTRAP_STDLIB_MODULES = frozenset({
+    "hashlib", "json", "os", "pathlib", "platform", "re", "shutil", "subprocess",
+    "sys", "tarfile", "tempfile", "urllib", "venv", "zipfile",
+})
+
+
 def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
     paths = [ASSET, ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", ROOT / ".sc-lint/bootstrap.py"]
     assert all(path.read_bytes() == ASSET.read_bytes() for path in paths)
@@ -70,7 +77,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
             modules.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.add(node.module.split(".")[0])
-    assert modules <= sys.stdlib_module_names
+    assert modules <= BOOTSTRAP_STDLIB_MODULES
     for relative in ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/.sc-lint/justfile",
                      "packages/sc-lint-adoption/templates/Justfile.default",
                      "packages/sc-lint-adoption/templates/test.just", "Justfile"):
@@ -139,7 +146,7 @@ def test_bootstrap_lint_accepts_fail_fast() -> None:
 
 
 def test_old_python_fails_before_importing_the_bootstrap() -> None:
-    probe = "import runpy,sys; sys.version_info=(3,10,0); runpy.run_path(sys.argv[1],run_name='__main__')"
+    probe = "import runpy,sys; sys.version_info=(3,8,0); runpy.run_path(sys.argv[1],run_name='__main__')"
     result = run_subprocess([sys.executable, "-c", probe, str(ASSET)], text=True, capture_output=True, check=False)
     assert result.returncode == 1
     assert "CLI.SC_LINT_PYTHON_UNAVAILABLE" in result.stderr

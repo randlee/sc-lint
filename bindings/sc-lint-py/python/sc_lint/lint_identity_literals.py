@@ -238,7 +238,7 @@ def collect_identity_violations(
         source = "\n".join(lines)
         scope = rust_file_test_scope(rel_path, lines)
 
-        for line_number, (line, in_test_scope) in enumerate(zip(lines, scope, strict=True), start=1):
+        for line_number, (line, in_test_scope) in enumerate(zip(lines, scope), start=1):
             if not is_code_line(line):
                 continue
             if line_is_suppressed(line_number, lines, DIRECTIVE_POLICY):

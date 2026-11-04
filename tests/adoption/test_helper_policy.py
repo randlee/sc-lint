@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
-import tomllib
+from sc_lint._toml import loads as toml_loads
 
 import pytest
 from conftest import ProductArtifacts
@@ -30,7 +30,7 @@ def test_helper_policies_and_default_profile_roundtrip_without_drift():
     source = install_policy(consumer)
     result = run("--input", str(source), str(consumer))
     assert result.returncode == 0, result.stderr
-    rendered = tomllib.loads((consumer / "sc-lint.toml").read_text())
+    rendered = toml_loads((consumer / "sc-lint.toml").read_text())
     assert {key: rendered[key] for key in POLICIES} == POLICIES
     assert rendered["tool"]["sc-lint"]["default_lint_profile"] == "quick"
     assert [row["name"] for row in rendered["tool"]["sc-lint"]["lint"]] == ["z-first", "a-next"]

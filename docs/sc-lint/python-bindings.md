@@ -10,14 +10,18 @@ invoke in every consumer; no consumer copies helper scripts any more
 
 | Surface | Contents |
 | --- | --- |
-| `sc_lint._native` (pyo3, abi3-py39) | exactly two exports: `version_json() -> str` (the `sc-lint --json version` payload) and `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code). No lint logic lives here. |
+| `sc_lint._native` (pyo3, abi3-py39) | exactly three exports: `version_json() -> str` (the `sc-lint --json version` payload), `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code), and `toml_loads(text: str) -> str` (parses TOML with the workspace `toml` crate and returns a JSON object). No lint logic lives here. |
 | `sc_lint.__version__` | parsed from `version_json()`; always equals the workspace version. |
 | `sc_lint.binary_path()` | resolves the native `sc-lint` executable: `SC_LINT_BIN`, then the managed install dir (`SC_LINT_INSTALL_DIR`, `$XDG_DATA_HOME/sc-lint/bin`, `~/.local/share/sc-lint/bin`), then `PATH`. |
 | `sc_lint.<helper>` modules | the former `.just/*.py` helpers (`run_lint`, `run_pytests`, `lint_*`, `check_version_sync`, `view_findings`, …) run as `python -m sc_lint.<helper>`. |
 | `sc_lint.tests` | the tests shipped inside the wheel (`python -m sc_lint.run_pytests`); the runner discovers its bundled `sc_lint.tests` package and does not assume the consumer checkout has the sc-lint repository's test tree. |
 
 The pyo3 layer is a packaging bridge only: `run` accepts argv tokens, never
-shell text, and the package adds no plugin registry or selection policy. The
+shell text, and the package adds no plugin registry or selection policy.
+`toml_loads` is a parser, not policy. `sc_lint/_toml.py` wraps it as `loads`,
+`load` and `TOMLDecodeError`, so the helpers parse TOML the same way the CLI
+does on Python 3.9, where `tomllib` is unavailable. Datetime values come back as
+RFC 3339 text and non-finite floats as `null`. The
 boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 
 ## How consumers get it

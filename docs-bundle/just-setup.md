@@ -42,7 +42,7 @@ upgrade:
     {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml
 ```
 
-Every platform runs the same Python bootstrap; Python 3.11 or newer is required.
+Every platform runs the same Python bootstrap; Python 3.9 or newer is required.
 
 ## Select lint steps and run managed commands
 
