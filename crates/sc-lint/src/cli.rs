@@ -141,7 +141,7 @@ pub enum Command {
     },
     /// Print the product, backend, and contract versions.
     Version,
-    /// Run the configured consumer CI profile, or the source-maintainer profile in a source checkout.
+    /// Run the source-maintainer CI profile. Use `sc-lint lint ci --consumer` for a configured consumer profile.
     Ci,
 }
 
@@ -379,7 +379,7 @@ pub enum LintTarget {
     Full,
     #[value(
         name = "ci",
-        help = "Run CI lint checks or the selected consumer profile"
+        help = "Run the source-maintainer profile, or the configured consumer profile with `--consumer`"
     )]
     Ci,
 }

@@ -110,6 +110,10 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
+
     #[test]
     fn analyzer_config_exit_codes_are_cli_owned() {
         assert_eq!(
@@ -147,12 +151,16 @@ mod tests {
             return;
         }
         assert_eq!(
-            docli::render::markdown::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint-runtime.md")
+            normalize_line_endings(&docli::render::markdown::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-runtime.md"
+            ))
         );
         assert_eq!(
-            docli::render::html::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint-runtime/index.html")
+            normalize_line_endings(&docli::render::html::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-runtime/index.html"
+            ))
         );
     }
 }

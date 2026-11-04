@@ -178,6 +178,10 @@ fn write_stdout(value: &str) -> io::Result<()> {
 mod tests {
     use super::*;
 
+    fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
+
     #[test]
     fn analyze_cli_parses_rule_alias_rule_filter_and_config() {
         let alias = Cli::try_parse_from([
@@ -258,12 +262,16 @@ mod tests {
             return;
         }
         assert_eq!(
-            docli::render::markdown::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint-boundary.md")
+            normalize_line_endings(&docli::render::markdown::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-boundary.md"
+            ))
         );
         assert_eq!(
-            docli::render::html::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint-boundary/index.html")
+            normalize_line_endings(&docli::render::html::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-boundary/index.html"
+            ))
         );
     }
 }

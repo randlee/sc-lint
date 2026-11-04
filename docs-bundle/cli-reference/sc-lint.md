@@ -32,7 +32,7 @@ Usage: sc-lint check <TARGET>
 
 ### `sc-lint ci`
 
-Run the configured consumer CI profile, or the source-maintainer profile in a source checkout
+Run the source-maintainer CI profile. Use `sc-lint lint ci --consumer` for a configured consumer profile
 
 ```text
 Usage: sc-lint ci
