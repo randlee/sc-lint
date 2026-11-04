@@ -23,7 +23,7 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | Atomic activation failed | Choose a writable install directory and retry. |
 | `SETUP_TOOLS.INSPECTION_UNAVAILABLE` | Dry-run cannot inspect declared tools because the managed helper is unavailable | Run ordinary `just setup` to provision the helper and declared tools, then retry `setup --dry-run`. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
-| `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
+| `CLI.SC_LINT_INTEGRATION_CONFLICT` | The bootstrap contains user-owned changes |  |
 | `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more product-managed integration files are missing or are unedited files from a prior release | Run `sc-lint init --just` to create or refresh the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
 | `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, or profile declaration is structurally invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
@@ -75,16 +75,6 @@ loaded config file's directory rather than step `cwd`. `env_path_keys` lists
 configured names without exposing resolved values; test listings separately
 retain literal `env_keys`. See [Configuration](./configuration.md) and
 [Using sc-lint](./using-sc-lint.md) for examples and selector defaults.
-
-## Initialization conflicts
-
-`sc-lint init --just` reports
-`CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
-user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap.py`. Missing managed
-files, and unedited managed files from a prior release that init would
-refresh, produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
-conflicting file or reconcile it with [the canonical guide](./just-setup.md),
-then rerun initialization.
 
 ## Cargo-shear exception migration
 

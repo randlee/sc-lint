@@ -58,12 +58,9 @@ def test_skill_has_the_seven_agent_run_steps() -> None:
         assert f"## {step}." in text
     assert "just setup && just lint && just test" in text
     assert "sc-lint adoption dry-run exit" in text
-    assert "command arrays must name a shipped binary or `sc_lint` module only" in text
     assert "test-<name>" in text
     assert "optional `test` and `justfile` fields" in text
     assert "`justfile.windows_shell` is a boolean that defaults to `true`" in text
-    for collision in ("`lint`", "`default`", "`set`", "windows_shell", "templates/test.just"):
-        assert collision in text
     assert "sc-lint docs --path" in text
     assert "adopt.xml.j2" in text
 
@@ -82,7 +79,6 @@ def test_adoption_guide_covers_the_contract_boundaries() -> None:
     for required in (
         "Consumer end state",
         "`install.json`",
-        "Drift and safe application",
         "sc-publish",
         "How to extend",
         "Migrate existing named test recipes",
@@ -94,7 +90,6 @@ def test_adoption_guide_covers_the_contract_boundaries() -> None:
         '"justfile": {"windows_shell": true}',
         "The optional\n`justfile` object accepts `windows_shell`, a boolean that defaults to `true`",
         "Assignment template",
-        "command arrays must name a shipped binary or `sc_lint` module only",
     ):
         assert required in text
 

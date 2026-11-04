@@ -355,8 +355,7 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-021`
   The product bootstrap `.sc-lint/bootstrap.py` exposes `setup`, `lint`,
   `test`, `upgrade` and `exec`, requires explicit `--config sc-lint.toml`, and
-  delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
-  as amended. ADR-017 adds bootstrap `exec` through the existing managed
+  delegates to the installed `sc-lint` command. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
   re-entering consumer profile dispatch. Bootstrap lint accepts
   `[--fail-fast] [selector] [host|all|linux|macos|windows]` and requires

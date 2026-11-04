@@ -147,7 +147,7 @@ Current implementation status:
     every `[[tool.sc-lint.test]]` row), the named selector with forwarded
     arguments, or lists the declared selectors
 - `init`
-  - implemented product-owned consumer integration renderer with check,
+  - implemented consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
 - `check.native`
   - implemented native preflight path

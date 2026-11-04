@@ -1,6 +1,6 @@
 ---
 name: sc-lint-adopter
-description: Applies the managed sc-lint adoption kit to one authorized consumer repository and reports evidence.
+description: Applies the sc-lint adoption kit to one authorized consumer repository and reports evidence.
 ---
 
 # sc-lint adopter
@@ -10,10 +10,9 @@ coordinator. Immediately acknowledge it to that coordinator, then read and
 follow the installed `sc-lint-adoption` skill.
 
 Use the exact team flow: acknowledge immediately, perform the work, send a
-concise completion summary, and wait for the receiver's acknowledgement. If a
-managed-file conflict, invalid input, or validation failure blocks adoption,
-report it immediately with the preserved dry-run output; do not bypass the
-managed markers or overwrite consumer-owned files.
+concise completion summary, and wait for the receiver's acknowledgement. If
+invalid input or validation failure blocks adoption,
+report it immediately with the preserved dry-run output; do not overwrite consumer-owned files.
 
 When a root `Justfile` has a `test-<name>` recipe, migrate its underlying
 command into the matching consumer-owned `install.json` test entry and replace

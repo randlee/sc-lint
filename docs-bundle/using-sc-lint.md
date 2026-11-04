@@ -127,7 +127,7 @@ Only rows surviving scope appear in output.
 `default_lint_profile` must name a profile in `[tool.sc-lint.lint_profiles]`;
 it is resolved only for a bare consumer lint run. Scope-only selection still
 uses that default. Explicit selectors override it, including `all`;
-`sc-lint test` is unaffected. With the managed Justfile:
+`sc-lint test` is unaffected. With the Justfile:
 
 ```sh
 just lint          # configured default, or every row if no default
