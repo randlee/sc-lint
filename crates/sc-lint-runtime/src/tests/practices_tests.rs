@@ -815,12 +815,12 @@ fn allowance_diagnostics_retain_typed_codes_and_source_positions() {
     assert_eq!(errors.diagnostics.len(), 2);
     assert_eq!(errors.diagnostics[0].position.line, 1);
     assert_eq!(
-        errors.diagnostics[0].code,
+        errors.diagnostics[0].directive.code(),
         sc_lint_directives::DirectiveCode::UnknownRule.qualified()
     );
     assert_eq!(errors.diagnostics[1].position.line, 2);
     assert_eq!(
-        errors.diagnostics[1].code,
+        errors.diagnostics[1].directive.code(),
         sc_lint_directives::DirectiveCode::MissingReason.qualified()
     );
     assert!(
@@ -1017,5 +1017,48 @@ fn typed_runtime_inventory_matches_catalog() {
             .iter()
             .map(|id| id.as_str())
             .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn parent_and_current_module_imports_preserve_static_identity() {
+    let source = r#"
+        mod a { pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(()); }
+        static R: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        mod b { use super::a::M; async fn f(){let g=M.lock().unwrap();tick().await;} }
+        mod c { use crate::a::M; async fn f(){let g=M.lock().unwrap();tick().await;} }
+        mod d { use crate::R; async fn f(){let g=R.lock().unwrap();tick().await;} }
+        mod e { use super::R; async fn f(){let g=R.lock().unwrap();tick().await;} }
+    "#;
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007; 4]
+    );
+    for (declarations, imports) in [
+        ("", "use super::super::a::M;"),
+        (
+            "mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}",
+            "use self::a::M;",
+        ),
+        ("", "use super::super::a::*;"),
+        (
+            "mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}",
+            "use self::a::*;",
+        ),
+        ("", "use crate::a::*;"),
+    ] {
+        let source = format!(
+            "mod a {{pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}} mod outer {{mod b {{{declarations} {imports} async fn f(){{let g=M.lock().unwrap();tick().await;}}}}}}"
+        );
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{imports}"
+        );
+    }
+    let source = "mod outer { mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());} mod b {use super::a::M;async fn f(){let g=M.lock().unwrap();tick().await;}}}";
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007]
     );
 }

@@ -20,7 +20,7 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
-use sc_lint_directives::{DirectiveError, SiteRuleId};
+use sc_lint_directives::DirectiveError;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 
@@ -34,6 +34,7 @@ mod platform_adapters;
 mod portability;
 mod predicates;
 mod site_allow;
+pub use site_allow::{SiteAllowDiagnostic, SiteAllowErrors};
 #[cfg(test)]
 mod tests;
 
@@ -127,12 +128,8 @@ pub enum PortabilityError {
         line: usize,
         error: DirectiveError,
     },
-    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unsupported portability rule `{rule}`; recovery: use PORT-010 or remove the allowance", path.display())]
-    UnknownRule {
-        path: PathBuf,
-        line: usize,
-        rule: SiteRuleId,
-    },
+    #[error(transparent)]
+    InvalidSiteAllows(#[from] SiteAllowErrors),
     #[error("failed to analyze portability findings for root `{}`: {source:#}", root.display())]
     AnalyzeFindings {
         root: PathBuf,
@@ -248,13 +245,12 @@ fn analyze_workspace_configured_with_metadata_loader(
 }
 
 fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
-    match source.downcast::<site_allow::SiteAllowError>() {
-        Ok(site_allow::SiteAllowError::InvalidDirective { path, line, error }) => {
+    match source.downcast::<SiteAllowErrors>() {
+        Ok(mut errors) if errors.diagnostics.len() == 1 => {
+            let SiteAllowDiagnostic { path, line, error } = errors.diagnostics.remove(0);
             PortabilityError::InvalidSiteAllow { path, line, error }
         }
-        Ok(site_allow::SiteAllowError::UnknownRule { path, line, rule }) => {
-            PortabilityError::UnknownRule { path, line, rule }
-        }
+        Ok(errors) => PortabilityError::InvalidSiteAllows(errors),
         Err(source) => PortabilityError::AnalyzeFindings {
             root: root.to_path_buf(),
             source: source.into(),

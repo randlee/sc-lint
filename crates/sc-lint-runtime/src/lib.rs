@@ -56,6 +56,7 @@ macro_rules! runtime_rules {
                 Self::ALL.iter().copied().find(|rule| rule.as_str() == value)
             }
         }
+        pub(crate) const KNOWN_RULES: &[&str] = &[$($code),+];
         const CATALOG_RULES: &[CatalogRuleId] = &[$(CatalogRuleId::new($code)),+];
     };
 }

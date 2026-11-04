@@ -2824,10 +2824,16 @@ fn site_allow_unknown_rule() {
     assert!(message.contains("lib.rs:1"), "{message}");
     assert!(matches!(
         error,
-        PortabilityError::UnknownRule { line: 1, .. }
+        PortabilityError::InvalidSiteAllow { line: 1, .. }
     ));
-    assert!(message.contains("PORTABILITY.UNKNOWN_RULE"), "{message}");
-    assert!(message.contains("recovery: use PORT-010"), "{message}");
+    assert!(
+        message.contains(sc_lint_directives::DirectiveCode::UnknownRule.qualified()),
+        "{message}"
+    );
+    assert!(
+        message.contains(sc_lint_directives::DirectiveCode::UnknownRule.recovery()),
+        "{message}"
+    );
 }
 
 #[test]
@@ -2847,9 +2853,13 @@ fn site_allow_unsupported_rule_is_unknown_rule() {
     .expect_err("PORT-001 has no item-scoped allowance behavior");
     assert!(matches!(
         error,
-        PortabilityError::UnknownRule { line: 1, .. }
+        PortabilityError::InvalidSiteAllow { line: 1, .. }
     ));
-    assert!(error.to_string().contains("PORTABILITY.UNKNOWN_RULE"));
+    assert!(
+        error
+            .to_string()
+            .contains(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+    );
 }
 
 #[test]
@@ -3998,4 +4008,41 @@ fn nested_items_keep_unix_file_context_and_site_allowances() {
             "portable::intentional"
         ]
     );
+}
+
+#[test]
+fn site_allow_reports_all_unknown_ids_in_source_order() {
+    let source = "#[sc_lint(allow(PORT-998,PORT-999),reason=\"typos\")]fn f(){}\n#[sc_lint(allow(PORT-997),reason=\"another typo\")]fn g(){}";
+    let file = syn::parse_file(source).unwrap();
+    let errors =
+        crate::site_allow::collect_site_allowances(&file, std::path::Path::new("src/lib.rs"))
+            .unwrap_err();
+    assert_eq!(errors.diagnostics.len(), 3);
+    for (diagnostic, (id, line)) in
+        errors
+            .diagnostics
+            .iter()
+            .zip([("PORT-998", 1), ("PORT-999", 1), ("PORT-997", 2)])
+    {
+        assert_eq!(diagnostic.line, line);
+        assert_eq!(
+            diagnostic.error.typed_code(),
+            Some(sc_lint_directives::DirectiveCode::UnknownRule)
+        );
+        assert!(diagnostic.error.cause().contains(id));
+        assert!(diagnostic.error.cause().contains("PORT-010"));
+    }
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", source);
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap_err();
+    let PortabilityError::InvalidSiteAllows(errors) = error else {
+        panic!("expected all source diagnostics")
+    };
+    assert_eq!(errors.diagnostics.len(), 3);
 }

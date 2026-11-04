@@ -1,19 +1,17 @@
-use crate::RuleId;
 use crate::position::SourcePosition;
+use crate::{KNOWN_RULES, RuleId};
 use sc_lint_directives::{
     AttributeInput, Directive, DirectiveCode, DirectiveError, is_sc_lint_attribute,
     unknown_owned_rules, unknown_rule,
 };
 use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::OnceLock;
 use syn::visit::Visit;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[error("{code} at line {line}: {cause}; recovery: {recovery}", line = .position.line, cause = .directive.cause(), recovery = .directive.recovery())]
+#[error("{code} at line {line}: {cause}; recovery: {recovery}", code = .directive.code(), line = .position.line, cause = .directive.cause(), recovery = .directive.recovery())]
 pub(crate) struct AllowanceDiagnostic {
-    pub(crate) code: &'static str,
     pub(crate) position: SourcePosition,
     #[source]
     pub(crate) directive: DirectiveError,
@@ -36,21 +34,15 @@ impl fmt::Display for AllowanceErrors {
 }
 impl std::error::Error for AllowanceErrors {}
 
-fn known_rules() -> &'static [&'static str] {
-    static KNOWN: OnceLock<Vec<&'static str>> = OnceLock::new();
-    KNOWN.get_or_init(|| RuleId::ALL.iter().map(|rule| rule.as_str()).collect())
-}
-
-type Position = SourcePosition;
 struct Entry {
-    start: Position,
-    end: Position,
+    start: SourcePosition,
+    end: SourcePosition,
     rules: Vec<RuleId>,
 }
 #[derive(Default)]
 pub(crate) struct Allowances {
     entries: Vec<Entry>,
-    parsed: BTreeMap<Position, Vec<RuleId>>,
+    parsed: BTreeMap<SourcePosition, Vec<RuleId>>,
     errors: Vec<AllowanceDiagnostic>,
 }
 
@@ -66,9 +58,8 @@ impl Allowances {
         }
         Ok(result)
     }
-    fn diagnostic(&mut self, position: Position, directive: DirectiveError) {
+    fn diagnostic(&mut self, position: SourcePosition, directive: DirectiveError) {
         self.errors.push(AllowanceDiagnostic {
-            code: directive.code(),
             position,
             directive,
         });
@@ -113,13 +104,13 @@ impl Allowances {
     fn site_allow_rules(
         &mut self,
         ids: &[sc_lint_directives::SiteRuleId],
-        position: Position,
+        position: SourcePosition,
     ) -> Vec<RuleId> {
-        for rule in unknown_owned_rules(ids, "SCB-RUNTIME-", known_rules()) {
-            self.diagnostic(position, unknown_rule(rule, known_rules()));
+        for rule in unknown_owned_rules(ids, "SCB-RUNTIME-", KNOWN_RULES) {
+            self.diagnostic(position, unknown_rule(rule, KNOWN_RULES));
         }
         ids.iter()
-            .filter(|id| known_rules().contains(&id.as_str()))
+            .filter(|id| KNOWN_RULES.contains(&id.as_str()))
             .map(|id| {
                 RuleId::from_known(id.as_str())
                     .expect("runtime catalog and typed rule inventory agree")
