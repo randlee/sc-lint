@@ -26,15 +26,8 @@ Private modules, whose items the crate root re-exports:
 - `analyzer_config` — the shared `[tool.sc-lint.analyzers.<name>]` parser.
 - `render` — `render_findings_report`, the shared text report.
 
-Since 0.8.5 these responsibilities include the shared `AnalyzeOptions` input
-(workspace root and output format) that the analyzers re-export,
-repository-relative source-path normalization (`repo_relative_source_path`,
-`RepoRelativeSourcePathError`), root-prefix stripping
-(`relative_path_under_root`) and test-only attribute recognition
-(`is_test_only`). These fit ADR-013 as written: path normalization belongs to
-source discovery, `is_test_only` to scope classification, and
-`AnalyzeOptions` carries no rule ids or analyzer policy, so no ADR amendment
-is needed.
+The `analyze_options` and `relative_path` modules and `is_test_only` were added
+in 0.8.5. Their ADR-013 fit is recorded in [requirements.md](./requirements.md).
 
 ## Governing ADRs
 

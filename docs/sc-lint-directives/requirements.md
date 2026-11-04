@@ -28,7 +28,8 @@ The crate provides one canonical parse model for supported source directives.
   `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` and recovery "use a known runtime rule
   id". Ids owned by another analyzer are left to that analyzer. ADR-022
   decision 4 names only `PORT-010`; this requirement is the decision record
-  for the runtime extension.
+  for the runtime extension until the ADR-022 runtime site-allowance
+  amendment (Pending Rand) is decided.
 - Shared helpers for analyzers that consume site allowances:
   `is_sc_lint_attribute` recognizes `#[sc_lint(...)]` and
   `#[sc_lint_attributes::sc_lint(...)]`; `unknown_owned_rule` returns the

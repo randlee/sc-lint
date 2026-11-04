@@ -86,8 +86,7 @@ scope. File-flattened type/static names and unproved control-flow exits can
 cause conservative false positives. In particular,
 `consume(g); other().await` and `loop { drop(g); break; } other().await` may
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
-proved. Rule 003's legacy resolver does not recognize renamed `self` imports
-such as `use std::thread::{self as thread}`; use a direct module alias instead.
+proved.
 For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
 including `Ok(_)` and `Ok(..)` scrutinees. Explicit
 `Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined

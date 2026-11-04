@@ -6,24 +6,51 @@ All notable changes to sc-lint are documented here.
 
 ## [0.8.5]
 
-### Added
+This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
+#844.
 
-- `SCB-RUNTIME-003` supports reason-required function/method allowances through
-  the shared directive path. Intentional synchronous helpers can use
-  `#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "...")]`
-  without suppressing sibling or nested functions (#836).
+### Added
 
 - Runtime rules reject thread `sleep_until` in production Tokio packages,
   Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
   held across `.await` (`SCB-RUNTIME-004`–`007`, #640, #838). Test code is exempt;
   function/method allows require a non-empty reason. `yield_now` stays legal.
+- `SCB-RUNTIME-003` supports reason-required function/method allowances through
+  the shared directive path. Intentional synchronous helpers can use
+  `#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "...")]`
+  without suppressing sibling or nested functions (#836).
+- Generated command-line references for `sc-lint`, `sc-lint-boundary`,
+  `sc-lint-portability` and `sc-lint-runtime`, in Markdown and HTML, ship in
+  the offline bundle; `sc-lint docs cli-reference` prints the index. Tests
+  regenerate them from the real clap definitions and fail on drift.
+- Every `sc-lint` command, option and target value has help text, and
+  `-V` is a short form of `--version`.
+- `sc-lint docs` accepts `README`, `README.md` and `overview` for the
+  overview and `setup` as an alias of `installation`, so the
+  `Docs: sc-lint docs setup` pointer in setup and compatibility errors
+  resolves.
+- The GitHub Action writes each failure as a `::error` annotation titled with
+  its stable code, with the recovery text in the message.
+- `python -m sc_lint.run_all`, `run_fmt` and `source_venv` answer `--help`;
+  `print_help` lists only recipes that exist in the `Justfile`. The adoption
+  installer's `--help` describes `--input`, `--dry-run`, the persisted input
+  and its exit codes.
+- Every crate on crates.io ships its `LICENSE` and a README that points to
+  the primary `sc-lint` crate and the repository; each crate has
+  crate-level rustdoc.
 
 ### Changed
 
+- The Python helpers and consumer bootstrap support Python 3.9 and newer
+  (`requires-python = ">=3.9"`, matching the abi3-py39 wheels, GitHub #778).
+  They parse TOML with the workspace `toml` crate through
+  `sc_lint._native.toml_loads` instead of `tomllib`. A source checkout that
+  has not built the native extension yet (before `just setup`) falls back to
+  `tomllib`, which needs Python 3.11 or newer; with neither available, parsing
+  raises `ImportError` with a recovery message. Windows ARM64 wheels still
+  require Python 3.11.
 - Runtime guard tracking handles diverging branches, match scrutinee ownership,
   rest/or patterns and nested reference bindings more accurately (#840).
-- Analyzer crates share common analysis options and repository-relative
-  source-path helpers, preserving existing public options shapes (#840).
 - Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
   opt-outs (#840).
 - Runtime test exemption: a source file whose inner attributes mark it
@@ -33,21 +60,52 @@ All notable changes to sc-lint are documented here.
   `#![cfg(test)]` at the top of `checks.rs`; the earlier documented
   limitation that such files were linted as production code is removed
   (#840).
-- Runtime rules share one test-scope classifier from
-  `sc-lint-analyzer-support`, which recognizes `#[test]`, qualified test
-  attributes such as `#[tokio::test]`, `#[cfg(test)]` and
-  `#[cfg(all(test, ...))]` (#840).
+- Every runtime rule, `SCB-RUNTIME-001` through `007`, uses one test-scope
+  classifier from `sc-lint-analyzer-support`, which recognizes `#[test]`,
+  qualified test attributes such as `#[tokio::test]`, `#[cfg(test)]` and
+  compound test cfgs such as `#[cfg(all(test, ...))]` (#840, lint-085.46).
 - `SCB-RUNTIME-003` recovery text now recommends event-driven
   synchronization or `yield_now` instead of `tokio::time::sleep(..).await`,
   which `SCB-RUNTIME-005` now reports (#838).
-- Runtime import aliases resolve per module and function scope, so a
-  `use ...::sleep` in one module no longer changes findings for a same-named
-  import in another; `SCB-RUNTIME-004` through `007` results no longer depend
-  on item order (lint-085.39).
+- Runtime import aliases, including `self::`, `super::` and `crate::`
+  imports, resolve per module and function scope for `SCB-RUNTIME-003`
+  through `007`. A `use ...::sleep` in one module no longer leaks into a
+  sibling module, so results no longer depend on item order, and statics
+  imported through `crate::` or `super::` stay tracked for `SCB-RUNTIME-007`.
+  `SCB-RUNTIME-003` also resolves renamed `self` imports such as
+  `use std::thread::{self as thread}` (lint-085.39, lint-085.46).
+- The bootstrap usage lists each operation's own flags: `setup` accepts only
+  `--dry-run`, and `--check` belongs to `upgrade`. `setup --check` is now a
+  bootstrap usage error instead of being forwarded to `sc-lint setup`.
 - Bootstrap `lint`, `test` and `exec` resolve the command's first word with
   `shutil.which` against PATH before running it. On Windows the child
   process otherwise searches the parent Python's directory first and can run
   a host interpreter instead of the managed venv tool (#841).
+- `sc-lint init` requires `--just`.
+- Files generated by `sc-lint init --just` start with
+  `# Generated by sc-lint; user edits are preserved by future init runs.`,
+  and the generated `sc-lint.toml` notes that its lint and test steps are
+  user-owned.
+- A config whose `lint` profile has no steps now loads; `sc-lint lint ci
+  --consumer` then fails with a recovery that asks for a
+  `[[tool.sc-lint.lint]]` row, instead of the whole config being rejected.
+- Command-line usage errors show the usage of the subcommand that failed and
+  suggest `sc-lint <subcommand> --help`.
+- Compatibility errors give specific recovery: a missing config suggests
+  `sc-lint init --just`, a malformed config asks to correct the reported
+  error. A `--root` path that does not exist is reported as such, with a
+  recovery.
+- An unknown `--rule-filter` selector error lists the valid selectors for
+  that analyzer.
+- A Python helper that fails to start (no stdout, error on stderr) is reported
+  as a backend failure that carries the stderr and suggests `just setup`.
+- The GitHub Action runs on Node 24. Its description and `operation` input
+  state that `setup` only installs and preflights the release, and list the
+  six supported runners.
+- The adoption kit keeps its `skills/` and `agents/` at the plugin root, where
+  Claude Code's plugin loader finds them, and still installs them under
+  `.claude/` in consumers. The `sc-lint-version-adoption` skill ships in its
+  plugin.
 - The adoption kit writes `.sc-lint/install.json` in declaration order
   instead of sorting keys, and rejects `null` helper-policy values instead of
   rendering invalid TOML (#841).
@@ -56,6 +114,10 @@ All notable changes to sc-lint are documented here.
   render as valid TOML instead of invalid surrogate-pair escapes
   (lint-085.39).
 - Published wheels exclude `**/*.pyc` (#841).
+- An `#[sc_lint(allow(...), reason = "...")]` runtime allowance on an item
+  that is not a function or method is reported as an error instead of being
+  silently ignored. A runtime allowance that names several unknown
+  `SCB-RUNTIME-*` ids reports every one, not only the first (lint-085.46).
 
 ### Public Rust API
 
@@ -66,39 +128,44 @@ All notable changes to sc-lint are documented here.
   `AnalyzeOptions`, so `sc_lint_portability::AnalyzeOptions` and
   `sc_lint_runtime::AnalyzeOptions` keep their paths and fields;
   `sc-lint-boundary` keeps its own `AnalyzeOptions` with the `rule` filter.
-- New in `sc-lint-directives`: `is_sc_lint_attribute`,
-  `unknown_owned_rule` and `DirectiveError::from_diagnostic`.
+- New in `sc-lint-directives`: `is_sc_lint_attribute`, `unknown_owned_rule`,
+  `unknown_owned_rules`, `unknown_rule`, the `#[non_exhaustive]` `DirectiveCode`,
+  `DirectiveError::typed` and `DirectiveError::typed_code`, and
+  `AttributeInput::parse_tokens` and `AttributeInput::parse_attribute`.
+  `DirectiveError::from_diagnostic` stays as the
+  fallback for foreign `syn` errors, and existing `DirectiveError` parse
+  variants and constructors remain (lint-085.46).
 - `sc-lint-analyzer-support`: `PackageDependency.name` is the validated
   `PackageName` instead of `String` (`PackageTarget.name` is already
-  `TargetName`). `PackageName::new` and `TargetName::new` panic on empty
-  input in release builds as well as debug builds. The unused public
+  `TargetName`). `PackageName` and `TargetName` keep `new`, `as_str`,
+  `AsRef<str>` and `Display` but no longer implement `Deref`; `new` panics on
+  empty input in release builds as well as debug builds, as documented
+  (lint-085.46). The unused public
   `count_scanned_crates(root)` is removed;
   `count_scanned_crates_with_metadata` remains (lint-085.39).
 - Rust library consumers that build `AnalyzeOptions` by struct literal or
   import it from an analyzer crate need no change. Consumers that read
-  `PackageDependency.name` as `String` or call `count_scanned_crates` must
-  update. CLI and Python users need no configuration migration.
+  `PackageDependency.name` as `String`, rely on `Deref` from `PackageName` or
+  `TargetName`, or call `count_scanned_crates` must update; use `as_str()`. CLI and Python users need no configuration migration.
 
 ### Fixed
 
-- The Python helpers and consumer bootstrap run on Python 3.9 (the abi3-py39
-  wheel floor, GitHub #778). TOML parsing uses the workspace `toml` crate through
-  `sc_lint._native.toml_loads` instead of `tomllib`; Windows ARM64 wheels still
-  require Python 3.11.
-- Make analyzer dependency-boundary test output draining deterministic (#839).
-- Published Python wheels exclude repository-only contract, lifecycle,
-  orchestration and release tests; release verification rejects leaked tests
-  (#841).
-- The reusable GitHub Action selects Linux and Windows ARM64 releases as well
-  as the existing x86_64 and macOS targets (#841).
+- Analyzer output draining is deterministic: a lingering grandchild process
+  can no longer cause a lint step to miss output (#839, #843).
+- Consumer adoption defects found in sc-compose (#841, #844):
+  - Published Python wheels exclude repository-only contract, lifecycle,
+    orchestration and release tests; release verification rejects leaked
+    tests.
+  - The reusable GitHub Action selects Linux and Windows ARM64 releases as
+    well as the existing x86_64 and macOS targets.
+  - Docs state that Python helper policies retain per-table fallback to
+    `.just/lint-config.toml`; the native CLI and analyzers use
+    `sc-lint.toml`.
 - The adoption kit renders consumer helper-policy tables, logging/artifact
   settings and `default_lint_profile` from its managed input without drift
-  (#841).
+  (#841, #834).
 - Bootstrap lint, test and exec commands put the managed venv scripts on
   child PATH after the archive bin directory and ahead of host interpreters
-  (#841).
-- Clarify that Python helper policies retain per-table fallback to
-  `.just/lint-config.toml`; the native CLI and analyzers use `sc-lint.toml`
   (#841).
 - The Python bootstrap's default managed binary directory matches the native
   installer on Windows: it follows `%APPDATA%` (Roaming), not `%LOCALAPPDATA%`,
@@ -107,6 +174,13 @@ All notable changes to sc-lint are documented here.
 - `sc_lint.lint_common.rust_file_test_scope` classifies compound test cfgs such
   as `#[cfg(any(test, feature = "..."))]` and `#[cfg(all(test, ...))]` under
   `src/` as test scope; `cfg(not(test))` stays production (#837).
+- Analyzer binaries no longer fail when stdout is closed early, for example
+  when piped into `head`.
+- `sc-lint init --just` still refreshes generated config files that carry the
+  0.8.4 generated header when only the version differs (lint-085.47).
+- The Python bindings guide now says bootstrap `setup --check` is a usage
+  error (exit 2), `setup --dry-run` is supported, and `upgrade --check` is the
+  non-mutating probe (lint-085.47).
 
 ## [0.8.4] — 2026-11-01
 
