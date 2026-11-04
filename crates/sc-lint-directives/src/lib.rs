@@ -22,18 +22,6 @@ pub fn is_sc_lint_attribute(attr: &syn::Attribute) -> bool {
         && (parts.len() == 1 || (parts.len() == 2 && parts[0].ident == "sc_lint_attributes"))
 }
 
-/// Finds the first rule owned by an analyzer prefix but absent from its catalog.
-/// Rules belonging to other analyzers are left for their owning analyzer.
-pub fn unknown_owned_rule<'a>(
-    rules: &'a [SiteRuleId],
-    prefix: &str,
-    known: &[&str],
-) -> Option<&'a SiteRuleId> {
-    rules
-        .iter()
-        .find(|rule| rule.as_str().starts_with(prefix) && !known.contains(&rule.as_str()))
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Scope {
     Boundary,
@@ -70,10 +58,9 @@ impl SiteRuleId {
                 .last()
                 .is_none_or(|part| part.is_empty() || !part.chars().all(|ch| ch.is_ascii_digit()))
         {
-            return Err(DirectiveError::new(
-                "MALFORMED_RULE_ID",
+            return Err(DirectiveError::typed(
+                DirectiveCode::MalformedRuleId,
                 "rule id must be an unquoted identifier such as PORT-010",
-                "write the rule id as an identifier with its analyzer prefix and numeric suffix",
             ));
         }
         Ok(Self(value))
@@ -97,10 +84,9 @@ impl SiteAllowReason {
     pub fn new(value: impl Into<String>) -> std::result::Result<Self, DirectiveError> {
         let value = value.into();
         if value.trim().is_empty() {
-            return Err(DirectiveError::new(
-                "EMPTY_REASON",
+            return Err(DirectiveError::typed(
+                DirectiveCode::EmptyReason,
                 "site allowance reason must not be empty",
-                "add a specific reason string",
             ));
         }
         Ok(Self(value))
@@ -154,6 +140,7 @@ directive_codes! {
     MalformedRuleId => ("MALFORMED_RULE_ID", "write an analyzer prefix and numeric suffix, for example PORT-010"),
     NonLiteralReason => ("NON_LITERAL_REASON", "use a string literal for the reason"),
     UnknownRule => ("UNKNOWN_RULE", "use a rule id from the owning analyzer catalog"),
+    SyntaxError => ("SYNTAX_ERROR", "correct the attribute syntax reported by the parser"),
     UnsupportedItem => ("UNSUPPORTED_ITEM", "place the allowance on a function or method"),
 }
 impl DirectiveError {
@@ -181,7 +168,7 @@ impl DirectiveError {
     }
     /// Wraps foreign parser errors; structured errors use the typed parsing API.
     pub fn from_diagnostic(message: &str) -> Self {
-        Self::typed(DirectiveCode::UnknownElement, message)
+        Self::typed(DirectiveCode::SyntaxError, message)
     }
 }
 /// Constructs an actionable error for an unknown analyzer-owned rule.
@@ -233,8 +220,15 @@ impl From<Error> for ParseFailure {
     }
 }
 impl ParseFailure {
-    fn at(input: ParseStream<'_>, code: DirectiveCode, cause: &str) -> Self {
-        Self::Structured(input.span(), DirectiveError::typed(code, cause))
+    fn fail<T>(
+        input: ParseStream<'_>,
+        code: DirectiveCode,
+        cause: &str,
+    ) -> std::result::Result<T, Self> {
+        Err(Self::Structured(
+            input.span(),
+            DirectiveError::typed(code, cause),
+        ))
     }
     fn into_syn(self) -> Error {
         match self {
@@ -304,75 +298,84 @@ struct SiteAllowParts {
 impl SiteAllowParts {
     fn parse_element(&mut self, input: ParseStream<'_>) -> TypedResult<()> {
         if !input.peek(Ident) {
-            return Err(ParseFailure::at(
+            return ParseFailure::fail(
                 input,
                 DirectiveCode::UnknownElement,
                 "expected a directive element",
-            ));
+            );
         }
         let key = input.parse::<Ident>()?;
         match key.to_string().as_str() {
-            "allow" => {
-                if self.rules.is_some() {
-                    return Err(ParseFailure::at(
-                        input,
-                        DirectiveCode::MultipleAllow,
-                        "multiple site allow elements",
-                    ));
-                }
-                self.rules = Some(parse_site_rules(input)?);
-            }
-            "reason" => {
-                if self.reason.is_some() {
-                    return Err(ParseFailure::at(
-                        input,
-                        DirectiveCode::DuplicateReason,
-                        "duplicate site allow reason",
-                    ));
-                }
-                input.parse::<Token![=]>()?;
-                if !input.peek(LitStr) {
-                    return Err(ParseFailure::at(
-                        input,
-                        DirectiveCode::NonLiteralReason,
-                        "reason must be a string literal",
-                    ));
-                }
-                let literal = input.parse::<LitStr>()?;
-                self.reason = Some(
-                    SiteAllowReason::new(literal.value())
-                        .map_err(|error| ParseFailure::Structured(literal.span(), error))?,
-                );
-            }
-            _ => {
-                return Err(ParseFailure::at(
-                    input,
-                    DirectiveCode::UnknownElement,
-                    "unknown site directive element",
-                ));
-            }
+            "allow" => self.parse_allow(input),
+            "reason" => self.parse_reason(input),
+            _ => ParseFailure::fail(
+                input,
+                DirectiveCode::UnknownElement,
+                "unknown site directive element",
+            ),
         }
+    }
+    fn parse_allow(&mut self, input: ParseStream<'_>) -> TypedResult<()> {
+        ensure_unset(
+            &self.rules,
+            input,
+            DirectiveCode::MultipleAllow,
+            "multiple site allow elements",
+        )?;
+        self.rules = Some(parse_site_rules(input)?);
+        Ok(())
+    }
+    fn parse_reason(&mut self, input: ParseStream<'_>) -> TypedResult<()> {
+        ensure_unset(
+            &self.reason,
+            input,
+            DirectiveCode::DuplicateReason,
+            "duplicate site allow reason",
+        )?;
+        input.parse::<Token![=]>()?;
+        if !input.peek(LitStr) {
+            return ParseFailure::fail(
+                input,
+                DirectiveCode::NonLiteralReason,
+                "reason must be a string literal",
+            );
+        }
+        let literal = input.parse::<LitStr>()?;
+        self.reason = Some(
+            SiteAllowReason::new(literal.value())
+                .map_err(|error| ParseFailure::Structured(literal.span(), error))?,
+        );
         Ok(())
     }
     fn finish(self, input: ParseStream<'_>, directives: &mut Vec<Directive>) -> TypedResult<()> {
         match (self.rules, self.reason) {
-            (Some(rules), Some(reason)) => directives.push(Directive::SiteAllow { rules, reason }),
-            (Some(_), None) => {
-                return Err(ParseFailure::at(
-                    input,
-                    DirectiveCode::MissingReason,
-                    "site allow requires `reason = \"...\"`",
-                ));
+            (Some(rules), Some(reason)) => {
+                directives.push(Directive::SiteAllow { rules, reason });
+                Ok(())
             }
-            (None, Some(_)) => {
-                return Err(ParseFailure::at(
-                    input,
-                    DirectiveCode::ReasonWithoutAllow,
-                    "reason requires a site allow",
-                ));
-            }
-            (None, None) => (),
+            (Some(_), None) => ParseFailure::fail(
+                input,
+                DirectiveCode::MissingReason,
+                "site allow requires `reason = \"...\"`",
+            ),
+            (None, Some(_)) => ParseFailure::fail(
+                input,
+                DirectiveCode::ReasonWithoutAllow,
+                "reason requires a site allow",
+            ),
+            (None, None) => Ok(()),
         }
+    }
+}
+fn ensure_unset<T>(
+    value: &Option<T>,
+    input: ParseStream<'_>,
+    code: DirectiveCode,
+    cause: &str,
+) -> TypedResult<()> {
+    if value.is_some() {
+        ParseFailure::fail(input, code, cause)
+    } else {
         Ok(())
     }
 }
@@ -383,69 +386,70 @@ fn rule_group(input: ParseStream<'_>) -> Result<syn::parse::ParseBuffer<'_>> {
 }
 fn parse_site_rules(input: ParseStream<'_>) -> TypedResult<Vec<SiteRuleId>> {
     let content = rule_group(input)?;
-    let mut rules: Vec<SiteRuleId> = Vec::new();
+    let mut rules = Vec::new();
     while !content.is_empty() {
-        if content.peek(LitStr) {
-            return Err(ParseFailure::at(
-                &content,
-                DirectiveCode::QuotedRuleId,
-                "rule ids must be unquoted identifiers",
-            ));
-        }
-        if !content.peek(Ident) {
-            return Err(ParseFailure::at(
-                &content,
-                DirectiveCode::MalformedRuleId,
-                "expected a rule identifier",
-            ));
-        }
-        let mut rule = content.parse::<Ident>()?.to_string();
-        loop {
-            if !content.peek(Token![-]) {
-                return Err(ParseFailure::at(
-                    &content,
-                    DirectiveCode::MalformedRuleId,
-                    "expected a numeric rule suffix",
-                ));
-            }
-            content.parse::<Token![-]>()?;
-            rule.push('-');
-            if content.peek(Ident) {
-                rule.push_str(&content.parse::<Ident>()?.to_string());
-            } else if content.peek(LitInt) {
-                rule.push_str(&content.parse::<LitInt>()?.to_string());
-                break;
-            } else {
-                return Err(ParseFailure::at(
-                    &content,
-                    DirectiveCode::MalformedRuleId,
-                    "malformed site allow rule id",
-                ));
-            }
-        }
-        if rules.iter().any(|existing| existing.as_str() == rule) {
-            return Err(ParseFailure::at(
+        let rule = parse_rule_id(&content)?;
+        if rules.contains(&rule) {
+            return ParseFailure::fail(
                 &content,
                 DirectiveCode::DuplicateRuleId,
                 "duplicate site allow rule id",
-            ));
+            );
         }
-        rules.push(
-            SiteRuleId::parse(rule)
-                .map_err(|error| ParseFailure::Structured(content.span(), error))?,
-        );
+        rules.push(rule);
         if !content.is_empty() {
             content.parse::<Token![,]>()?;
         }
     }
     if rules.is_empty() {
-        return Err(ParseFailure::at(
+        return ParseFailure::fail(
             input,
             DirectiveCode::EmptyRules,
             "site allow requires at least one rule id",
-        ));
+        );
     }
     Ok(rules)
+}
+fn parse_rule_id(input: ParseStream<'_>) -> TypedResult<SiteRuleId> {
+    if input.peek(LitStr) {
+        return ParseFailure::fail(
+            input,
+            DirectiveCode::QuotedRuleId,
+            "rule ids must be unquoted identifiers",
+        );
+    }
+    if !input.peek(Ident) {
+        return ParseFailure::fail(
+            input,
+            DirectiveCode::MalformedRuleId,
+            "expected a rule identifier",
+        );
+    }
+    let mut rule = input.parse::<Ident>()?.to_string();
+    loop {
+        if !input.peek(Token![-]) {
+            return ParseFailure::fail(
+                input,
+                DirectiveCode::MalformedRuleId,
+                "expected a numeric rule suffix",
+            );
+        }
+        input.parse::<Token![-]>()?;
+        rule.push('-');
+        if input.peek(Ident) {
+            rule.push_str(&input.parse::<Ident>()?.to_string());
+        } else if input.peek(LitInt) {
+            rule.push_str(&input.parse::<LitInt>()?.to_string());
+            break;
+        } else {
+            return ParseFailure::fail(
+                input,
+                DirectiveCode::MalformedRuleId,
+                "malformed site allow rule id",
+            );
+        }
+    }
+    SiteRuleId::parse(rule).map_err(|error| ParseFailure::Structured(input.span(), error))
 }
 
 pub(crate) fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {
@@ -631,7 +635,10 @@ mod tests {
         let error = SiteAllowReason::new(" \t").expect_err("blank reasons are rejected");
         assert_eq!(error.code(), "DIRECTIVE.SITE_ALLOW.EMPTY_REASON");
         assert_eq!(error.cause(), "site allowance reason must not be empty");
-        assert_eq!(error.recovery(), "add a specific reason string");
+        assert_eq!(
+            error.recovery(),
+            super::DirectiveCode::EmptyReason.recovery()
+        );
     }
 
     #[test]
@@ -788,12 +795,10 @@ mod site_policy_tests {
         let rules =
             ["PORT-010", "PORT-999", "SCB-RUNTIME-007"].map(|id| SiteRuleId::parse(id).unwrap());
         assert_eq!(
-            unknown_owned_rule(&rules, "PORT-", &["PORT-010"])
-                .unwrap()
-                .as_str(),
+            unknown_owned_rules(&rules, "PORT-", &["PORT-010"])[0].as_str(),
             "PORT-999"
         );
-        assert!(unknown_owned_rule(&rules, "SCB-RUNTIME-", &["SCB-RUNTIME-007"]).is_none());
+        assert!(unknown_owned_rules(&rules, "SCB-RUNTIME-", &["SCB-RUNTIME-007"]).is_empty());
     }
 }
 
@@ -824,7 +829,7 @@ mod typed_diagnostic_tests {
             );
         }
         let foreign = DirectiveError::from_diagnostic("foreign text contains MISSING_REASON");
-        assert_eq!(foreign.typed_code(), Some(DirectiveCode::UnknownElement));
+        assert_eq!(foreign.typed_code(), Some(DirectiveCode::SyntaxError));
     }
     #[test]
     fn unknown_rules_include_catalog_and_keep_all_unknown_ids() {
@@ -837,5 +842,42 @@ mod typed_diagnostic_tests {
             assert_eq!(error.typed_code(), Some(DirectiveCode::UnknownRule));
             assert!(error.cause().contains("PORT-010"));
         }
+    }
+}
+
+#[cfg(test)]
+mod validation_consistency_tests {
+    use super::*;
+    #[test]
+    fn typed_and_parsed_validation_share_codes_and_recovery() {
+        let cases = [
+            (
+                SiteRuleId::parse("PORT").unwrap_err(),
+                AttributeInput::parse_tokens(quote::quote!(allow(PORT), reason = "x")).unwrap_err(),
+                DirectiveCode::MalformedRuleId,
+            ),
+            (
+                SiteAllowReason::new(" ").unwrap_err(),
+                AttributeInput::parse_tokens(quote::quote!(allow(PORT - 010), reason = " "))
+                    .unwrap_err(),
+                DirectiveCode::EmptyReason,
+            ),
+        ];
+        for (constructor, parser, code) in cases {
+            for error in [constructor, parser] {
+                assert_eq!(error.typed_code(), Some(code));
+                assert_eq!(error.recovery(), code.recovery());
+            }
+        }
+    }
+    #[test]
+    fn foreign_syntax_errors_have_a_distinct_category() {
+        let error =
+            AttributeInput::parse_tokens(quote::quote!(allow(PORT-010) reason="missing comma"))
+                .unwrap_err();
+        assert_eq!(error.typed_code(), Some(DirectiveCode::SyntaxError));
+        assert!(error.cause().contains("expected"));
+        let foreign = DirectiveError::from_diagnostic("unknown foreign parser message");
+        assert_eq!(foreign.typed_code(), Some(DirectiveCode::SyntaxError));
     }
 }
