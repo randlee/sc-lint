@@ -14,6 +14,7 @@ use sc_lint_analyzer_support::AnalyzeOptions as CommonAnalyzeOptions;
 use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::load_analyzer_settings;
+use sc_lint_analyzer_support::relative_path_under_root;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
 pub use sc_lint_schema::CrateId;
@@ -768,10 +769,7 @@ fn finding_source_paths(
         .iter()
         .filter_map(|id| node_paths.get(id))
         .filter_map(|path| {
-            path.strip_prefix(root)
-                .ok()
-                .or_else(|| canonical_root.and_then(|root| path.strip_prefix(root).ok()))
-                .map(Path::to_path_buf)
+            relative_path_under_root(root, path, canonical_root).map(Path::to_path_buf)
         })
         .collect()
 }

@@ -1,8 +1,6 @@
 use std::fmt;
 use std::path::Path;
-
-use anyhow::Context;
-use anyhow::Result;
+use std::path::PathBuf;
 
 use crate::source_scan::relative_slash_path;
 
@@ -75,14 +73,43 @@ fn is_windows_absolute(value: &str) -> bool {
         && value.as_bytes()[2] == b'/'
 }
 
+/// Failure to represent a source path relative to its repository root.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error(
+    "failed to build repository-relative source path for `{}` under `{}`",
+    source_path.display(),
+    root.display()
+)]
+pub struct RepoRelativeSourcePathError {
+    pub source_path: PathBuf,
+    pub root: PathBuf,
+    #[source]
+    pub source: RelativePathError,
+}
+
 /// Normalize a source path relative to its repository, retaining path context on failure.
-pub fn repo_relative_source_path(root: &Path, source_path: &Path) -> Result<RepoRelativePath> {
+pub fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Result<RepoRelativePath, RepoRelativeSourcePathError> {
     let relative = relative_slash_path(root, source_path);
-    RepoRelativePath::parse(&relative).with_context(|| {
-        format!(
-            "failed to build repository-relative source path for `{}` under `{}`",
-            source_path.display(),
-            root.display()
-        )
+    RepoRelativePath::parse(&relative).map_err(|source| RepoRelativeSourcePathError {
+        source_path: source_path.to_path_buf(),
+        root: root.to_path_buf(),
+        source,
     })
+}
+
+/// Strip the repository root or a caller-resolved alias without filesystem access.
+///
+/// Callers may supply a cached canonical root with their platform's preferred
+/// normalization, such as a Windows root without the verbatim path prefix.
+pub fn relative_path_under_root<'a>(
+    root: &Path,
+    path: &'a Path,
+    canonical_root: Option<&Path>,
+) -> Option<&'a Path> {
+    path.strip_prefix(root)
+        .ok()
+        .or_else(|| canonical_root.and_then(|root| path.strip_prefix(root).ok()))
 }

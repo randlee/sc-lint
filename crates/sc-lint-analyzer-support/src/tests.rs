@@ -967,3 +967,54 @@ fn test_attribute_helpers_preserve_direct_and_expanded_policies() {
         assert_eq!(super::is_test_only(&item.attrs), expanded, "{source}");
     }
 }
+
+#[test]
+fn source_path_error_retains_paths_cause_and_display_contract() {
+    let root = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    let source_path = outside.path().join("outside.rs");
+    let error = super::repo_relative_source_path(root.path(), &source_path).unwrap_err();
+    assert_eq!(error.root, root.path());
+    assert_eq!(error.source_path, source_path);
+    assert_eq!(error.source, RelativePathError::Absolute);
+    let context = format!(
+        "failed to build repository-relative source path for `{}` under `{}`",
+        source_path.display(),
+        root.path().display()
+    );
+    assert_eq!(error.to_string(), context);
+    assert_eq!(
+        error.source().unwrap().to_string(),
+        RelativePathError::Absolute.to_string()
+    );
+    assert_eq!(
+        format!("{:#}", anyhow::Error::from(error)),
+        format!("{context}: {}", RelativePathError::Absolute)
+    );
+}
+
+#[test]
+fn root_alias_stripping_preserves_lexical_paths_and_rejects_outside_files() {
+    let root = std::path::Path::new("workspace");
+    let canonical_root = std::path::Path::new("resolved");
+    let relative = std::path::Path::new("src/lib.rs");
+    let direct = root.join(relative);
+    let alias = canonical_root.join(relative);
+    assert_eq!(
+        super::relative_path_under_root(root, &direct, None),
+        Some(relative)
+    );
+    assert_eq!(
+        super::relative_path_under_root(root, &alias, Some(canonical_root)),
+        Some(relative)
+    );
+    assert_eq!(super::relative_path_under_root(root, &alias, None), None);
+    assert_eq!(
+        super::relative_path_under_root(
+            root,
+            std::path::Path::new("outside/lib.rs"),
+            Some(canonical_root)
+        ),
+        None
+    );
+}

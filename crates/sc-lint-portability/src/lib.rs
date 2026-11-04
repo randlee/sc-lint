@@ -2,6 +2,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
+/// Shared analysis inputs from `sc-lint-analyzer-support`.
+#[doc(inline)]
 pub use sc_lint_analyzer_support::AnalyzeOptions;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerName;

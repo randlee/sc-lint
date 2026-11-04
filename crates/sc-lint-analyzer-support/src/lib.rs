@@ -17,6 +17,8 @@ pub use analyzer_config::load_analyzer_settings;
 pub use analyzer_config::read_config_document;
 pub use relative_path::RelativePathError;
 pub use relative_path::RepoRelativePath;
+pub use relative_path::RepoRelativeSourcePathError;
+pub use relative_path::relative_path_under_root;
 pub use relative_path::repo_relative_source_path;
 pub use render::render_findings_report;
 pub use source_scan::FileContext;

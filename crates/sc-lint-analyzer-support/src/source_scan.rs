@@ -13,10 +13,12 @@ use syn::Attribute;
 use syn::Ident;
 use syn::Item;
 
+use crate::relative_path::relative_path_under_root;
+
 pub fn relative_slash_path(root: &Path, path: &Path) -> String {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    path.strip_prefix(&root)
+    relative_path_under_root(&root, &path, None)
         .unwrap_or(&path)
         .to_string_lossy()
         .replace('\\', "/")
