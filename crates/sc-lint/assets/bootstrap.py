@@ -23,7 +23,8 @@ import urllib.request
 import venv
 import zipfile
 
-USAGE = ("usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]; "
+USAGE = ("usage: .sc-lint/bootstrap.py setup --config sc-lint.toml [--dry-run]; "
+         ".sc-lint/bootstrap.py upgrade --config sc-lint.toml [--check] [--dry-run]; "
          ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; "
          ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml; "
          ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml; "
@@ -62,7 +63,9 @@ def parse(argv):
             if config is not None or not rest or not rest[0]:
                 usage()
             config, rest = rest[0], rest[1:]
-        elif token in ("--check", "--dry-run") and operation in ("setup", "upgrade"):
+        elif token == "--dry-run" and operation == "setup" and token not in flags:
+            flags.append(token)
+        elif token in ("--check", "--dry-run") and operation == "upgrade" and token not in flags:
             flags.append(token)
         elif (token == "--fail-fast" and operation in ("lint", "test")
               or token == "--list" and operation == "test") and token not in flags:

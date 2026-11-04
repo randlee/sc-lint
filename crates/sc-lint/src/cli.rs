@@ -12,20 +12,26 @@ use crate::profile_plan::PlatformScope;
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
 #[command(
-    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation`, `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-analyzer-support`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. Use `sc-lint docs --path` for the installed bundle path."
+    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation` (alias: `setup`), `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, `cli-reference`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-analyzer-support`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. The overview accepts `README`, `README.md`, or `overview`. Use `sc-lint docs --path` for the installed bundle path."
 )]
 #[command(disable_version_flag = true)]
 pub struct Cli {
+    /// Write the stable JSON envelope to stdout (errors are written to stderr).
     #[arg(long, global = true)]
     pub json: bool,
-    #[arg(long, global = true)]
+    /// Print the sc-lint and analyzer versions.
+    #[arg(long, short = 'V', global = true)]
     pub version: bool,
-    #[arg(long, global = true, value_name = "path")]
+    /// Repository root used by lint, view, check, clippy, compatibility check, test, and CI.
+    #[arg(long, global = true, value_name = "PATH")]
     pub root: Option<PathBuf>,
-    #[arg(long, global = true, value_name = "path")]
+    /// Read the consumer configuration from this path, relative to the repository root when relative.
+    #[arg(long, global = true, value_name = "PATH")]
     pub config: Option<PathBuf>,
-    #[arg(long, global = true, value_name = "path")]
+    /// Override the configured command log directory.
+    #[arg(long, global = true, value_name = "PATH")]
     pub log_root: Option<PathBuf>,
+    /// Enable console logging for this command.
     #[arg(long, global = true)]
     pub log_console: bool,
     #[command(subcommand)]
@@ -34,37 +40,42 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
+    /// Run one analyzer, maintainer lint profile, or configured consumer lint profile.
     Lint {
-        #[arg(value_enum)]
+        #[arg(value_enum, value_name = "TARGET")]
         target: LintTarget,
-        /// Run the explicitly configured consumer profile instead of the source-maintainer profile.
+        /// Run a configured consumer profile. Supported only with `ci`.
         #[arg(long)]
         consumer: bool,
-        /// Run only the named consumer lint step or named lint profile (`all` runs every step in declaration order).
+        /// Select a consumer lint profile or step (`all` runs every step in declaration order); requires `--consumer`.
         #[arg(long, requires = "consumer")]
         profile: Option<String>,
-        /// Consumer platform selection: `host` (default) runs unannotated and host-tagged steps; `all` also reports unsupported cross-platform steps; `linux`, `macos` or `windows` adds that platform's steps.
+        /// Consumer CI platform scope: `host` runs unannotated and host-tagged steps; `all` also reports unsupported cross-platform steps; a named platform adds its steps. Requires `--consumer`.
         #[arg(long = "platform-scope", value_enum, requires = "consumer")]
         platform_scope: Option<PlatformScopeArg>,
-        /// Run only these rules (`<RULE-ID|family>[,...]`); forwarded unchanged to sc-boundary, sc-portability or sc-runtime.
+        /// Run these analyzer rules (`<RULE-ID|family>[,...]`); forwarded unchanged to the selected analyzer.
         #[arg(long = "rule-filter", conflicts_with = "consumer")]
         rule_filter: Option<String>,
         /// Stop starting new cargo-lane and `after_all` steps after the first failure; running steps finish.
         #[arg(long = "fail-fast", requires = "consumer")]
         fail_fast: bool,
     },
+    /// Show analyzer findings or the reserved graph view.
     View {
-        #[arg(value_enum)]
+        #[arg(value_enum, value_name = "TARGET")]
         target: ViewTarget,
     },
+    /// Run the native or Windows cross-target cargo check.
     Check {
-        #[arg(value_enum)]
+        #[arg(value_enum, value_name = "TARGET")]
         target: CheckTarget,
     },
+    /// Run the native or Windows cross-target cargo clippy analysis.
     Clippy {
-        #[arg(value_enum)]
+        #[arg(value_enum, value_name = "TARGET")]
         target: ClippyTarget,
     },
+    /// Check the configured consumer installation and version requirement.
     Compatibility {
         #[command(subcommand)]
         command: CompatibilityCommand,
@@ -84,10 +95,10 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Materialize the product-owned consumer integration files.
+    /// Create or verify the product-owned consumer integration files.
     Init {
         /// Generate the canonical thin Just integration.
-        #[arg(long)]
+        #[arg(long, required = true)]
         just: bool,
         /// Verify that the generated integration is current without changing files.
         #[arg(long)]
@@ -96,12 +107,15 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Discover and print the installed offline documentation bundle.
+    /// Read an installed guide from the offline documentation bundle.
+    #[command(
+        after_help = "Guide aliases: `README.md` and `overview` select `README`; `setup` selects `installation`."
+    )]
     Docs {
-        /// Guide to print or resolve. Without a guide, print the overview.
+        /// Guide to print or resolve. Defaults to the overview (`README`).
         #[arg(value_enum)]
         guide: Option<DocsGuide>,
-        /// Print the installed filesystem path instead of guide contents.
+        /// Print the guide or bundle path without a label.
         #[arg(long)]
         path: bool,
     },
@@ -125,7 +139,9 @@ pub enum Command {
         #[arg(long = "fail-fast")]
         fail_fast: bool,
     },
+    /// Print the product, backend, and contract versions.
     Version,
+    /// Run the configured consumer CI profile, or the source-maintainer profile in a source checkout.
     Ci,
 }
 
@@ -158,7 +174,7 @@ impl From<PlatformScopeArg> for PlatformScope {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DocsGuide {
-    #[value(name = "README.md")]
+    #[value(name = "README", aliases = ["README.md", "overview"])]
     Overview,
     #[value(name = "installation", alias = "setup")]
     Installation,
@@ -172,6 +188,8 @@ pub enum DocsGuide {
     Troubleshooting,
     #[value(name = "best-practices")]
     BestPractices,
+    #[value(name = "cli-reference")]
+    CliReference,
     #[value(name = "sc-lint")]
     ScLint,
     #[value(name = "sc-lint-attributes")]
@@ -234,6 +252,10 @@ impl DocsGuide {
             Self::BestPractices => DocsGuideMetadata {
                 name: "best-practices",
                 path: "best-practices.md",
+            },
+            Self::CliReference => DocsGuideMetadata {
+                name: "cli-reference",
+                path: "cli-reference/README.md",
             },
             Self::ScLint => DocsGuideMetadata {
                 name: "sc-lint",
@@ -318,23 +340,47 @@ impl OutputMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LintTarget {
-    #[value(name = "sc-boundary")]
+    #[value(
+        name = "sc-boundary",
+        help = "Run the Rust dependency and manifest boundary analyzer"
+    )]
     ScBoundary,
-    #[value(name = "sc-portability")]
+    #[value(
+        name = "sc-portability",
+        help = "Run the Rust cross-platform portability analyzer"
+    )]
     ScPortability,
-    #[value(name = "sc-runtime")]
+    #[value(
+        name = "sc-runtime",
+        help = "Run the Rust async and runtime-pattern analyzer"
+    )]
     ScRuntime,
-    #[value(name = "function-length")]
+    #[value(
+        name = "function-length",
+        help = "Check configured function-length limits"
+    )]
     FunctionLength,
-    #[value(name = "line-counts")]
+    #[value(
+        name = "line-counts",
+        help = "Check configured source line-count limits"
+    )]
     LineCounts,
-    #[value(name = "identity-literals")]
+    #[value(
+        name = "identity-literals",
+        help = "Check configured identity and sentinel literals"
+    )]
     IdentityLiterals,
-    #[value(name = "fast")]
+    #[value(name = "fast", help = "Run the source-maintainer fast lint profile")]
     Fast,
-    #[value(name = "full")]
+    #[value(
+        name = "full",
+        help = "Run the complete source-maintainer lint profile"
+    )]
     Full,
-    #[value(name = "ci")]
+    #[value(
+        name = "ci",
+        help = "Run CI lint checks or the selected consumer profile"
+    )]
     Ci,
 }
 
@@ -370,9 +416,12 @@ impl LintTarget {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ViewTarget {
-    #[value(name = "graph")]
+    #[value(name = "graph", help = "Reserved graph view; not implemented yet")]
     Graph,
-    #[value(name = "findings")]
+    #[value(
+        name = "findings",
+        help = "Show findings through the installed Python adapter"
+    )]
     Findings,
 }
 
@@ -380,9 +429,12 @@ impl ViewTarget {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CheckTarget {
-    #[value(name = "native")]
+    #[value(name = "native", help = "Run cargo check for the current host")]
     Native,
-    #[value(name = "xwin")]
+    #[value(
+        name = "xwin",
+        help = "Run cargo check for x86_64-pc-windows-msvc with cargo-xwin"
+    )]
     Xwin,
 }
 
@@ -397,9 +449,12 @@ impl CheckTarget {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ClippyTarget {
-    #[value(name = "native")]
+    #[value(name = "native", help = "Run cargo clippy for the current host")]
     Native,
-    #[value(name = "xwin")]
+    #[value(
+        name = "xwin",
+        help = "Run cargo clippy for x86_64-pc-windows-msvc with cargo-xwin"
+    )]
     Xwin,
 }
 

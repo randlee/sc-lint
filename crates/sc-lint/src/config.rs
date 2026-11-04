@@ -125,11 +125,15 @@ impl RepoRoot {
                 .map_or_else(|| start.to_path_buf(), Path::to_path_buf)
         };
         current = dunce::canonicalize(&current).map_err(|error| {
-            CliError::config(format!(
-                "failed to canonicalize repo-root discovery start `{}`",
-                start.display()
-            ))
-            .with_source(error)
+            let message = if error.kind() == std::io::ErrorKind::NotFound {
+                format!("repository root path `{}` does not exist", start.display())
+            } else {
+                format!("failed to canonicalize repo-root discovery start `{}`", start.display())
+            };
+            CliError::config(message)
+                .with_source(error)
+                .with_detail("discovery_start", json!(start.display().to_string()))
+                .with_suggested_action("Pass `--root <path>` to an existing repository root, or change to the repository and rerun the command.")
         })?;
 
         loop {
@@ -291,6 +295,15 @@ impl LoadedConfig {
                 "consumer profile execution requires a consumer configuration",
             ));
         };
+        if requirement.lint.is_empty() {
+            return Err(consumer_profile_error(
+                self.config_path.as_deref().unwrap_or_else(|| Path::new(CONFIG_FILENAME)),
+                ConsumerProfile::Lint.as_str(),
+                "consumer `lint` profile has no configured steps".to_string(),
+            ).with_suggested_action(
+                "Add at least one `[[tool.sc-lint.lint]]` command row before running consumer lint.",
+            ));
+        }
         let selector = crate::profile_host::lint_selector(
             selector,
             requirement.default_lint_profile.as_deref(),
@@ -562,6 +575,8 @@ pub(crate) fn parse_repo_config(path: &Path) -> Result<RepoConfigFile, CliError>
     let text = fs::read_to_string(path).map_err(|error| {
         CliError::config(format!("failed to read repo config `{}`", path.display()))
             .with_source(error)
+            .with_detail("config_path", Value::String(path.display().to_string()))
+            .with_suggested_action("Check that the configuration path exists and is readable, then rerun with `--config <path>` if it is outside the repository default.")
     })?;
     let parse_error = |error: toml::de::Error| {
         CliError::config(format!("failed to parse repo config `{}`", path.display()))
@@ -749,11 +764,7 @@ fn validate_consumer_profile(
     path: &Path,
 ) -> Result<Vec<ConsumerProfileStep>, CliError> {
     if raw_steps.is_empty() {
-        return Err(consumer_profile_error(
-            path,
-            profile,
-            format!("consumer `{profile}` profile must contain at least one command"),
-        ));
+        return empty_consumer_profile(profile, path);
     }
     let mut names = std::collections::BTreeSet::new();
     let mut steps = Vec::with_capacity(raw_steps.len());
@@ -820,6 +831,24 @@ fn validate_consumer_profile(
         steps.push(declared);
     }
     Ok(steps)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Empty consumer profile failures use the shared top-level CliError contract."
+)]
+fn empty_consumer_profile(
+    profile: &str,
+    path: &Path,
+) -> Result<Vec<ConsumerProfileStep>, CliError> {
+    if profile == ConsumerProfile::Lint.as_str() {
+        return Ok(Vec::new());
+    }
+    Err(consumer_profile_error(
+        path,
+        profile,
+        format!("consumer `{profile}` profile must contain at least one command"),
+    ))
 }
 
 #[expect(

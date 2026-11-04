@@ -35,4 +35,5 @@ toml = "1.1.8"
 thiserror = "2.0.21"
 
 [dev-dependencies]
+sc-docli = "=0.2.0"
 tempfile = "3.27.0"

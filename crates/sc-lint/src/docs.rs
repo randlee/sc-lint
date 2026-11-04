@@ -157,6 +157,7 @@ mod tests {
         "upgrade.md",
         "troubleshooting.md",
         "best-practices.md",
+        "cli-reference/README.md",
     ];
 
     fn source_root() -> PathBuf {

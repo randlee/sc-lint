@@ -16,6 +16,15 @@ required_files = [
   "upgrade.md",
   "troubleshooting.md",
   "best-practices.md",
+  "cli-reference/README.md",
+  "cli-reference/sc-lint.md",
+  "cli-reference/sc-lint/index.html",
+  "cli-reference/sc-lint-boundary.md",
+  "cli-reference/sc-lint-boundary/index.html",
+  "cli-reference/sc-lint-portability.md",
+  "cli-reference/sc-lint-portability/index.html",
+  "cli-reference/sc-lint-runtime.md",
+  "cli-reference/sc-lint-runtime/index.html",
 ]
 package_guides = [
   "sc-lint.md",
