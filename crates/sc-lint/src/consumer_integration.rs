@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 use serde_json::json;
+use sha2::Digest;
+use sha2::Sha256;
 
 use crate::CliError;
 use crate::command::ConsumerInitRequest;
@@ -18,6 +20,8 @@ const CURRENT_CONFIG_ADDED_COMMENTS: &str = concat!(
     "# User-owned configuration: edit lint/test steps as needed; `sc-lint init --just`\n",
     "# refreshes only missing files and generated version-only updates.\n",
 );
+const KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256: &[&str] =
+    &["5e26b4ab0d8fafbe856a94089d3b575b10164258776c4c5c828fecd9802a76db"];
 const CONSUMER_JUSTFILE_ASSET: &str = include_str!("../assets/consumer-Justfile");
 const CANONICAL_CONSUMER_CONFIG_ASSET: &str = include_str!("../assets/consumer-config.toml");
 const CONFIG_VERSION_TOKEN: &str = "{{SC_LINT_VERSION}}";
@@ -32,6 +36,7 @@ enum ManagedFileState {
     Current,
     Missing,
     RefreshableGenerated,
+    RefreshablePriorRelease,
     UserModified,
 }
 
@@ -59,26 +64,12 @@ pub(crate) fn run_consumer_init_at(
     root: &Path,
     request: ConsumerInitRequest,
 ) -> Result<Value, CliError> {
-    if !request.just {
-        return Err(CliError::usage("`sc-lint init` requires `--just`")
-            .with_suggested_action(
-                "Run `sc-lint init --just` to create the canonical consumer integration.",
-            )
-            .with_documentation(DOCS_SETUP_REFERENCE));
-    }
-    if request.check && request.dry_run {
-        return Err(
-            CliError::usage("`--check` and `--dry-run` cannot be combined")
-                .with_suggested_action(
-                    "Use either `--check` or `--dry-run`, then rerun `sc-lint init --just`.",
-                )
-                .with_documentation(DOCS_SETUP_REFERENCE),
-        );
-    }
+    validate_consumer_init_request(request)?;
 
     let files = consumer_integration_files(root);
     let mut preserved = Vec::new();
     let mut missing = Vec::new();
+    let mut refresh = Vec::new();
     let mut version_only_stale = Vec::new();
     let mut conflicts = Vec::new();
     for file in &files {
@@ -87,6 +78,10 @@ pub(crate) fn run_consumer_init_at(
             ManagedFileState::Missing => missing.push(file.path.clone()),
             ManagedFileState::RefreshableGenerated => {
                 preserved.push(file.path.clone());
+                version_only_stale.push(file.path.clone());
+            }
+            ManagedFileState::RefreshablePriorRelease => {
+                refresh.push(file.path.clone());
                 version_only_stale.push(file.path.clone());
             }
             ManagedFileState::UserModified => conflicts.push(file.path.clone()),
@@ -103,11 +98,15 @@ pub(crate) fn run_consumer_init_at(
             )
             .with_documentation(DOCS_SETUP_REFERENCE));
     }
-    if request.check && !write_needed.is_empty() {
+    if request.check && (!write_needed.is_empty() || !refresh.is_empty()) {
+        let mut outdated = write_needed.clone();
+        outdated.extend(refresh.iter().cloned());
         return Err(CliError::config("consumer integration is not current")
             .with_code("CLI.SC_LINT_INTEGRATION_OUTDATED")
-            .with_detail("outdated", paths_to_json(&write_needed))
-            .with_cause("one or more product-managed integration files are missing")
+            .with_detail("outdated", paths_to_json(&outdated))
+            .with_cause(
+                "one or more product-managed integration files are missing or from a prior release",
+            )
             .with_suggested_action(
                 "Run `sc-lint init --just` to create or refresh the managed files.",
             )
@@ -115,7 +114,7 @@ pub(crate) fn run_consumer_init_at(
     }
     if !request.check && !request.dry_run {
         for file in &files {
-            if write_needed.contains(&file.path) {
+            if write_needed.contains(&file.path) || refresh.contains(&file.path) {
                 if let Some(parent) = file.path.parent() {
                     fs::create_dir_all(parent).map_err(|error| {
                         CliError::config(format!(
@@ -156,6 +155,30 @@ pub(crate) fn run_consumer_init_at(
     }))
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer initialization request validation uses the shared CliError contract."
+)]
+fn validate_consumer_init_request(request: ConsumerInitRequest) -> Result<(), CliError> {
+    if !request.just {
+        return Err(CliError::usage("`sc-lint init` requires `--just`")
+            .with_suggested_action(
+                "Run `sc-lint init --just` to create the canonical consumer integration.",
+            )
+            .with_documentation(DOCS_SETUP_REFERENCE));
+    }
+    if request.check && request.dry_run {
+        return Err(
+            CliError::usage("`--check` and `--dry-run` cannot be combined")
+                .with_suggested_action(
+                    "Use either `--check` or `--dry-run`, then rerun `sc-lint init --just`.",
+                )
+                .with_documentation(DOCS_SETUP_REFERENCE),
+        );
+    }
+    Ok(())
+}
+
 struct ConsumerIntegrationFile {
     path: PathBuf,
     contents: String,
@@ -166,6 +189,7 @@ struct ConsumerIntegrationFile {
 enum ManagedFileKind {
     Config,
     Static,
+    Bootstrap,
 }
 
 fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
@@ -183,7 +207,7 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
         ConsumerIntegrationFile {
             path: root.join(".sc-lint/bootstrap.py"),
             contents: CONSUMER_BOOTSTRAP_ASSET.to_string(),
-            kind: ManagedFileKind::Static,
+            kind: ManagedFileKind::Bootstrap,
         },
     ]
 }
@@ -201,6 +225,17 @@ fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, Cli
             if file.kind == ManagedFileKind::Config && is_refreshable_generated_config(&actual) =>
         {
             Ok(ManagedFileState::RefreshableGenerated)
+        }
+        Ok(actual)
+            if file.kind == ManagedFileKind::Static && is_legacy_generated_justfile(&actual) =>
+        {
+            Ok(ManagedFileState::Current)
+        }
+        Ok(actual)
+            if file.kind == ManagedFileKind::Bootstrap
+                && is_known_prior_release_bootstrap(&actual) =>
+        {
+            Ok(ManagedFileState::RefreshablePriorRelease)
         }
         Ok(_) => Ok(ManagedFileState::UserModified),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(ManagedFileState::Missing),
@@ -230,13 +265,30 @@ fn normalize_line_endings(contents: &str) -> String {
     contents.replace("\r\n", "\n")
 }
 
+fn is_legacy_generated_justfile(actual: &str) -> bool {
+    normalize_line_endings(actual)
+        .strip_prefix(LEGACY_GENERATED_FILE_HEADER)
+        .is_some_and(|body| body == normalize_line_endings(CONSUMER_JUSTFILE_ASSET))
+}
+
+fn is_known_prior_release_bootstrap(actual: &str) -> bool {
+    let normalized = normalize_line_endings(actual);
+    let digest = format!("{:x}", Sha256::digest(normalized.as_bytes()));
+    KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256.contains(&digest.as_str())
+}
+
 fn has_version_only_difference(actual: &str, template: &str) -> bool {
     let (prefix, suffix) = template
         .split_once(CONFIG_VERSION_TOKEN)
         .expect("consumer config asset must contain its version token");
-    actual.starts_with(prefix)
-        && actual.ends_with(suffix)
-        && actual.len() > prefix.len() + suffix.len()
+    actual
+        .strip_prefix(prefix)
+        .and_then(|remainder| remainder.strip_suffix(suffix))
+        .is_some_and(|version| {
+            version
+                .parse::<crate::compatibility::MinimumVersion>()
+                .is_ok()
+        })
 }
 
 fn canonical_consumer_config() -> String {
@@ -341,33 +393,32 @@ mod tests {
             "command = [\"cargo\", \"test\", \"--workspace\"]\n",
         );
 
+        let legacy_justfile = include_str!("../tests/fixtures/consumer-Justfile-v0.8.4");
+        let legacy_bootstrap = include_str!("../tests/fixtures/consumer-bootstrap-v0.8.4.py");
         for legacy_config in [
             LEGACY_0_8_4_GENERATED_CONFIG.to_owned(),
-            LEGACY_0_8_4_GENERATED_CONFIG.replace('\n', "\r\n"),
+            to_crlf(LEGACY_0_8_4_GENERATED_CONFIG),
         ] {
             let crlf = legacy_config.contains("\r\n");
             let fixture = tempfile::TempDir::new().expect("fixture");
             let config_path = fixture.path().join(CONFIG_FILENAME);
             fs::write(&config_path, &legacy_config).expect("legacy config");
             let justfile_path = fixture.path().join("Justfile");
-            let justfile = format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}");
-            fs::write(
-                &justfile_path,
-                if crlf {
-                    justfile.replace('\n', "\r\n")
-                } else {
-                    justfile.clone()
-                },
-            )
-            .expect("Justfile");
+            let justfile = if crlf {
+                to_crlf(legacy_justfile)
+            } else {
+                legacy_justfile.to_owned()
+            };
+            fs::write(&justfile_path, &justfile).expect("legacy Justfile");
             let bootstrap_dir = fixture.path().join(".sc-lint");
             fs::create_dir(&bootstrap_dir).expect("bootstrap directory");
+            let bootstrap_path = bootstrap_dir.join("bootstrap.py");
             let bootstrap = if crlf {
-                CONSUMER_BOOTSTRAP_ASSET.replace('\n', "\r\n")
+                to_crlf(legacy_bootstrap)
             } else {
-                CONSUMER_BOOTSTRAP_ASSET.to_owned()
+                legacy_bootstrap.to_owned()
             };
-            fs::write(bootstrap_dir.join("bootstrap.py"), bootstrap).expect("bootstrap");
+            fs::write(&bootstrap_path, bootstrap).expect("bootstrap");
 
             let result = run_consumer_init_at(
                 fixture.path(),
@@ -381,30 +432,57 @@ mod tests {
             assert_eq!(result["status"], "current");
             assert_eq!(
                 result["version_only_stale_files"],
-                json!([config_path.display().to_string()])
+                json!([
+                    config_path.display().to_string(),
+                    bootstrap_path.display().to_string()
+                ])
             );
             assert_eq!(
                 fs::read_to_string(&config_path).expect("config remains user-owned"),
                 legacy_config
             );
+            assert_eq!(
+                fs::read_to_string(&bootstrap_path).expect("refreshed bootstrap"),
+                CONSUMER_BOOTSTRAP_ASSET
+            );
 
-            if crlf {
-                let edited_justfile = justfile.replace("default: lint", "default: edited");
-                fs::write(&justfile_path, edited_justfile.replace('\n', "\r\n"))
-                    .expect("edited CRLF Justfile");
-                let error = run_consumer_init_at(
-                    fixture.path(),
-                    ConsumerInitRequest {
-                        just: true,
-                        check: false,
-                        dry_run: false,
-                    },
-                )
-                .expect_err("edited CRLF Justfile remains user-owned");
-                assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
-                fs::write(&justfile_path, justfile.replace('\n', "\r\n"))
-                    .expect("restore CRLF Justfile");
-            }
+            let edited_justfile = justfile.replace("default: lint", "default: edited");
+            fs::write(&justfile_path, &edited_justfile).expect("edited legacy Justfile");
+            let error = run_consumer_init_at(
+                fixture.path(),
+                ConsumerInitRequest {
+                    just: true,
+                    check: false,
+                    dry_run: false,
+                },
+            )
+            .expect_err("edited legacy Justfile remains user-owned");
+            assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+            fs::write(&justfile_path, &justfile).expect("restore legacy Justfile");
+
+            let edited_bootstrap = legacy_bootstrap.replace(
+                "#!/usr/bin/env python3\n",
+                "#!/usr/bin/env python3\n# user-owned edit\n",
+            );
+            fs::write(
+                &bootstrap_path,
+                if crlf {
+                    to_crlf(&edited_bootstrap)
+                } else {
+                    edited_bootstrap
+                },
+            )
+            .expect("edited legacy bootstrap");
+            let error = run_consumer_init_at(
+                fixture.path(),
+                ConsumerInitRequest {
+                    just: true,
+                    check: false,
+                    dry_run: false,
+                },
+            )
+            .expect_err("edited legacy bootstrap remains user-owned");
+            assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
 
             let edited_steps =
                 legacy_config.replace("\"fmt\", \"--all\", \"--check\"", "\"fmt\", \"--all\"");
@@ -421,6 +499,22 @@ mod tests {
             .expect_err("edited steps remain user-owned");
             assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
         }
+    }
+
+    #[test]
+    fn version_token_must_not_contain_inserted_config_fields() {
+        let template = CANONICAL_CONSUMER_CONFIG_ASSET.replace(CONFIG_VERSION_TOKEN, "0.8.4");
+        let inserted_key = template.replace(
+            "minimum_version = \"0.8.4\"\n",
+            "minimum_version = \"0.8.4\"\nextra = \"user value\"\n",
+        );
+        assert!(!has_version_only_difference(
+            &inserted_key,
+            CANONICAL_CONSUMER_CONFIG_ASSET
+        ));
+        assert!(!is_refreshable_generated_config(&format!(
+            "{LEGACY_GENERATED_FILE_HEADER}{inserted_key}"
+        )));
     }
 
     fn to_crlf(contents: &str) -> String {
