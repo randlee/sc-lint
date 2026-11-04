@@ -348,7 +348,10 @@ is present in the JSON envelope. The rule reflects the existing
   `refreshed_files` is always an array of files that were or would be refreshed;
   `dry_run` and `status` indicate whether the refresh occurred. Refreshed
   prior-release files do not appear in `version_only_stale_files`; that list
-  reports preserved version-only config changes.
+  reports preserved version-only config changes. The init data object also
+  includes `status`, `managed_files`, `preserved_files`, `created_files`,
+  `refreshed_files`, `version_only_stale_files`, `check`, `dry_run` and
+  `summary`.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
 
