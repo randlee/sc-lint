@@ -80,7 +80,7 @@ def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | 
     return conclusion
 
 
-def require_built_commit(client: GitHub, commit: str, workflow: str) -> None:
+def require_built_commit(client: GitHub, tag: str, commit: str, workflow: str) -> None:
     """Fail unless a successful run of the workflow that builds the tag's kind published a release at commit.
 
     A tag re-cut to a commit whose build failed, or was never run, names assets that no
@@ -88,6 +88,8 @@ def require_built_commit(client: GitHub, commit: str, workflow: str) -> None:
     """
     runs = paged(client, f"actions/workflows/{BUILD_WORKFLOWS[workflow]}/runs?head_sha={commit}&status=success", "workflow_runs")
     for run in runs:
+        if workflow == PRERELEASE_WORKFLOW and run.get("head_branch") != tag:
+            continue
         if run_release_conclusion(client, str(run["id"]), workflow) == "success":
             return
     raise ValueError(
@@ -116,36 +118,33 @@ def plan_commit(client: GitHub, tag: str, supplied: str, *, dispatch: bool, mani
         if supplied != commit:
             raise ValueError(f"{tag} names commit {commit}, not the commit {supplied} the run was given")
     if dispatch:
-        require_built_commit(client, commit, build_workflow_for(tag, manifest))
+        require_built_commit(client, tag, commit, build_workflow_for(tag, manifest))
     return commit
 
 
-def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workflow: str = RELEASE_WORKFLOW) -> tuple[str, dict] | None:
-    """Select the published release, or prerelease, whose native matrix must run.
-
-    The tag's shape picks its build workflow: a prerelease (prerelease/vX.Y.Z) is built by
-    Prerelease Archive and a release (vX.Y.Z) by Release, so a dispatch never takes the workflow
-    from its caller. A prerelease run gates a publish: its archives and wheels are verified like a release's.
-    """
+def select_release(client: GitHub, manifest: dict, tag: str, run_id: str, workflow: str) -> tuple[str, str] | None:
     if tag:
-        workflow = build_workflow_for(tag, manifest)
-        conclusion = "success"
-    else:
-        conclusion = run_release_conclusion(client, run_id, workflow)
-        if conclusion is None:
-            return None
-        tag = tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
-        if workflow == PRERELEASE_WORKFLOW:
-            require_source_branch(client, run_id, tag)
+        return tag, "success"
+    conclusion = run_release_conclusion(client, run_id, workflow)
+    if conclusion is None:
+        return None
+    tag = tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
+    if workflow == PRERELEASE_WORKFLOW:
+        require_source_branch(client, run_id, tag)
+    return tag, conclusion
+
+
+def plan_release(client: GitHub, manifest: dict, tag: str, conclusion: str) -> dict | None:
+    """Build the matrix from the manifest at the resolved tag commit."""
     release_version(tag, manifest)
     try:
         client.json(f"releases/tags/{quote_tag(tag)}")
     except GitHubError as error:
         if error.status != 404 or conclusion == "success":
             raise
-        print(f"Skipping native verification: {workflow} run {run_id} release job concluded {conclusion} and {tag} has no published release (HTTP 404).", flush=True)
+        print(f"Skipping native verification: {tag} has no published release (HTTP 404).", flush=True)
         return None
-    return tag, native_matrix(client.manifest(tag))
+    return native_matrix(manifest)
 
 
 def wheel_python_version(run, python: str) -> tuple[int, int]:
@@ -249,10 +248,10 @@ def write_result(path: Path, *, tag: str, target: str, checks: list[dict], error
 
 
 def verify_release(
-    client: GitHub, tag: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command,
+    client: GitHub, tag: str, commit: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command,
     checks: list[dict] | None = None,
 ) -> None:
-    manifest = client.manifest(tag)
+    manifest = client.manifest(commit)
     version = release_version(tag, manifest)
     assert_native(target)
     record(checks, "native host", f"{target} on {native_host(target)[0]}")
@@ -321,10 +320,17 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"unsupported verification workflow {workflow!r}")
             if not is_full_sha(args.commit):
                 raise ValueError("plan requires --commit: the full 40-character commit SHA the tag names")
-            plan = plan_release(client, local_manifest, args.tag, args.run_id, workflow=workflow)
-            tag, matrix = plan if plan is not None else ("", {"include": []})
-            commit = plan_commit(client, tag, args.commit, dispatch=bool(args.tag), manifest=local_manifest) if plan is not None else ""
-            enabled = "true" if plan is not None else "false"
+            selected = select_release(client, local_manifest, args.tag, args.run_id, workflow)
+            if selected is None:
+                tag, commit, matrix = "", "", {"include": []}
+            else:
+                tag, conclusion = selected
+                commit = plan_commit(client, tag, args.commit, dispatch=bool(args.tag), manifest=local_manifest)
+                manifest = client.manifest(commit)
+                matrix = plan_release(client, manifest, tag, conclusion) or {"include": []}
+                if not matrix["include"]:
+                    tag, commit = "", ""
+            enabled = "true" if tag else "false"
             targets = ",".join(row["target"] for row in matrix["include"])
             output = (
                 f"verify={enabled}\ntag={tag}\ncommit={commit}\ntargets={targets}\n"
@@ -337,13 +343,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.target:
                 raise ValueError("verify requires --target")
+            if not is_full_sha(args.commit):
+                raise ValueError("verify requires --commit: the full 40-character tag commit SHA")
             if not args.wheel_python:
                 raise ValueError("verify requires --wheel-python")
             checks: list[dict] = []
             error = ""
             try:
                 with tempfile.TemporaryDirectory(prefix="release-native-verify-") as directory:
-                    verify_release(client, args.tag, args.target, Path(directory), wheel_python=args.wheel_python, checks=checks)
+                    verify_release(client, args.tag, args.commit, args.target, Path(directory), wheel_python=args.wheel_python, checks=checks)
             except (ValueError, OSError, KeyError, tarfile.TarError, zipfile.BadZipFile) as caught:
                 error = str(caught)
             if args.result:

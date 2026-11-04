@@ -1,12 +1,4 @@
-"""Gate a publish on a native matrix run that proved a verified prerelease.
-
-A Release Native Verify run gates the publish only when it ran for the prerelease tag at
-its commit V: its title names both, every native job and the report job concluded success,
-and it was triggered from a branch its tag allows. V must be an ancestor of the release
-candidate commit C, and no artifact input may differ between V and C. The artifact inputs,
-the manifest sections that build them and the trusted-run rules are the constants below.
-Fail closed otherwise and name the offending paths.
-"""
+"""Gate publication on a successful native prerelease matrix and unchanged build inputs."""
 from __future__ import annotations
 
 import argparse
@@ -18,11 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from release_native_common import (
-    BUILD_WORKFLOWS, MANIFEST_PATH, PRERELEASE_KIND, PRERELEASE_WORKFLOW, REPORT_JOB, VERIFY_WORKFLOW_FILE,
-    VERIFY_WORKFLOW_NAME, VERIFY_WORKFLOW_PATH, GitHub, GitHubError, is_full_sha, native_job, paged, quote_tag,
-    tag_kind, verify_run_title,
+    MANIFEST_PATH, PRERELEASE_KIND, REPORT_JOB, VERIFY_WORKFLOW_NAME, GitHub, GitHubError, is_full_sha,
+    native_job, paged, quote_tag, tag_kind, verify_run_title,
 )
 from release_native_matrix import native_matrix
+
+VERIFY_WORKFLOW_FILE = "release-native-verify.yml"
+VERIFY_WORKFLOW_PATH = f".github/workflows/{VERIFY_WORKFLOW_FILE}"
 
 # Paths whose content changes the released archives or wheels, or how they are built. The
 # gate's tests derive the manifest's declared sources and the scripts and actions that
@@ -45,7 +39,7 @@ ARTIFACT_INPUT_FILES = frozenset({
     ".github/scripts/verify_release_arch.py",
     ".github/scripts/worker_result.py",
     ".github/scripts/wheel_contents.py",
-    f".github/workflows/{BUILD_WORKFLOWS[PRERELEASE_WORKFLOW]}",
+    ".github/workflows/prerelease-archive.yml",
 })
 # The manifest sections that describe the archives and wheels; python_packages are built into
 # wheels. Channel and prerelease settings only drive publication, so editing them never forces a rerun.
@@ -107,23 +101,16 @@ def unproven_reason(jobs: dict[str, str | None], targets: list[str]) -> str | No
     return f"jobs did not all succeed: {', '.join(failing)}" if failing else None
 
 
-def trusted_verify_run(run: dict, tag: str, kind: str, default_branch: str) -> bool:
-    """Only the verify workflow file can prove a publish, from a trusted trigger.
-
-    A workflow_run inherits the branch of the build run that triggered it. A prerelease run
-    is triggered by its tag push, so its branch is the tag. A release run is triggered by its
-    tag push or, when release.yml retries an existing tag, from the default branch. A dispatch
-    counts only from the default branch.
-    """
+def trusted_verify_run(run: dict, tag: str, default_branch: str) -> bool:
+    """Trust this workflow only on the prerelease tag's workflow_run or default-branch dispatch."""
     if run.get("path") != VERIFY_WORKFLOW_PATH:
         return False
     if run.get("event") == "workflow_run":
-        allowed = {tag} if kind == PRERELEASE_KIND else {tag, default_branch}
-        return run.get("head_branch") in allowed
+        return run.get("head_branch") == tag
     return run.get("event") == "workflow_dispatch" and run.get("head_branch") == default_branch
 
 
-def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str], kind: str) -> int:
+def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str]) -> int:
     """Return the id of the newest successful verify run that proved the native matrix for tag at commit.
 
     The title binds the run to the tag and commit, so a run for an earlier build of a re-cut
@@ -134,7 +121,7 @@ def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str],
     default_branch = client.default_branch()
     rejected = []
     for run in paged(client, f"actions/workflows/{VERIFY_WORKFLOW_FILE}/runs?status=success", "workflow_runs"):
-        if not trusted_verify_run(run, tag, kind, default_branch):
+        if not trusted_verify_run(run, tag, default_branch):
             continue
         if run.get("display_title") != title or run.get("status") != "completed" or run.get("conclusion") != "success":
             continue
@@ -228,7 +215,9 @@ def main(argv: list[str] | None = None) -> int:
         # The manifest is read at the verified commit V, not the tag: the tag is mutable, V is not.
         manifest = client.manifest(args.prerelease_commit)
         targets = [row["target"] for row in native_matrix(manifest)["include"]]
-        run_id = find_verified_run(client, args.tag, args.prerelease_commit, targets, tag_kind(args.tag, manifest))
+        if tag_kind(args.tag, manifest) != PRERELEASE_KIND:
+            raise GateError(f"{args.tag} is not a prerelease tag")
+        run_id = find_verified_run(client, args.tag, args.prerelease_commit, targets)
         is_ancestor = git_is_ancestor(args.prerelease_commit, args.candidate_commit)
         paths = git_changed_paths(args.prerelease_commit, args.candidate_commit) if is_ancestor else []
         diff = classify(paths, manifest_build_changed=MANIFEST_PATH in paths and manifest_build_changed(

@@ -87,12 +87,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.plan.outputs.commit }}
           RELEASE_TARGET: ${{ matrix.target }}
           TOOLING_PYTHON: ${{ steps.tooling.outputs.python-path }}
           WHEEL_PYTHON: ${{ steps.wheel.outputs.python-path }}
         run: >-
           "$TOOLING_PYTHON" .github/scripts/release_native_verify.py verify
-          --tag "$RELEASE_TAG" --target "$RELEASE_TARGET" --wheel-python "$WHEEL_PYTHON"
+          --tag "$RELEASE_TAG" --commit "$RELEASE_COMMIT" --target "$RELEASE_TARGET" --wheel-python "$WHEEL_PYTHON"
           --result "native-results/${RELEASE_TARGET}.json"
       - name: Upload the native result for the report
         if: ${{ always() }}

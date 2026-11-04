@@ -28,9 +28,6 @@ TITLE = common.verify_run_title(TAG, VERIFIED)
 TARGETS = [row["target"] for row in matrix.native_matrix(tomllib.loads(MANIFEST.read_text(encoding="utf-8")))["include"]]
 PROVEN = {common.native_job(target): "success" for target in TARGETS} | {common.REPORT_JOB: "success"}
 DEFAULT_BRANCH = "main"
-PRERELEASE_KIND = common.PRERELEASE_KIND
-RELEASE_KIND = common.RELEASE_KIND
-KIND = PRERELEASE_KIND
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +79,7 @@ class FakeGitHub:
         if endpoint.startswith("actions/runs/"):
             conclusions = self.jobs.get(int(endpoint.split("/")[2]), PROVEN)
             return {"total_count": len(conclusions), "jobs": [{"name": name, "conclusion": value} for name, value in conclusions.items()]}
-        prefix = f"actions/workflows/{common.VERIFY_WORKFLOW_FILE}/runs?"
+        prefix = f"actions/workflows/{gate.VERIFY_WORKFLOW_FILE}/runs?"
         assert endpoint.startswith(prefix), endpoint
         query = parse_qs(urlsplit(endpoint).query)
         assert query["status"] == ["success"]
@@ -107,20 +104,20 @@ def test_newest_successful_run_with_matching_title_is_selected():
         run(7, TITLE),
         run(5, TITLE),
     )})
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
 
 
 def test_run_for_another_tag_is_ignored():
     client = FakeGitHub({1: page(run(12, common.verify_run_title("prerelease/v1.2.4", VERIFIED)))})
     with pytest.raises(gate.GateError, match="no successful Release Native Verify run exists for prerelease/v1.2.3 at aaaa"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_run_for_a_moved_tag_does_not_satisfy_the_gate():
     older_build = common.verify_run_title(TAG, "b" * 40)
     client = FakeGitHub({1: page(run(12, older_build))})
     with pytest.raises(gate.GateError, match="no successful Release Native Verify run exists"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_failed_or_unfinished_matching_runs_fail_closed():
@@ -129,12 +126,12 @@ def test_failed_or_unfinished_matching_runs_fail_closed():
         run(2, TITLE, status="in_progress", conclusion=None),
     )})
     with pytest.raises(gate.GateError, match="no successful"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_no_verify_runs_fails_closed():
     with pytest.raises(gate.GateError, match=f"dispatch Release Native Verify with tag {TAG} and commit {VERIFIED}"):
-        gate.find_verified_run(FakeGitHub(), TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(FakeGitHub(), TAG, VERIFIED, TARGETS)
 
 
 @pytest.mark.parametrize("override", [
@@ -145,12 +142,12 @@ def test_no_verify_runs_fails_closed():
 def test_only_the_verify_workflow_on_a_trusted_event_can_prove_a_publish(override):
     client = FakeGitHub({1: page(run(7, TITLE, **override))})
     with pytest.raises(gate.GateError, match="no successful"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_a_dispatch_from_the_default_branch_proves_a_publish():
     client = FakeGitHub({1: page(run(7, TITLE, event="workflow_dispatch", head_branch=DEFAULT_BRANCH))})
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
 
 
 def test_a_success_run_whose_native_jobs_were_skipped_proves_nothing():
@@ -158,7 +155,7 @@ def test_a_success_run_whose_native_jobs_were_skipped_proves_nothing():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: skipped})
 
     with pytest.raises(gate.GateError, match="rejected: run 7: jobs did not all succeed"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_a_failed_native_job_in_a_success_run_is_named():
@@ -166,7 +163,7 @@ def test_a_failed_native_job_in_a_success_run_is_named():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: failed})
 
     with pytest.raises(gate.GateError, match=rf"{common.native_job(TARGETS[0])} \(failure\)"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_a_run_without_the_report_job_is_not_proof():
@@ -174,14 +171,14 @@ def test_a_run_without_the_report_job_is_not_proof():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: without_report})
 
     with pytest.raises(gate.GateError, match=rf"{common.REPORT_JOB} \(absent\)"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
 
 
 def test_an_older_proven_run_is_used_when_the_newest_is_unproven():
     skipped = {name: "skipped" for name in PROVEN}
     client = FakeGitHub({1: page(run(9, TITLE), run(7, TITLE))}, jobs={9: skipped})
 
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
 
 
 def test_pagination_finds_matching_run_on_second_page():
@@ -190,7 +187,7 @@ def test_pagination_finds_matching_run_on_second_page():
         1: page(*other_runs, total=common.PAGE_SIZE + 1),
         2: page(run(7, TITLE), total=common.PAGE_SIZE + 1),
     })
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
     assert [parse_qs(urlsplit(call).query)["page"][0] for call in client.calls if "/runs?" in call] == ["1", "2"]
 
 
@@ -200,7 +197,7 @@ def test_search_stops_at_the_page_limit():
                   for number in range(1, common.MAX_PAGES + 2)}
     client = FakeGitHub(full_pages)
     with pytest.raises(gate.GateError):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
     assert len([call for call in client.calls if "/runs?" in call]) == common.MAX_PAGES
 
 
@@ -541,6 +538,15 @@ def test_main_rejects_a_malformed_commit_before_calling_github(monkeypatch, caps
     assert client.calls == []
 
 
+def test_main_accepts_only_prerelease_tags(monkeypatch, capsys):
+    _use_fixture(monkeypatch, FakeGitHub())
+    args = _main_args()
+    args[args.index(TAG)] = "v1.2.3"
+
+    assert gate.main(args) == 1
+    assert "is not a prerelease tag" in capsys.readouterr().err
+
+
 def test_main_rejects_a_repository_that_is_not_owner_slash_name(monkeypatch, capsys):
     monkeypatch.setenv("GITHUB_REPOSITORY", "not a repository")
     monkeypatch.setenv("GH_TOKEN", "test-token")
@@ -589,23 +595,26 @@ def test_verify_workflow_names_its_jobs_as_the_gate_expects():
     assert f"name: {common.REPORT_JOB}" in text
 
 
-@pytest.mark.parametrize("event, branch, kind, trusted", [
-    ("workflow_run", TAG, PRERELEASE_KIND, True),
-    ("workflow_run", DEFAULT_BRANCH, PRERELEASE_KIND, False),
-    ("workflow_run", "v1.2.3", RELEASE_KIND, True),
-    ("workflow_run", DEFAULT_BRANCH, RELEASE_KIND, True),
-    ("workflow_run", "feature/x", RELEASE_KIND, False),
-    ("workflow_dispatch", DEFAULT_BRANCH, RELEASE_KIND, True),
-    ("workflow_dispatch", "feature/x", RELEASE_KIND, False),
+@pytest.mark.parametrize("event, branch, trusted", [
+    ("workflow_run", TAG, True),
+    ("workflow_run", DEFAULT_BRANCH, False),
+    ("workflow_run", "feature/x", False),
+    ("workflow_dispatch", DEFAULT_BRANCH, True),
+    ("workflow_dispatch", "feature/x", False),
 ])
-def test_a_run_proves_a_tag_only_from_a_branch_its_tag_kind_allows(event, branch, kind, trusted):
-    tag = TAG if kind == PRERELEASE_KIND else "v1.2.3"
+def test_a_run_proves_a_prerelease_only_from_its_tag_or_default_branch(event, branch, trusted):
     candidate = {"path": VERIFY_PATH, "event": event, "head_branch": branch}
-    assert gate.trusted_verify_run(candidate, tag, kind, DEFAULT_BRANCH) is trusted
+    assert gate.trusted_verify_run(candidate, TAG, DEFAULT_BRANCH) is trusted
 
 
 def test_gate_takes_the_matrix_from_the_policy_module_not_the_verifier():
     tree = ast.parse(Path(gate.__file__).read_text(encoding="utf-8"))
-    imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    imported = {
+        alias.name.split(".", 1)[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    imported.update(node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom))
     assert "release_native_matrix" in imported
     assert "release_native_verify" not in imported

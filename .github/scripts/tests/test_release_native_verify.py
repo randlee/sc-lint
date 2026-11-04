@@ -65,6 +65,7 @@ class Assets:
     def __init__(self, target, *, payload_target=None, tag="v1.2.3"):
         self.target = target
         self.tag = tag
+        self.commit = "d" * 40
         self.version = "1.2.3"
         windows = matrix.native_host(target)[0] == "Windows"
         extension = "zip" if windows else "tar.gz"
@@ -103,8 +104,8 @@ class Assets:
         self.assets = [{"name": name, "id": index} for index, name in enumerate(self.payloads)]
         self.downloads = []
 
-    def manifest(self, tag):
-        assert tag == self.tag
+    def manifest(self, ref):
+        assert ref == self.commit
         return self.manifest_data
 
     def json(self, endpoint):
@@ -154,7 +155,7 @@ def test_each_native_platform_checks_every_binary_and_installs_its_wheel(monkeyp
     host(monkeypatch, target)
     seen, run = commands()
     wheel_python = "/controlled/python3.9"
-    native.verify_release(assets, "v1.2.3", target, tmp_path, wheel_python=wheel_python, run=run)
+    native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, wheel_python=wheel_python, run=run)
     venv = next(argv for argv in seen if argv[1:3] == ["-m", "venv"])
     assert venv[0] == wheel_python, "the wheel is installed under the wheel interpreter, not the tooling Python"
     versions = ["sc-lint" if "-c" in argv else Path(argv[0]).name.removesuffix(".exe") for argv in seen if argv[-1] == "--version"]
@@ -173,7 +174,7 @@ def test_wrong_host_fails_before_downloading(monkeypatch, tmp_path):
     host(monkeypatch, "x86_64-unknown-linux-gnu")
     assets = Assets(target)
     with pytest.raises(ValueError, match="native runner required"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path)
     assert assets.downloads == []
 
 
@@ -185,7 +186,7 @@ def test_missing_asset_fails_clearly(monkeypatch, tmp_path, missing):
     name = {"archive": assets.archive_name, "wheel": assets.wheel_name, "checksums": "checksums.txt"}[missing]
     assets.assets = [entry for entry in assets.assets if entry["name"] != name]
     with pytest.raises(ValueError, match="required release asset|expected one sc_lint wheel"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path)
 
 
 @pytest.mark.parametrize("corrupt", ["archive", "wheel"])
@@ -196,7 +197,7 @@ def test_checksum_applies_to_both_archive_and_wheel(monkeypatch, tmp_path, corru
     assets.payloads[assets.archive_name if corrupt == "archive" else assets.wheel_name] += b"corrupted"
     seen, run = commands()
     with pytest.raises(ValueError, match="SHA256 mismatch"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, run=run)
     assert seen == []
 
 
@@ -207,7 +208,7 @@ def test_archive_and_installed_wheel_versions_must_match_tag(monkeypatch, tmp_pa
     assets = Assets(target)
     _, run = commands(wrong_version=wrong_version)
     with pytest.raises(ValueError, match=wrong_version + ": version mismatch"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, run=run)
 
 
 def test_mislabeled_architecture_fails_even_on_emulation_capable_host(monkeypatch, tmp_path):
@@ -216,7 +217,7 @@ def test_mislabeled_architecture_fails_even_on_emulation_capable_host(monkeypatc
     assets = Assets(target, payload_target="x86_64-pc-windows-msvc")
     _, run = commands()
     with pytest.raises(ValueError, match="payload architecture does not match"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, run=run)
 
 
 def test_pip_failure_is_not_skipped(monkeypatch, tmp_path):
@@ -224,7 +225,7 @@ def test_pip_failure_is_not_skipped(monkeypatch, tmp_path):
     host(monkeypatch, target)
     _, run = commands(pip_error=True)
     with pytest.raises(ValueError, match="pip installation failed"):
-        native.verify_release(Assets(target), "v1.2.3", target, tmp_path, run=run)
+        native.verify_release(Assets(target), "v1.2.3", "d" * 40, target, tmp_path, run=run)
 
 
 class RunArtifact:
@@ -287,6 +288,9 @@ def test_workflow_only_triggers_for_release_prerelease_or_explicit_dispatch():
     assert plan["permissions"] == {"contents": "read", "actions": "read"}
     assert "needs.plan.outputs.verify" in workflow["jobs"]["native"]["if"]
     assert "permissions" not in workflow["jobs"]["native"]
+    native_step = next(step for step in workflow["jobs"]["native"]["steps"] if "release_native_verify.py verify" in step.get("run", ""))
+    assert native_step["env"]["RELEASE_COMMIT"] == "${{ needs.plan.outputs.commit }}"
+    assert '--commit "$RELEASE_COMMIT"' in native_step["run"]
 
 
 def test_wheel_payload_must_match_native_target_before_pip(monkeypatch, tmp_path):
@@ -303,7 +307,7 @@ def test_wheel_payload_must_match_native_target_before_pip(monkeypatch, tmp_path
     ).encode()
     seen, run = commands()
     with pytest.raises(ValueError, match="expected"):
-        native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
+        native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, run=run)
     assert not any("pip" in argv for argv in seen)
 
 
@@ -321,7 +325,7 @@ def test_wheel_python_version_is_queried_from_the_wheel_interpreter(monkeypatch,
     host(monkeypatch, target)
     seen, run = commands(wheel_version="3.10")
     with pytest.raises(ValueError, match="Python 3.11 or newer"):
-        native.verify_release(Assets(target), "v1.2.3", target, tmp_path, wheel_python="/controlled/python3.10", run=run)
+        native.verify_release(Assets(target), "v1.2.3", "d" * 40, target, tmp_path, wheel_python="/controlled/python3.10", run=run)
     assert any(argv[0] == "/controlled/python3.10" and "sys.version_info" in argv[-1] for argv in seen)
 
 
@@ -386,11 +390,12 @@ def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
 
 
 class ReleaseRun(RunArtifact):
-    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3", built=True):
+    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3", built=True, build_branch=None):
         super().__init__("tool_1.2.3_x86_64-unknown-linux-gnu.tar.gz")
         self.conclusion = conclusion
         self.published = published
         self.built = built
+        self.build_branch = build_branch or tag
         self.tag = tag
         self.tag_endpoint = f"releases/tags/{urllib.parse.quote(tag, safe='')}"
         self.commit = "d" * 40
@@ -411,28 +416,42 @@ class ReleaseRun(RunArtifact):
             return {"object": {"type": "commit", "sha": self.commit}}
         if endpoint.startswith("actions/workflows/"):
             self.calls.append(endpoint)
-            return {"workflow_runs": [{"id": 9}] if self.built else []}
+            workflow = common.build_workflow_for(self.tag, self.manifest_data)
+            assert endpoint.startswith(f"actions/workflows/{common.BUILD_WORKFLOWS[workflow]}/runs?"), endpoint
+            return {"workflow_runs": [{"id": 9, "head_branch": self.build_branch}] if self.built else []}
         if endpoint == "actions/runs/42":
             self.calls.append(endpoint)
             return {"id": 42, "head_branch": self.tag}
         return super().json(endpoint)
 
-    def manifest(self, tag):
-        assert tag == self.tag
-        self.calls.append("manifest:" + tag)
+    def manifest(self, ref):
+        assert ref == self.commit
+        self.calls.append("manifest:" + ref)
         return self.manifest_data
+
+
+def release_plan(client, *, tag="", workflow=native.RELEASE_WORKFLOW):
+    manifest = client.manifest_data
+    dispatch = bool(tag)
+    selected = native.select_release(client, manifest, tag, "42", workflow)
+    if selected is None:
+        return None
+    tag, conclusion = selected
+    commit = native.plan_commit(client, tag, client.commit, dispatch=dispatch, manifest=manifest)
+    matrix = native.plan_release(client, client.manifest(commit), tag, conclusion)
+    return (tag, matrix) if matrix is not None else None
 
 
 def test_rehearsal_skips_before_artifact_tag_or_release_lookup(capsys):
     client = ReleaseRun("skipped", published=False)
-    assert native.plan_release(client, {}, "", "42") is None
+    assert native.select_release(client, {}, "", "42", native.RELEASE_WORKFLOW) is None
     assert client.calls == ["actions/runs/42/jobs?filter=latest&per_page=100&page=1"]
     assert "Skipping native verification" in capsys.readouterr().out
 
 
 def test_production_release_is_planned_for_native_verification():
     client = ReleaseRun()
-    tag, matrix = native.plan_release(client, client.manifest_data, "", "42")
+    tag, matrix = release_plan(client)
     assert tag == "v1.2.3"
     assert matrix["include"][0]["target"] == "x86_64-unknown-linux-gnu"
     assert "releases/tags/v1.2.3" in client.calls
@@ -441,23 +460,23 @@ def test_production_release_is_planned_for_native_verification():
 def test_production_missing_release_fails_instead_of_skipping():
     client = ReleaseRun(published=False)
     with pytest.raises(ValueError, match="HTTP 404"):
-        native.plan_release(client, client.manifest_data, "", "42")
+        release_plan(client)
 
 
 def test_production_missing_assets_fails_instead_of_skipping(monkeypatch, tmp_path):
     client = ReleaseRun()
-    tag, _ = native.plan_release(client, client.manifest_data, "", "42")
+    tag, _ = release_plan(client)
     target = "x86_64-unknown-linux-gnu"
     host(monkeypatch, target)
     assets = Assets(target)
     assets.assets = [entry for entry in assets.assets if entry["name"] != assets.wheel_name]
     with pytest.raises(ValueError, match="expected one sc_lint wheel"):
-        native.verify_release(assets, tag, target, tmp_path)
+        native.verify_release(assets, tag, client.commit, target, tmp_path)
 
 
 def test_manual_dispatch_checks_the_release_even_if_no_run_id():
     client = ReleaseRun()
-    tag, _ = native.plan_release(client, client.manifest_data, "v1.2.3", "")
+    tag = native.select_release(client, client.manifest_data, "v1.2.3", "", native.RELEASE_WORKFLOW)[0]
     assert tag == "v1.2.3"
     assert not any("/jobs?" in call for call in client.calls)
 
@@ -474,7 +493,7 @@ def test_unknown_production_state_fails(jobs):
 @pytest.mark.parametrize("published", [True, False])
 def test_unsuccessful_release_job_checks_for_published_release(conclusion, published, capsys):
     client = ReleaseRun(conclusion, published=published)
-    plan = native.plan_release(client, client.manifest_data, "", "42")
+    plan = release_plan(client)
     assert "releases/tags/v1.2.3" in client.calls
     if published:
         assert plan[0] == "v1.2.3"
@@ -482,7 +501,7 @@ def test_unsuccessful_release_job_checks_for_published_release(conclusion, publi
     else:
         assert plan is None
         reason = capsys.readouterr().out
-        assert conclusion in reason and "HTTP 404" in reason
+        assert "has no published release" in reason and "HTTP 404" in reason
 
 
 def test_publish_failure_does_not_skip_successful_release(monkeypatch, tmp_path):
@@ -541,7 +560,7 @@ def test_release_job_api_name_matches_workflow():
 def test_absent_release_job_skips_with_reason(capsys):
     client = ReleaseRun()
     client.json = lambda endpoint: {"total_count": 1, "jobs": [{"name": "build", "conclusion": "failure"}]}
-    assert native.plan_release(client, {}, "", "42") is None
+    assert native.select_release(client, {}, "", "42", native.RELEASE_WORKFLOW) is None
     assert "has no release job" in capsys.readouterr().out
 
 
@@ -555,7 +574,7 @@ def test_release_probe_errors_other_than_404_fail(conclusion):
         return original_json(endpoint)
     client.json = denied_release
     with pytest.raises(native.GitHubError, match="HTTP 403"):
-        native.plan_release(client, client.manifest_data, "", "42")
+        release_plan(client)
 
 
 def test_release_version_accepts_release_and_prerelease_tags_only():
@@ -576,11 +595,11 @@ def test_release_version_follows_the_manifest_prerelease_prefix():
 
 def test_prerelease_run_plans_its_prerelease_tag_and_matrix():
     client = ReleaseRun(tag="prerelease/v1.2.3")
-    tag, matrix = native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW)
+    tag, matrix = release_plan(client, workflow=native.PRERELEASE_WORKFLOW)
     assert tag == "prerelease/v1.2.3"
     assert matrix["include"][0]["target"] == "x86_64-unknown-linux-gnu"
     assert "releases/tags/prerelease%2Fv1.2.3" in client.calls
-    assert "manifest:prerelease/v1.2.3" in client.calls
+    assert "manifest:" + client.commit in client.calls
 
 
 def test_prerelease_run_selects_archives_and_cp39_wheels_for_its_version():
@@ -605,28 +624,28 @@ def test_prerelease_archives_and_wheels_are_verified_on_the_native_host(monkeypa
     host(monkeypatch, target)
     assets = Assets(target, tag="prerelease/v1.2.3")
     seen, run = commands()
-    native.verify_release(assets, "prerelease/v1.2.3", target, tmp_path, run=run)
+    native.verify_release(assets, "prerelease/v1.2.3", "d" * 40, target, tmp_path, run=run)
     assert len(assets.downloads) == 3
     assert any(argv[1:3] == ["-m", "venv"] for argv in seen)
 
 
 def test_prerelease_unsuccessful_unpublished_run_skips(capsys):
     client = ReleaseRun("failure", published=False, tag="prerelease/v1.2.3")
-    assert native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW) is None
+    assert release_plan(client, workflow=native.PRERELEASE_WORKFLOW) is None
     reason = capsys.readouterr().out
-    assert "Prerelease Archive run 42" in reason and "HTTP 404" in reason
+    assert "prerelease/v1.2.3 has no published release" in reason and "HTTP 404" in reason
 
 
 def test_prerelease_successful_run_without_published_prerelease_fails():
     client = ReleaseRun(published=False, tag="prerelease/v1.2.3")
     with pytest.raises(ValueError, match="HTTP 404"):
-        native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW)
+        release_plan(client, workflow=native.PRERELEASE_WORKFLOW)
 
 
 def test_prerelease_without_release_job_skips_with_reason(capsys):
     client = ReleaseRun(tag="prerelease/v1.2.3")
     client.json = lambda endpoint: {"total_count": 1, "jobs": [{"name": "build", "conclusion": "failure"}]}
-    assert native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW) is None
+    assert native.select_release(client, client.manifest_data, "", "42", native.PRERELEASE_WORKFLOW) is None
     assert "Prerelease Archive run 42 has no release job" in capsys.readouterr().out
 
 
@@ -672,6 +691,32 @@ def test_dispatch_with_a_successful_build_plans_the_release(monkeypatch, tmp_pat
     assert status == 0
     assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
     assert f"actions/workflows/release.yml/runs?head_sha={'d' * 40}&status=success&per_page=100&page=1" in client.calls
+    assert client.calls.index("manifest:" + client.commit) < client.calls.index(client.tag_endpoint)
+
+
+@pytest.mark.parametrize(("tag", "workflow", "build_file"), [
+    ("prerelease/v1.2.3", native.RELEASE_WORKFLOW, "prerelease-archive.yml"),
+    ("v1.2.3", native.PRERELEASE_WORKFLOW, "release.yml"),
+])
+def test_dispatch_uses_the_build_workflow_selected_by_tag(
+    monkeypatch, tmp_path, tag, workflow, build_file,
+):
+    client = ReleaseRun(tag=tag)
+    status, output = _plan(
+        monkeypatch, client, tmp_path, "--tag", tag, "--workflow", workflow, "--commit", "d" * 40,
+    )
+    assert status == 0
+    assert output.read_text().startswith(f"verify=true\ntag={tag}\n")
+    assert any(call.startswith(f"actions/workflows/{build_file}/runs?") for call in client.calls)
+
+
+def test_prerelease_dispatch_rejects_a_build_from_another_tag(monkeypatch, tmp_path, capsys):
+    client = ReleaseRun(tag="prerelease/v1.2.3", build_branch="prerelease/v1.2.4")
+    status, output = _plan(
+        monkeypatch, client, tmp_path, "--tag", client.tag, "--commit", "d" * 40,
+    )
+    assert status == 1 and not output.exists()
+    assert "no successful Prerelease Archive run" in capsys.readouterr().err
 
 
 def test_dispatch_rejects_a_tag_recut_to_another_commit(monkeypatch, tmp_path, capsys):
@@ -710,7 +755,7 @@ def test_verify_records_each_passed_check_for_the_native_report(monkeypatch, tmp
     assets = Assets(target)
     seen, run = commands()
     checks = []
-    native.verify_release(assets, "v1.2.3", target, tmp_path, run=run, checks=checks)
+    native.verify_release(assets, "v1.2.3", "d" * 40, target, tmp_path, run=run, checks=checks)
     assert [check["name"] for check in checks] == [
         "native host",
         f"sha256 {assets.archive_name}",
@@ -732,7 +777,7 @@ def test_verify_writes_a_failing_result_with_the_checks_it_passed(monkeypatch, t
     result = tmp_path / "native-results" / f"{target}.json"
 
     status = native.main([
-        "verify", "--tag", "v1.2.3", "--target", target, "--wheel-python", "/controlled/python3.9",
+        "verify", "--tag", "v1.2.3", "--commit", "d" * 40, "--target", target, "--wheel-python", "/controlled/python3.9",
         "--result", str(result),
     ])
 

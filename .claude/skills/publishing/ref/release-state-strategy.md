@@ -56,35 +56,28 @@ release.
 
 ## Native Matrix Gate
 
-Before publishing `vX.Y.Z`, a prerelease built from an ancestor of the
-release-candidate commit must pass the native matrix. `Prerelease Archive` builds
-the archives and cp39-abi3 wheels for `prerelease/vX.Y.Z`; `Release Native Verify`
-then runs the same native matrix it runs for a published release (each release
-target, the wheel installed and run on Python 3.9, and 3.11 on win_arm64). The
-gate is satisfied only by a verify run whose title names the prerelease tag and
-its commit `V`, whose native jobs and report job all concluded `success`. A run
-that concludes `success` with skipped native jobs does not count.
+Before publishing `vX.Y.Z`, `Prerelease Archive` builds and publishes the
+manifest-declared archives and wheels for `prerelease/vX.Y.Z`. `Release Native
+Verify` checks them on their native hosts and renders its JSON results with the
+pinned sc-compose wheel. The report remains a workflow artifact until
+`lint-085.77` automates committing it to `site/`.
 
-Preflight does not demand a rerun for every commit. It enforces two rules, both
-defined in `.github/scripts/release_native_gate.py`, and `release/README.md`
-documents them:
+Preflight enforces two rules, also documented in `release/README.md`:
 
-- Only a `release-native-verify.yml` run from a trusted trigger can prove a tag:
-  a run from its tag push or, for a release tag, from the default branch.
-- The verified commit `V` must be an ancestor of the candidate `C`, and the
-  `V..C` diff may touch no artifact input. The artifact inputs and the manifest
-  build sections are the gate's constants. Other paths never force a rerun.
+- **Trusted run.** Only `release-native-verify.yml` can prove the prerelease.
+  A `workflow_run` must come from the prerelease tag push; a
+  `workflow_dispatch` must come from the default branch. The exact trigger rule
+  is defined by [`trusted_verify_run`](../../../../.github/scripts/release_native_gate.py).
+- **Verified commit and inputs.** The tag is resolved through `refs/tags` (peeling
+  annotated tags), and the manifest and native matrix are read at that commit
+  `V`; its verify-run title binds the tag to `V`. A prerelease workflow run
+  proves that tag commit, and a dispatch must name it and have a successful
+  prerelease build at that commit. `V` must be an ancestor of candidate `C`, and
+  no artifact input may differ between them. Artifact inputs and build manifest sections are defined in
+  [`release_native_gate.py`](../../../../.github/scripts/release_native_gate.py).
 
-A violation fails the gate and names the offending paths; cut a new prerelease
-and rerun the native matrix.
-
-`publisher` preflight prints the verify run id, the verified commit `V`, the
-artifact-input list, and the count of paths that need no rerun. A failure names
-the offending paths. The published-release run still verifies the published
-assets afterward.
-
-Each verify target writes a JSON result, and the verify run renders it into a
-durable HTML report. See the Native Verification Gate in `release/README.md`.
+A violation fails the gate and names the reason; cut a new prerelease and rerun
+the native matrix. The published-release run verifies the published assets too.
 
 ## Preflight and Recovery
 

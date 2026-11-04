@@ -463,9 +463,18 @@ PR #850):
 - `lint-085.93`: #847 QA round 3: default_branch 404 and 12 minors. Acceptance:
   the default-branch request reaches the repository URL; release tags need no
   `[prerelease]` section; tags resolve through `refs/tags` with annotated tags
-  peeled; the gate reads the manifest at `V`; the trusted-run rule follows the tag
-  kind; the prerelease prefix is validated; the native matrix policy sits in its
-  own module; each finding has a deterministic test or a documented resolution.
+  peeled; the gate reads the manifest at `V`; one shared prerelease-prefix
+  definition and one trusted-run rule are covered by deterministic tests, and
+  both release guides state the same two gate rules. Pushed
+  to `ci/085-native-verify-prerelease` at `0bc3f655`, with no pull request, to
+  merge into PR #842.
+- `lint-085.94`: QA round 4 of #847. Acceptance: findings recorded against
+  `0bc3f655` and scoped by the lead before implementation.
+- `lint-085.100`: scoped fixes for #847 QA round 4 findings 1, 2, 3, 4, 5, 7,
+  8, 11 and 13. Acceptance: prerelease build, manifest and native workflow are
+  bound to the resolved tag commit; both release guides state the same gate
+  rules; project-plan traceability and AST import coverage are current; code is
+  simplified with a net-negative line delta.
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 The REQ-CLI-022 prior-release refresh exception and the ADR-022 runtime

@@ -22,8 +22,6 @@ REPORT_JOB = "Render native verification report"
 PAGE_SIZE = 100
 MAX_PAGES = 10
 VERIFY_WORKFLOW_NAME = "Release Native Verify"
-VERIFY_WORKFLOW_FILE = "release-native-verify.yml"
-VERIFY_WORKFLOW_PATH = f".github/workflows/{VERIFY_WORKFLOW_FILE}"
 RELEASE_WORKFLOW = "Release"
 PRERELEASE_WORKFLOW = "Prerelease Archive"
 # The one identifier per build workflow: its display name, and the file that runs it. Every
