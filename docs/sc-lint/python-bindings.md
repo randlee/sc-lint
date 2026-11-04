@@ -98,6 +98,8 @@ The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
 | `winget.missing_field` | A configured Winget version or installer URL field is absent. |
 | `release_wiring.file_missing` | The configured release workflow does not exist. |
 | `release_wiring.fragment` | A configured release workflow fragment is absent. |
+| `release_docs.files` | The configured `release_docs` globs matched no files. |
+| `release_docs.version` | A release-version literal matched by a configured `release_docs` pattern differs from the workspace version; `expected` and `actual` carry the line number. |
 
 Configuration is resolved per `[version_sync]` table: `--config` first, then
 `sc-lint.toml`, then `.just/lint-config.toml`; a candidate without that table
@@ -122,6 +124,14 @@ accepts `enabled`, `file` (no default; required when enabled), and
 `required_fragments` (default `[]`); absent files and fragments produce
 `release_wiring.file_missing` and `release_wiring.fragment` findings. Paths
 and globs must be relative to the repository root and stay inside it.
+
+`[version_sync.release_docs]` is disabled by default with `enabled = false`.
+When enabled it requires `files` (a non-empty array of repo-relative globs)
+and `patterns` (a non-empty array of regular expressions). Each pattern must
+capture the release version in the named group `version`; every match in a
+listed file must equal the workspace version. Matching is per line, so a
+finding names the file and line. This is how the sc-lint repository keeps its
+README, crate manifests and docs-bundle at the release version.
 
 ## Release channel
 

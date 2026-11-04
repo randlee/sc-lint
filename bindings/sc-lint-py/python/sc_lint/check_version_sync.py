@@ -365,6 +365,63 @@ def validate_release_wiring(repo_root: Path, config: dict[str, Any]) -> tuple[bo
     return True, findings
 
 
+def release_docs_settings(config: dict[str, Any]) -> tuple[list[str], list[re.Pattern[str]]]:
+    docs = subtable(config, "release_docs")
+    files = docs.get("files")
+    patterns = docs.get("patterns")
+    if not isinstance(files, list) or not files or not all(isinstance(item, str) and item.strip() for item in files):
+        raise AdapterError("config", "[version_sync.release_docs].files must be a non-empty array of strings when enabled")
+    if not isinstance(patterns, list) or not patterns or not all(isinstance(item, str) and item for item in patterns):
+        raise AdapterError("config", "[version_sync.release_docs].patterns must be a non-empty array of strings when enabled")
+    compiled: list[re.Pattern[str]] = []
+    for pattern in patterns:
+        try:
+            expression = re.compile(pattern, re.MULTILINE)
+        except re.error as error:
+            raise AdapterError("config", f"[version_sync.release_docs].patterns has an invalid regex {pattern!r}: {error}") from error
+        if "version" not in expression.groupindex:
+            raise AdapterError("config", f"[version_sync.release_docs].patterns entry {pattern!r} must capture (?P<version>...)")
+        compiled.append(expression)
+    return files, compiled
+
+
+def validate_release_docs(
+    repo_root: Path,
+    workspace_version: str,
+    config: dict[str, Any],
+) -> tuple[bool, list[Finding]]:
+    docs = subtable(config, "release_docs")
+    if not _enabled(docs, "release_docs"):
+        return False, []
+
+    file_globs, patterns = release_docs_settings(config)
+    release_paths: set[Path] = set()
+    for file_glob in file_globs:
+        glob_path = repo_relative(repo_root, file_glob, "release_docs.files")
+        relative_glob = glob_path.relative_to(repo_root.resolve()).as_posix()
+        release_paths.update(path for path in repo_root.glob(relative_glob) if path.is_file())
+    if not release_paths:
+        return True, [Finding("release_docs.files", ", ".join(file_globs), "at least one file", "none")]
+
+    findings: list[Finding] = []
+    for release_path in sorted(release_paths, key=lambda path: path.as_posix()):
+        rel_file = _relative_display(release_path, repo_root)
+        for line_number, line in enumerate(read_text(release_path, repo_root).splitlines(), start=1):
+            for expression in patterns:
+                for match in expression.finditer(line):
+                    actual = match.group("version")
+                    if actual != workspace_version:
+                        findings.append(
+                            Finding(
+                                "release_docs.version",
+                                rel_file,
+                                f"{workspace_version} (line {line_number})",
+                                f"{actual} (line {line_number})",
+                            )
+                        )
+    return True, findings
+
+
 def success_message(workspace_version: str, executed_checks: list[str]) -> str:
     return (
         f"version sync check passed: workspace_version={workspace_version}; "
@@ -406,6 +463,10 @@ def _evaluate(root: Path, explicit_config: Path | None) -> tuple[str, list[Findi
     findings.extend(release_findings)
     if release_ran:
         executed.append("release wiring")
+    docs_ran, docs_findings = validate_release_docs(root, workspace_version, config)
+    findings.extend(docs_findings)
+    if docs_ran:
+        executed.append("release docs")
     findings.sort(key=lambda finding: (finding.check, finding.file))
     return workspace_version, findings, skipped, executed
 

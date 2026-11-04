@@ -102,15 +102,31 @@ def test_default_install_directory_follows_the_native_installer_rule(tmp_path: P
     default_windows = home / "AppData" / "Roaming" / "sc-lint" / "bin"
     default_unix = home / ".local" / "share" / "sc-lint" / "bin"
 
-    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, home, windows=True) == roaming / "sc-lint" / "bin"
-    assert bootstrap.default_install_directory({"APPDATA": ""}, home, windows=True) == default_windows
-    assert bootstrap.default_install_directory({}, home, windows=True) == default_windows
-    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, home, windows=False) == default_unix
-    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
-    assert bootstrap.default_install_directory({"XDG_DATA_HOME": ""}, home, windows=False) == default_unix
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, lambda: home, windows=True) == roaming / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"APPDATA": ""}, lambda: home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({}, lambda: home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, lambda: home, windows=False) == default_unix
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, lambda: home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": ""}, lambda: home, windows=False) == default_unix
     assert bootstrap.default_install_directory(
-        {"SC_LINT_INSTALL_DIR": str(tmp_path / "managed"), "APPDATA": str(roaming)}, home, windows=True
+        {"SC_LINT_INSTALL_DIR": str(tmp_path / "managed"), "APPDATA": str(roaming)}, lambda: home, windows=True
     ) == tmp_path / "managed"
+
+
+def test_default_install_directory_reads_no_home_when_an_override_supplies_it(tmp_path: Path) -> None:
+    # Windows finding 1b: a host with no home directory must still resolve an
+    # explicit install dir or %APPDATA%; the home lookup must not run eagerly.
+    bootstrap = load_bootstrap()
+
+    def no_home() -> Path:
+        raise RuntimeError("Could not determine home directory")
+
+    roaming = tmp_path / "Roaming"
+    managed = tmp_path / "managed"
+    assert bootstrap.default_install_directory({"SC_LINT_INSTALL_DIR": str(managed)}, no_home, windows=True) == managed
+    assert bootstrap.default_install_directory({"SC_LINT_INSTALL_DIR": str(managed)}, no_home, windows=False) == managed
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, no_home, windows=True) == roaming / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, no_home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
 
 
 def test_bootstrap_test_forwards_selector_and_args() -> None:
