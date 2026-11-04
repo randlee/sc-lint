@@ -1,6 +1,6 @@
 plan = "docs/plans/phase-n.jsonl"
 root = "lint-phase-n"
-integration_branch = "integrate/phase-n"
+integration_branch = "plans/phase-n"
 lead = "team-lead"
 
 [templates]
