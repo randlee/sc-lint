@@ -4,12 +4,42 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.5]
+
 ### Added
 
 - Runtime rules reject thread `sleep_until` in production Tokio packages,
   Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
-  held across `.await` (`SCB-RUNTIME-004`–`007`, #640). Test code is exempt;
+  held across `.await` (`SCB-RUNTIME-004`–`007`, #640, #838). Test code is exempt;
   function/method allows require a non-empty reason. `yield_now` stays legal.
+
+### Changed
+
+- Runtime guard tracking handles diverging branches, match scrutinee ownership,
+  rest/or patterns and nested reference bindings more accurately (#840).
+- Analyzer crates share common analysis options and repository-relative
+  source-path helpers, preserving existing public options shapes (#840).
+- Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
+  opt-outs. Separate test-module files can put `#![cfg(test)]` at the top to
+  mark the whole file as test code (#840).
+
+### Fixed
+
+- Make analyzer dependency-boundary test output draining deterministic (#839).
+- Published Python wheels exclude repository-only contract, lifecycle,
+  orchestration and release tests; release verification rejects leaked tests
+  (#841).
+- The reusable GitHub Action selects Linux and Windows ARM64 releases as well
+  as the existing x86_64 and macOS targets (#841).
+- The adoption kit renders consumer helper-policy tables, logging/artifact
+  settings and `default_lint_profile` from its managed input without drift
+  (#841).
+- Bootstrap lint, test and exec commands put the managed venv scripts on
+  child PATH after the archive bin directory and ahead of host interpreters
+  (#841).
+- Clarify that Python helper policies retain per-table fallback to
+  `.just/lint-config.toml`; the native CLI and analyzers use `sc-lint.toml`
+  (#841).
 
 ## [0.8.4] — 2026-11-01
 
