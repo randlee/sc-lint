@@ -28,6 +28,7 @@ STRING_LITERAL_RE = re.compile(
 # this to one token prevents an apostrophe inside a string from becoming a
 # false character match across the rest of the source line.
 CHAR_LITERAL_RE = re.compile(r"'(?P<quoted>(?:\\u\{[0-9A-Fa-f]{1,6}\}|\\.|[^'\\]))'")
+CFG_PREDICATE_TOKEN_RE = re.compile(r'"[^"]*"|[A-Za-z_][A-Za-z0-9_]*|[(),=]')
 
 RUST_SIMPLE_ESCAPES = {
     "0": "\0",
@@ -555,6 +556,32 @@ def line_is_suppressed(
     )
 
 
+def cfg_attribute_gates_on_test(line: str) -> bool:
+    """True when a `#[cfg(...)]` on this line admits only builds that include `test`.
+
+    `test` counts anywhere in the predicate except under `not(...)`: `cfg(test)`,
+    `cfg(any(test, feature = "x"))` and `cfg(all(test, unix))` are test scope,
+    while `cfg(not(test))` and `cfg(any(not(test), unix))` are not.
+    """
+    start = line.find("#[cfg(")
+    if start == -1:
+        return False
+    tokens = CFG_PREDICATE_TOKEN_RE.findall(line[start + len("#[cfg("):])
+    not_groups: list[bool] = []
+    previous = ""
+    for token in tokens:
+        if token == "(":
+            not_groups.append(previous == "not")
+        elif token == ")":
+            if not not_groups:
+                break
+            not_groups.pop()
+        elif token == "test" and not any(not_groups):
+            return True
+        previous = token
+    return False
+
+
 def classify_rust_test_scope(
     lines: list[str],
     *,
@@ -574,7 +601,7 @@ def classify_rust_test_scope(
     for line in lines:
         stripped = line.strip()
 
-        if "#[cfg(test)]" in stripped:
+        if cfg_attribute_gates_on_test(stripped):
             cfg_test_pending = True
             cfg_test_attribute_active = True
             scope.append(True)

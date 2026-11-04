@@ -40,6 +40,13 @@ All notable changes to sc-lint are documented here.
 - Clarify that Python helper policies retain per-table fallback to
   `.just/lint-config.toml`; the native CLI and analyzers use `sc-lint.toml`
   (#841).
+- The Python bootstrap's default managed binary directory matches the native
+  installer on Windows: it follows `%APPDATA%` (Roaming), not `%LOCALAPPDATA%`,
+  so a fresh install without `SC_LINT_INSTALL_DIR` finds the released binary
+  (#833).
+- `sc_lint.lint_common.rust_file_test_scope` classifies compound test cfgs such
+  as `#[cfg(any(test, feature = "..."))]` and `#[cfg(all(test, ...))]` under
+  `src/` as test scope; `cfg(not(test))` stays production (#837).
 
 ## [0.8.4] — 2026-11-01
 

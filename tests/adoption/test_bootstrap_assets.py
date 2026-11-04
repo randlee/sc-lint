@@ -105,6 +105,26 @@ def load_bootstrap():
     return module
 
 
+def test_default_install_directory_follows_the_native_installer_rule(tmp_path: Path) -> None:
+    # Issue #833: the bootstrap and the native installer must pick the same
+    # default. The inputs are passed in, so no real %APPDATA% or home is read.
+    bootstrap = load_bootstrap()
+    home = tmp_path / "home"
+    roaming = tmp_path / "Roaming"
+    default_windows = home / "AppData" / "Roaming" / "sc-lint" / "bin"
+    default_unix = home / ".local" / "share" / "sc-lint" / "bin"
+
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, home, windows=True) == roaming / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"APPDATA": ""}, home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({}, home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, home, windows=False) == default_unix
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": ""}, home, windows=False) == default_unix
+    assert bootstrap.default_install_directory(
+        {"SC_LINT_INSTALL_DIR": str(tmp_path / "managed"), "APPDATA": str(roaming)}, home, windows=True
+    ) == tmp_path / "managed"
+
+
 def test_bootstrap_test_forwards_selector_and_args() -> None:
     bootstrap = load_bootstrap()
     parsed = bootstrap.parse(["test", "--config", "c", "--fail-fast", "unit", "--nocapture", "--config", "x"])
