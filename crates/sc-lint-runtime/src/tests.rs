@@ -24,7 +24,7 @@ fn outside_source_path_reports_repository_relative_path_error() {
     let root = TempDir::new().unwrap();
     let outside_source = root.path().join("..\u{2f}outside.rs");
 
-    let error = super::runtime::repo_relative_source_path(root.path(), &outside_source)
+    let error = sc_lint_analyzer_support::repo_relative_source_path(root.path(), &outside_source)
         .expect_err("outside paths must produce a diagnostic");
     assert!(error.to_string().contains("outside.rs"));
     assert!(error.to_string().contains("repository-relative"));

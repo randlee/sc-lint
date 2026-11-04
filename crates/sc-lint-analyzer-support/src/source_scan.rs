@@ -30,7 +30,7 @@ pub struct PackageName(String);
 impl PackageName {
     pub fn new(value: impl Into<String>) -> Self {
         let value = value.into();
-        debug_assert!(!value.is_empty(), "package names must not be empty");
+        assert!(!value.is_empty(), "package names must not be empty");
         Self(value)
     }
 
@@ -65,7 +65,7 @@ pub struct TargetName(String);
 impl TargetName {
     pub fn new(value: impl Into<String>) -> Self {
         let value = value.into();
-        debug_assert!(!value.is_empty(), "target names must not be empty");
+        assert!(!value.is_empty(), "target names must not be empty");
         Self(value)
     }
 
@@ -126,7 +126,7 @@ pub enum PackageDependencyKind {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageDependency {
-    pub name: String,
+    pub name: PackageName,
     pub rename: Option<String>,
     pub kind: PackageDependencyKind,
     pub target: Option<String>,
@@ -157,7 +157,7 @@ impl WorkspaceMetadata {
                     .dependencies
                     .iter()
                     .map(|dependency| PackageDependency {
-                        name: dependency.name.clone(),
+                        name: PackageName::new(dependency.name.clone()),
                         rename: dependency.rename.clone(),
                         kind: match dependency.kind {
                             cargo_metadata::DependencyKind::Normal => PackageDependencyKind::Normal,
@@ -271,11 +271,6 @@ pub fn discover_source_files_with_metadata(
     }
 
     Ok(files)
-}
-
-pub fn count_scanned_crates(root: &Path) -> Result<usize> {
-    let metadata = load_workspace_metadata(root)?;
-    Ok(count_scanned_crates_with_metadata(&metadata))
 }
 
 pub fn count_scanned_crates_with_metadata(workspace: &WorkspaceMetadata) -> usize {

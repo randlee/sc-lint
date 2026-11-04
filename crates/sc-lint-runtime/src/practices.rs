@@ -3,9 +3,10 @@ pub(crate) mod allowances;
 mod bindings;
 mod flow;
 mod matches;
+mod state;
 use crate::RuleId;
 use crate::api::{Api, lookup};
-pub(crate) use crate::scope::production;
+use crate::scope::production;
 use bindings::{Imports, ValueKind, type_kind};
 use std::collections::{BTreeMap, BTreeSet};
 use syn::spanned::Spanned;
@@ -57,18 +58,24 @@ pub(crate) struct Site {
     pub(crate) detail: String,
 }
 
-#[derive(Clone)]
 struct Binding {
     name: String,
+    kind: ValueKind,
+    guard: bool,
+}
+#[derive(Clone, Copy)]
+struct BindingState {
     kind: ValueKind,
     guard: bool,
 }
 struct Scanner {
     imports: Imports,
     never_functions: BTreeSet<String>,
-    fields: BTreeMap<(String, String), ValueKind>,
+    fields: BTreeMap<String, BTreeMap<String, ValueKind>>,
     owner: String,
+    module: String,
     bindings: Vec<Binding>,
+    state_buffers: Vec<Vec<BindingState>>,
     asynchronous: bool,
     function: String,
     sites: Vec<Site>,
@@ -79,8 +86,9 @@ pub(crate) fn find(file: &syn::File) -> Vec<Site> {
     let mut never = flow::NeverFunctions::default();
     never.visit_file(file);
     let mut fields = Fields {
-        imports: &imports,
+        imports: Imports::collect(file),
         fields: BTreeMap::new(),
+        module: String::new(),
     };
     fields.visit_file(file);
     let fields = fields.fields;
@@ -89,7 +97,9 @@ pub(crate) fn find(file: &syn::File) -> Vec<Site> {
         never_functions: never.names,
         fields,
         owner: String::new(),
+        module: String::new(),
         bindings: Vec::new(),
+        state_buffers: Vec::new(),
         asynchronous: false,
         function: "<module>".into(),
         sites: Vec::new(),
@@ -98,23 +108,61 @@ pub(crate) fn find(file: &syn::File) -> Vec<Site> {
     scanner.sites
 }
 
-struct Fields<'a> {
-    imports: &'a Imports,
-    fields: BTreeMap<(String, String), ValueKind>,
+struct Fields {
+    imports: Imports,
+    fields: BTreeMap<String, BTreeMap<String, ValueKind>>,
+    module: String,
 }
-impl<'ast> Visit<'ast> for Fields<'_> {
+
+fn qualified(module: &str, name: &str) -> String {
+    if module.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{module}::{name}")
+    }
+}
+fn type_owner(module: &str, path: &str) -> String {
+    if let Some(path) = path.strip_prefix("crate::") {
+        return path.to_owned();
+    }
+    if let Some(path) = path.strip_prefix("self::") {
+        return qualified(module, path);
+    }
+    let mut module = module;
+    let mut path = path;
+    while let Some(parent) = path.strip_prefix("super::") {
+        module = module.rsplit_once("::").map_or("", |(parent, _)| parent);
+        path = parent;
+    }
+    qualified(module, path)
+}
+
+impl<'ast> Visit<'ast> for Fields {
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        self.imports.push_block(block);
+        syn::visit::visit_block(self, block);
+        self.imports.pop();
+    }
+
     fn visit_item_static(&mut self, item: &'ast syn::ItemStatic) {
         if production(&item.attrs, None) {
-            self.fields.insert(
-                (String::new(), item.ident.to_string()),
-                type_kind(&item.ty, self.imports),
-            );
+            self.fields
+                .entry(self.module.clone())
+                .or_default()
+                .insert(item.ident.to_string(), type_kind(&item.ty, &self.imports));
         }
     }
 
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        if production(&item.attrs, Some(item.ident == "tests")) {
+        if production(&item.attrs, Some(item.ident == "tests"))
+            && let Some((_, items)) = &item.content
+        {
+            let module = qualified(&self.module, &item.ident.to_string());
+            let old_module = std::mem::replace(&mut self.module, module);
+            self.imports.push_items(items, false);
             syn::visit::visit_item_mod(self, item);
+            self.imports.pop();
+            self.module = old_module;
         }
     }
     fn visit_item_struct(&mut self, item: &'ast syn::ItemStruct) {
@@ -123,10 +171,10 @@ impl<'ast> Visit<'ast> for Fields<'_> {
         }
         for field in &item.fields {
             if let Some(name) = &field.ident {
-                self.fields.insert(
-                    (item.ident.to_string(), name.to_string()),
-                    type_kind(&field.ty, self.imports),
-                );
+                self.fields
+                    .entry(qualified(&self.module, &item.ident.to_string()))
+                    .or_default()
+                    .insert(name.to_string(), type_kind(&field.ty, &self.imports));
             }
         }
         syn::visit::visit_item_struct(self, item);
@@ -177,18 +225,27 @@ impl Scanner {
                 {
                     return binding.kind;
                 }
-                self.imports
-                    .resolve(&path.path)
-                    .last()
-                    .and_then(|name| self.fields.get(&(String::new(), name.clone())))
+                let resolved = self.imports.resolve(&path.path);
+                let (module, name) = resolved
+                    .rsplit_once("::")
+                    .unwrap_or((&self.module, &resolved));
+                let module = module.strip_prefix("crate::").unwrap_or(module);
+                self.fields
+                    .get(module)
+                    .and_then(|fields| fields.get(name))
                     .copied()
                     .unwrap_or(ValueKind::Other)
             }
             syn::Expr::Field(field) if matches!(&*field.base, syn::Expr::Path(path) if path.path.is_ident("self")) => {
                 if let syn::Member::Named(name) = &field.member {
                     self.fields
-                        .get(&(self.owner.clone(), name.to_string()))
-                        .copied()
+                        .get(&self.owner)
+                        .and_then(|fields| {
+                            fields
+                                .iter()
+                                .find(|(key, _)| *name == key.as_str())
+                                .map(|(_, value)| *value)
+                        })
                         .unwrap_or(ValueKind::Other)
                 } else {
                     ValueKind::Other
@@ -207,20 +264,29 @@ impl Scanner {
     }
     fn method_kind(&self, call: &syn::ExprMethodCall) -> ValueKind {
         let receiver = self.kind(&call.receiver);
-        match call.method.to_string().as_str() {
-            "unwrap" | "expect" | "clone" => receiver,
-            "into_inner" if receiver == ValueKind::PoisonedGuard => ValueKind::Guard,
-            "handle" if receiver == ValueKind::Runtime => ValueKind::Handle,
-            "build" if receiver == ValueKind::Builder => ValueKind::Runtime,
-            _ if receiver == ValueKind::Builder => ValueKind::Builder,
-            _ => ValueKind::Other,
+        let method = &call.method;
+        if ["unwrap", "expect", "clone"]
+            .iter()
+            .any(|name| *method == *name)
+        {
+            receiver
+        } else if *method == "into_inner" && receiver == ValueKind::PoisonedGuard {
+            ValueKind::Guard
+        } else if *method == "handle" && receiver == ValueKind::Runtime {
+            ValueKind::Handle
+        } else if *method == "build" && receiver == ValueKind::Builder {
+            ValueKind::Runtime
+        } else if receiver == ValueKind::Builder {
+            ValueKind::Builder
+        } else {
+            ValueKind::Other
         }
     }
     fn call_kind(&self, call: &syn::ExprCall) -> ValueKind {
         let syn::Expr::Path(path) = &*call.func else {
             return ValueKind::Other;
         };
-        let path = self.imports.resolve(&path.path).join("::");
+        let path = self.imports.resolve(&path.path);
         match lookup(&path) {
             Some(Api::MutexNew) => ValueKind::Mutex,
             Some(Api::RuntimeNew) => ValueKind::Runtime,
@@ -236,22 +302,21 @@ impl Scanner {
     fn guard(&self, expr: &syn::Expr) -> bool {
         match expr {
             syn::Expr::MethodCall(call)
-                if matches!(
-                    call.method.to_string().as_str(),
-                    "unwrap" | "expect" | "unwrap_or_else"
-                ) =>
+                if ["unwrap", "expect", "unwrap_or_else"]
+                    .iter()
+                    .any(|name| call.method == *name) =>
             {
                 self.guard(&call.receiver)
             }
             syn::Expr::MethodCall(call) => {
-                matches!(call.method.to_string().as_str(), "lock" | "try_lock")
+                ["lock", "try_lock"].iter().any(|name| call.method == *name)
                     && self.kind(&call.receiver) == ValueKind::Mutex
             }
             syn::Expr::Match(branch) => self.match_result_guard(branch),
             syn::Expr::Try(expr) => self.guard(&expr.expr),
             syn::Expr::Paren(expr) => self.guard(&expr.expr),
             syn::Expr::Call(call) => {
-                matches!(&*call.func, syn::Expr::Path(path) if matches!(lookup(&self.imports.resolve(&path.path).join("::")), Some(Api::MutexLock | Api::MutexTryLock)))
+                matches!(&*call.func, syn::Expr::Path(path) if matches!(lookup(&self.imports.resolve(&path.path)), Some(Api::MutexLock | Api::MutexTryLock)))
             }
             _ => false,
         }
@@ -261,7 +326,7 @@ impl Scanner {
             syn::visit::visit_expr_call(self, call);
             return;
         };
-        let path = self.imports.resolve(&path.path).join("::");
+        let path = self.imports.resolve(&path.path);
         let rule = match lookup(&path) {
             Some(Api::ThreadSleepUntil) => Some(PracticeRule::ThreadSleepUntil),
             Some(Api::TokioSleep | Api::TokioSleepUntil) => Some(PracticeRule::TokioSleep),
@@ -284,73 +349,6 @@ impl Scanner {
         {
             binding.guard = false;
         }
-    }
-    fn deferred(&mut self, asynchronous: bool, visit: impl FnOnce(&mut Self)) {
-        let bindings = self.bindings.clone();
-        for binding in &mut self.bindings {
-            binding.guard = false;
-        }
-        let old = std::mem::replace(&mut self.asynchronous, asynchronous);
-        visit(self);
-        self.asynchronous = old;
-        self.bindings = bindings;
-    }
-    fn branch(&mut self, continues: bool, visit: impl FnOnce(&mut Self)) -> Option<Vec<Binding>> {
-        let before = self.bindings.clone();
-        visit(self);
-        let after = std::mem::replace(&mut self.bindings, before);
-        continues.then_some(after)
-    }
-    fn merge_guards(&mut self, branches: &[Option<Vec<Binding>>]) {
-        for (index, binding) in self.bindings.iter_mut().enumerate() {
-            binding.guard = branches.iter().flatten().any(|branch| branch[index].guard);
-        }
-    }
-    fn condition_guard(&self, cond: &syn::Expr) -> Option<Binding> {
-        let syn::Expr::Let(binding) = cond else {
-            return None;
-        };
-        self.pattern_guard(&binding.pat, &binding.expr)
-    }
-    fn visit_conditional(&mut self, branch: &syn::ExprIf) {
-        self.visit_expr(&branch.cond);
-        let binding = self.condition_guard(&branch.cond);
-        let then = self.branch(self.block_continues(&branch.then_branch), |this| {
-            let count = this.bindings.len();
-            this.bindings.extend(binding);
-            this.visit_block(&branch.then_branch);
-            this.bindings.truncate(count);
-        });
-        let otherwise = if let Some((_, other)) = &branch.else_branch {
-            self.branch(self.expr_continues(other), |this| this.visit_expr(other))
-        } else {
-            Some(self.bindings.clone())
-        };
-        self.merge_guards(&[then, otherwise]);
-    }
-    fn visit_match_branches(&mut self, branch: &syn::ExprMatch) {
-        self.visit_expr(&branch.expr);
-        let states = branch
-            .arms
-            .iter()
-            .map(|arm| {
-                let bindings = self.match_arm_bindings(&arm.pat, &branch.expr);
-                self.branch(self.expr_continues(&arm.body), |this| {
-                    let count = this.bindings.len();
-                    this.bindings.extend(bindings);
-                    this.visit_arm(arm);
-                    this.bindings.truncate(count);
-                })
-            })
-            .collect::<Vec<_>>();
-        if !states.is_empty() {
-            self.merge_guards(&states);
-        }
-    }
-    fn conditional(&mut self, visit: impl FnOnce(&mut Self)) {
-        let bindings = self.bindings.clone();
-        visit(self);
-        self.bindings = bindings;
     }
 }
 
@@ -384,8 +382,15 @@ impl<'ast> Visit<'ast> for Scanner {
         }
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        if production(&item.attrs, Some(item.ident == "tests")) {
+        if production(&item.attrs, Some(item.ident == "tests"))
+            && let Some((_, items)) = &item.content
+        {
+            let module = qualified(&self.module, &item.ident.to_string());
+            let old_module = std::mem::replace(&mut self.module, module);
+            self.imports.push_items(items, false);
             syn::visit::visit_item_mod(self, item);
+            self.imports.pop();
+            self.module = old_module;
         }
     }
     fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
@@ -394,11 +399,7 @@ impl<'ast> Visit<'ast> for Scanner {
         }
         let owner = self.owner.clone();
         if let syn::Type::Path(path) = &*item.self_ty {
-            self.owner = path
-                .path
-                .segments
-                .last()
-                .map_or_else(String::new, |segment| segment.ident.to_string());
+            self.owner = type_owner(&self.module, &self.imports.resolve(&path.path));
         }
         syn::visit::visit_item_impl(self, item);
         self.owner = owner;
@@ -410,7 +411,9 @@ impl<'ast> Visit<'ast> for Scanner {
     }
     fn visit_block(&mut self, block: &'ast syn::Block) {
         let count = self.bindings.len();
+        self.imports.push_block(block);
         syn::visit::visit_block(self, block);
+        self.imports.pop();
         self.bindings.truncate(count);
     }
     fn visit_expr_assign(&mut self, expr: &'ast syn::ExprAssign) {
@@ -483,18 +486,14 @@ impl<'ast> Visit<'ast> for Scanner {
             syn::Expr::Await(awaited) => {
                 self.visit_expr(&awaited.base);
                 if self.asynchronous {
-                    let names = self
-                        .bindings
-                        .iter()
-                        .filter(|binding| binding.guard)
-                        .map(|binding| binding.name.clone())
-                        .collect::<Vec<_>>();
-                    for name in names {
-                        self.record(
-                            PracticeRule::MutexAcrossAwait,
-                            expr,
-                            format!("std::sync::Mutex guard `{name}` is live across .await"),
-                        );
+                    for index in 0..self.bindings.len() {
+                        if self.bindings[index].guard {
+                            let detail = format!(
+                                "std::sync::Mutex guard `{}` is live across .await",
+                                self.bindings[index].name
+                            );
+                            self.record(PracticeRule::MutexAcrossAwait, expr, detail);
+                        }
                     }
                 }
             }

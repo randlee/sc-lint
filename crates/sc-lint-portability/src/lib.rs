@@ -219,7 +219,8 @@ fn analyze_workspace_configured_with_metadata_loader(
                 &module_cfg,
             )
             .map_err(|source| map_portability_analysis_error(source, &options.root))?;
-            let scanned_crates = portability::count_scanned_crates(workspace);
+            let scanned_crates =
+                sc_lint_analyzer_support::count_scanned_crates_with_metadata(workspace);
             (findings, allowed, scanned_crates)
         } else {
             (Vec::new(), Vec::new(), 0)

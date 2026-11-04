@@ -156,10 +156,10 @@ def values(path: Path) -> dict:
 
 def toml_value(value: object) -> str:
     if value is None: raise ValueError("TOML configuration cannot contain null")
-    if isinstance(value, dict): return "{ " + ", ".join(f"{json.dumps(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, dict): return "{ " + ", ".join(f"{toml_value(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
     if isinstance(value, list): return "[" + ", ".join(toml_value(item) for item in value) + "]"
     if isinstance(value, bool): return str(value).lower()
-    return json.dumps(value, allow_nan=False)
+    return json.dumps(value, ensure_ascii=False, allow_nan=False).replace("\x7f", "\\u007f")
 
 
 def substitute_template_variables(source: str, replacements: dict[str, str]) -> str:
@@ -169,19 +169,19 @@ def substitute_template_variables(source: str, replacements: dict[str, str]) -> 
 
 
 def toml_key(name: str) -> str:
-    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
+    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else toml_value(name)
 
 
 def lint_profiles_table(lint_profiles: dict) -> str:
     if not lint_profiles: return ""
-    rows = "\n".join(f"{toml_key(name)} = {json.dumps(members)}" for name, members in lint_profiles.items())
+    rows = "\n".join(f"{toml_key(name)} = {toml_value(members)}" for name, members in lint_profiles.items())
     return f"[tool.sc-lint.lint_profiles]\n{rows}"
 
 
 def lint_step(name: str, step: object) -> str:
     """Render one lint row; cross-target and command semantics belong to sc-lint."""
     command, tags = (step, {}) if isinstance(step, list) else (step["command"], step)
-    lines = [f"name = {json.dumps(tags.get('name', name))}", f"command = {toml_value(command)}"]
+    lines = [f"name = {toml_value(tags.get('name', name))}", f"command = {toml_value(command)}"]
     lines += [f"{key} = {toml_value(tags[key])}" for key in ("platform", "target", "host", "after_all", "env", "env_paths", "cwd") if key in tags]
     return "[[tool.sc-lint.lint]]\n" + "\n".join(lines)
 
@@ -189,7 +189,7 @@ def lint_step(name: str, step: object) -> str:
 def test_layer(name: str, step: object) -> str:
     """Renders one test row using the fields accepted by the Rust test-step model."""
     command, fields = (step, {}) if isinstance(step, list) else (step["command"], step)
-    lines = [f"name = {json.dumps(name)}", f"command = {toml_value(command)}"]
+    lines = [f"name = {toml_value(name)}", f"command = {toml_value(command)}"]
     if "after_all" in fields:
         lines.append(f"after_all = {toml_value(fields['after_all'])}")
     return "[[tool.sc-lint.test]]\n" + "\n".join(lines)

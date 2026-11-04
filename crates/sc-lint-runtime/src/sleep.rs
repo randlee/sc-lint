@@ -1,5 +1,5 @@
-use crate::api::{Api, lookup};
-use crate::scope::is_test_only;
+use crate::api::{Api, lookup, lookup_path};
+use sc_lint_analyzer_support::is_test_only;
 use sc_lint_analyzer_support::span_start_line;
 use std::collections::BTreeSet;
 use syn::spanned::Spanned;
@@ -59,19 +59,22 @@ impl CallVisitor {
         if path.qself.is_some() || path.path.segments.iter().any(has_arguments) {
             return false;
         }
-        let names = path
-            .path
-            .segments
-            .iter()
-            .map(|segment| segment.ident.to_string())
-            .collect::<Vec<_>>();
-        lookup(&names.join("::")) == Some(Api::ThreadSleep)
-            || (names.len() == 2
-                && names[1] == "sleep"
-                && self.bindings.thread_modules.contains(&names[0]))
-            || (names.len() == 1
-                && (self.bindings.sleeps.contains(&names[0])
-                    || (names[0] == "sleep" && self.bindings.glob_thread)))
+        let parts = &path.path.segments;
+        lookup_path(&path.path) == Some(Api::ThreadSleep)
+            || (parts.len() == 2
+                && parts[1].ident == "sleep"
+                && self
+                    .bindings
+                    .thread_modules
+                    .iter()
+                    .any(|name| parts[0].ident == name.as_str()))
+            || (parts.len() == 1
+                && (self
+                    .bindings
+                    .sleeps
+                    .iter()
+                    .any(|name| parts[0].ident == name.as_str())
+                    || (parts[0].ident == "sleep" && self.bindings.glob_thread)))
     }
 }
 
