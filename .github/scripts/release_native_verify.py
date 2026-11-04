@@ -197,6 +197,12 @@ def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str) -> tuple
     return tag, native_matrix(client.manifest(tag))
 
 
+def wheel_python_version(run, python: str) -> tuple[int, int]:
+    text = run([python, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"])
+    major, minor = text.split(".")
+    return int(major), int(minor)
+
+
 def assert_native(target: str) -> None:
     expected = native_host(target)
     aliases = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}
@@ -204,9 +210,12 @@ def assert_native(target: str) -> None:
     print(f"Native host: {actual}; target: {target}; Python: {sys.version}", flush=True)
     if actual != expected:
         raise ValueError(f"{target}: native runner required; expected {expected}, got {actual}")
-    if sys.version_info < (3, 9):
+
+
+def assert_wheel_python(target: str, python_version: tuple[int, int]) -> None:
+    if python_version < (3, 9):
         raise ValueError("wheel verification requires Python 3.9 or newer")
-    if target == WIN_ARM64_TARGET and sys.version_info < (3, 11):
+    if target == WIN_ARM64_TARGET and python_version < (3, 11):
         raise ValueError("wheel verification on win_arm64 requires Python 3.11 or newer")
 
 
@@ -276,7 +285,9 @@ def assert_version(run, argv: list[str], binary: str, version: str) -> None:
         raise ValueError(f"{binary}: version mismatch; expected {expected!r}, got {actual!r}")
 
 
-def verify_release(client: GitHub, tag: str, target: str, destination: Path, *, run=run_command) -> None:
+def verify_release(
+    client: GitHub, tag: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command
+) -> None:
     version = release_version(tag)
     assert_native(target)
     manifest = client.manifest(tag)
@@ -305,8 +316,9 @@ def verify_release(client: GitHub, tag: str, target: str, destination: Path, *, 
     for index, name in enumerate(wheel_names):
         wheel = destination / name
         verify_wheel_arch(wheel, target)
+        assert_wheel_python(target, wheel_python_version(run, wheel_python))
         environment = destination / f"wheel-env-{index}"
-        run([sys.executable, "-m", "venv", str(environment)])
+        run([wheel_python, "-m", "venv", str(environment)])
         scripts = environment / ("Scripts" if suffix else "bin")
         python = scripts / ("python.exe" if suffix else "python")
         run([str(python), "-m", "pip", "install", "--retries", "0", "--disable-pip-version-check", "--force-reinstall", str(wheel)])
@@ -321,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tag", default="")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--target")
+    parser.add_argument("--wheel-python", help="interpreter the wheel is installed and run under (e.g. Python 3.9)")
     parser.add_argument("--manifest", type=Path, default=Path(MANIFEST_PATH))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -339,8 +352,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.target:
                 raise ValueError("verify requires --target")
+            if not args.wheel_python:
+                raise ValueError("verify requires --wheel-python")
             with tempfile.TemporaryDirectory(prefix="release-native-verify-") as directory:
-                verify_release(client, args.tag, args.target, Path(directory))
+                verify_release(client, args.tag, args.target, Path(directory), wheel_python=args.wheel_python)
         return 0
     except (ValueError, OSError, KeyError, tarfile.TarError, zipfile.BadZipFile) as error:
         print(f"release-native-verify: {error}", file=sys.stderr)

@@ -11,7 +11,7 @@ import json
 import os
 import re
 import sys
-from sc_lint._toml import loads as toml_loads
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -44,12 +44,12 @@ def install_profiles(profiles: dict, lint_profiles: dict | None, *, ci_os: list[
 
 
 def rendered_config(consumer: Path) -> dict:
-    return toml_loads((consumer / "sc-lint.toml").read_text())["tool"]["sc-lint"]
+    return tomllib.loads((consumer / "sc-lint.toml").read_text())["tool"]["sc-lint"]
 
 
 def test_profiles_exact_json_toml_roundtrip() -> None:
     fragment = json.loads((PROFILE_FIXTURES / "roundtrip-fragment.json").read_text())
-    expected = toml_loads((PROFILE_FIXTURES / "roundtrip-fragment.toml").read_text())["tool"]["sc-lint"]
+    expected = tomllib.loads((PROFILE_FIXTURES / "roundtrip-fragment.toml").read_text())["tool"]["sc-lint"]
     consumer, result = install_profiles(fragment["profiles"], fragment["lint_profiles"])
     assert result.returncode == 0, result.stderr
 
@@ -95,7 +95,7 @@ def test_installer_defers_remaining_rust_semantic_rejections(case: str) -> None:
     fragment = json.loads((SEMANTIC_INVALID / f"{case}.json").read_text())
     consumer, result = install_profiles(fragment["profiles"], fragment.get("lint_profiles"))
     assert result.returncode == 0, f"{case}: {result.stderr}"
-    expected = toml_loads((SEMANTIC_INVALID / f"{case}.toml").read_text())["tool"]["sc-lint"]
+    expected = tomllib.loads((SEMANTIC_INVALID / f"{case}.toml").read_text())["tool"]["sc-lint"]
     config = rendered_config(consumer)
     assert config["lint"] == expected["lint"], case
     assert config.get("lint_profiles") == expected.get("lint_profiles"), case

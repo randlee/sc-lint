@@ -1,7 +1,11 @@
 """Consumer TOML retains Unicode scalar values and escaped control characters."""
 from pathlib import Path
 import runpy
-import tomllib
+
+import pytest
+
+# tomllib arrived in Python 3.11; on 3.9 the module skips rather than breaking collection.
+tomllib = pytest.importorskip("tomllib")
 
 INSTALL = runpy.run_path(str(Path(__file__).resolve().parents[1] / "install.py"))
 

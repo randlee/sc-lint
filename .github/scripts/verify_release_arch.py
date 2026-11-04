@@ -1,5 +1,7 @@
 """Verify release architecture and Windows binary CRT imports without execution."""
 
+from __future__ import annotations
+
 import argparse
 from pathlib import Path
 import struct
