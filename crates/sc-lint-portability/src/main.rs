@@ -98,8 +98,7 @@ fn main() -> Result<ExitCode> {
                     eprintln!("error: {error}");
                     return Ok(ExitCode::from(3));
                 }
-                Err(error @ sc_lint_portability::PortabilityError::InvalidSiteAllow { .. })
-                | Err(error @ sc_lint_portability::PortabilityError::InvalidSiteAllows(_)) => {
+                Err(error @ sc_lint_portability::PortabilityError::InvalidSiteAllows(_)) => {
                     eprintln!("error: {error}");
                     return Ok(ExitCode::from(3));
                 }

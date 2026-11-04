@@ -32,7 +32,7 @@ pub struct SiteAllowDiagnostic {
     #[source]
     pub error: DirectiveError,
 }
-/// All site allowance diagnostics, retained in source order.
+/// Site allowance diagnostics, ordered by source path and then source location.
 #[derive(Debug)]
 pub struct SiteAllowErrors {
     pub diagnostics: Vec<SiteAllowDiagnostic>,

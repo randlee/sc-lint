@@ -2823,8 +2823,8 @@ fn site_allow_unknown_rule() {
     let message = error.to_string();
     assert!(message.contains("lib.rs:1"), "{message}");
     assert!(matches!(
-        error,
-        PortabilityError::InvalidSiteAllow { line: 1, .. }
+        &error,
+        PortabilityError::InvalidSiteAllows(errors) if errors.diagnostics.len() == 1 && errors.diagnostics[0].line == 1
     ));
     assert!(
         message.contains(sc_lint_directives::DirectiveCode::UnknownRule.qualified()),
@@ -2852,8 +2852,8 @@ fn site_allow_unsupported_rule_is_unknown_rule() {
     })
     .expect_err("PORT-001 has no item-scoped allowance behavior");
     assert!(matches!(
-        error,
-        PortabilityError::InvalidSiteAllow { line: 1, .. }
+        &error,
+        PortabilityError::InvalidSiteAllows(errors) if errors.diagnostics.len() == 1 && errors.diagnostics[0].line == 1
     ));
     assert!(
         error
@@ -2878,12 +2878,11 @@ fn malformed_site_allow_is_a_typed_source_error() {
     })
     .expect_err("missing reason is rejected");
     assert!(matches!(
-        error,
-        PortabilityError::InvalidSiteAllow { line: 1, .. }
+        &error,
+        PortabilityError::InvalidSiteAllows(errors) if errors.diagnostics.len() == 1 && errors.diagnostics[0].line == 1
     ));
     let message = error.to_string();
     assert!(message.contains("lib.rs:1"));
-    assert!(message.contains("PORTABILITY.INVALID_SITE_ALLOW"));
     assert!(message.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"));
     assert!(message.contains("recovery: add reason"));
 }
@@ -4045,4 +4044,48 @@ fn site_allow_reports_all_unknown_ids_in_source_order() {
         panic!("expected all source diagnostics")
     };
     assert_eq!(errors.diagnostics.len(), 3);
+}
+
+#[test]
+fn site_allow_errors_are_combined_across_files_in_source_order() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "mod a; mod b;");
+    fixture.write_source(
+        "example",
+        "b.rs",
+        "\n#[sc_lint(allow(PORT-997),reason=\"typo\")]fn b(){}",
+    );
+    fixture.write_source(
+        "example",
+        "a.rs",
+        "#[sc_lint(allow(PORT-998,PORT-999),reason=\"typos\")]fn a(){}",
+    );
+    for threads in [1, 4] {
+        let error = in_pool(threads, || {
+            analyze_workspace(&AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            })
+        })
+        .unwrap_err();
+        let PortabilityError::InvalidSiteAllows(errors) = error else {
+            panic!("expected combined site allowance errors")
+        };
+        assert_eq!(errors.diagnostics.len(), 3);
+        for (diagnostic, (file, line, id)) in errors.diagnostics.iter().zip([
+            ("a.rs", 1, "PORT-998"),
+            ("a.rs", 1, "PORT-999"),
+            ("b.rs", 2, "PORT-997"),
+        ]) {
+            assert_eq!(diagnostic.path.file_name().unwrap(), file);
+            assert_eq!(diagnostic.line, line);
+            assert_eq!(
+                diagnostic.error.typed_code(),
+                Some(sc_lint_directives::DirectiveCode::UnknownRule)
+            );
+            assert!(diagnostic.error.cause().contains(id));
+        }
+    }
 }

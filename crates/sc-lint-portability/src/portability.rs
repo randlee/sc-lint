@@ -51,6 +51,11 @@ mod parity;
 use self::findings::PortabilityFinding;
 use self::findings::convert_findings;
 
+type FileAnalysis = (
+    Vec<PortabilityFinding>,
+    Vec<crate::site_allow::SiteAllowance>,
+);
+
 type AnalyzedFinding = (Finding, Option<RepoRelativePath>);
 type PortabilityAnalysis = (Vec<AnalyzedFinding>, Vec<AllowedFinding<RuleId>>);
 
@@ -199,9 +204,8 @@ pub(crate) fn analyze_portability(
             ));
             Ok((findings, allowances))
         })
-        .collect::<Vec<Result<_>>>()
-        .into_iter()
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Vec<Result<_>>>();
+    let file_findings = combine_file_analyses(file_findings)?;
     let mut findings = Vec::new();
     let mut allowances = Vec::new();
     for (file_findings, file_allowances) in file_findings {
@@ -222,6 +226,27 @@ pub(crate) fn analyze_portability(
         .expect("relative source path preserves AllowedFinding invariants");
     }
     Ok((convert_findings(root, findings)?, allowed))
+}
+
+fn combine_file_analyses(results: Vec<Result<FileAnalysis>>) -> Result<Vec<FileAnalysis>> {
+    let mut analyses = Vec::new();
+    let mut diagnostics = Vec::new();
+    for result in results {
+        match result {
+            Ok(analysis) => analyses.push(analysis),
+            Err(error) => match error.downcast::<crate::SiteAllowErrors>() {
+                Ok(errors) => diagnostics.extend(errors.diagnostics),
+                Err(error) => return Err(error),
+            },
+        }
+    }
+    if diagnostics.is_empty() {
+        return Ok(analyses);
+    }
+    // Indexed parallel collection preserves within-file order; stable sorting
+    // orders files while retaining the original order of ids on the same line.
+    diagnostics.sort_by(|left, right| left.path.cmp(&right.path).then(left.line.cmp(&right.line)));
+    Err(anyhow::Error::new(crate::SiteAllowErrors { diagnostics }))
 }
 
 struct PortabilityCollector<'a> {
