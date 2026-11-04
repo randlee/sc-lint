@@ -20,7 +20,6 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
-use sc_lint_directives::DirectiveError;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 
@@ -122,12 +121,6 @@ impl From<anyhow_crate::Error> for PortabilityErrorSource {
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
-    #[error("PORTABILITY.INVALID_SITE_ALLOW at {}:{line}: {error}", path.display())]
-    InvalidSiteAllow {
-        path: PathBuf,
-        line: usize,
-        error: DirectiveError,
-    },
     #[error(transparent)]
     InvalidSiteAllows(#[from] SiteAllowErrors),
     #[error("failed to analyze portability findings for root `{}`: {source:#}", root.display())]
@@ -246,10 +239,6 @@ fn analyze_workspace_configured_with_metadata_loader(
 
 fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
     match source.downcast::<SiteAllowErrors>() {
-        Ok(mut errors) if errors.diagnostics.len() == 1 => {
-            let SiteAllowDiagnostic { path, line, error } = errors.diagnostics.remove(0);
-            PortabilityError::InvalidSiteAllow { path, line, error }
-        }
         Ok(errors) => PortabilityError::InvalidSiteAllows(errors),
         Err(source) => PortabilityError::AnalyzeFindings {
             root: root.to_path_buf(),

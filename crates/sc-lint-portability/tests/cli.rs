@@ -125,8 +125,8 @@ fn site_allow_errors_exit_as_configuration_errors() {
     for (source, code, recovery) in [
         (
             "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)] pub fn only_unix() {}\n",
-            "PORTABILITY.INVALID_SITE_ALLOW",
-            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+            sc_lint_directives::DirectiveCode::MissingReason.qualified(),
+            sc_lint_directives::DirectiveCode::MissingReason.recovery(),
         ),
         (
             "#[sc_lint(allow(PORT-001), reason = \"unsupported\")]\n#[cfg(unix)] pub fn only_unix() {}\n",
