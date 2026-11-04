@@ -143,16 +143,56 @@ pub(crate) fn run_consumer_init_at(
         }
     }
 
-    Ok(json!({
-        "status": if write_needed.is_empty() { "current" } else if request.dry_run { "would_create" } else { "created" },
+    Ok(init_result(
+        request,
+        &files,
+        &preserved,
+        &write_needed,
+        &refresh,
+        &version_only_stale,
+    ))
+}
+
+fn init_status(
+    request: ConsumerInitRequest,
+    created: &[PathBuf],
+    refreshed: &[PathBuf],
+) -> &'static str {
+    if !refreshed.is_empty() {
+        if request.dry_run {
+            "would_update"
+        } else {
+            "updated"
+        }
+    } else if created.is_empty() {
+        "current"
+    } else if request.dry_run {
+        "would_create"
+    } else {
+        "created"
+    }
+}
+
+fn init_result(
+    request: ConsumerInitRequest,
+    files: &[ConsumerIntegrationFile],
+    preserved: &[PathBuf],
+    created: &[PathBuf],
+    refreshed: &[PathBuf],
+    version_only_stale: &[PathBuf],
+) -> Value {
+    json!({
+        "status": init_status(request, created, refreshed),
         "managed_files": files.iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(),
-        "preserved_files": paths_to_strings(&preserved),
-        "created_files": paths_to_strings(&write_needed),
-        "version_only_stale_files": paths_to_strings(&version_only_stale),
+        "preserved_files": paths_to_strings(preserved),
+        "created_files": paths_to_strings(created),
+        "refreshed_files": if request.dry_run { Vec::<String>::new() } else { paths_to_strings(refreshed) },
+        "would_refresh_files": if request.dry_run { paths_to_strings(refreshed) } else { Vec::<String>::new() },
+        "version_only_stale_files": paths_to_strings(version_only_stale),
         "check": request.check,
         "dry_run": request.dry_run,
         "summary": "consumer Just integration is managed by sc-lint",
-    }))
+    })
 }
 
 #[expect(
@@ -420,6 +460,27 @@ mod tests {
             };
             fs::write(&bootstrap_path, bootstrap).expect("bootstrap");
 
+            let expected_bootstrap = fs::read(&bootstrap_path).expect("prior bootstrap bytes");
+            let dry_run = run_consumer_init_at(
+                fixture.path(),
+                ConsumerInitRequest {
+                    just: true,
+                    check: false,
+                    dry_run: true,
+                },
+            )
+            .expect("dry-run recognizes prior bootstrap");
+            assert_eq!(dry_run["status"], "would_update");
+            assert_eq!(
+                dry_run["would_refresh_files"],
+                json!([bootstrap_path.display().to_string()])
+            );
+            assert_eq!(dry_run["refreshed_files"], json!([]));
+            assert_eq!(
+                fs::read(&bootstrap_path).expect("dry-run leaves prior bootstrap"),
+                expected_bootstrap
+            );
+
             let result = run_consumer_init_at(
                 fixture.path(),
                 ConsumerInitRequest {
@@ -429,7 +490,12 @@ mod tests {
                 },
             )
             .expect("legacy generated config should be recognized");
-            assert_eq!(result["status"], "current");
+            assert_eq!(result["status"], "updated");
+            assert_eq!(
+                result["refreshed_files"],
+                json!([bootstrap_path.display().to_string()])
+            );
+            assert_eq!(result["would_refresh_files"], json!([]));
             assert_eq!(
                 result["version_only_stale_files"],
                 json!([
