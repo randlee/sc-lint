@@ -24,7 +24,9 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   the offline bundle; `sc-lint docs cli-reference` prints the index. Tests
   regenerate them from the real clap definitions and fail on drift.
 - Every `sc-lint` command, option and target value has help text, and
-  `-V` is a short form of `--version`.
+  `-V` is a short form of `--version`. The `sc-lint ci` help says that
+  in a source checkout it runs the source-maintainer profile, and that
+  `sc-lint lint ci --consumer` selects the consumer CI profile.
 - `sc-lint docs` accepts `README`, `README.md` and `overview` for the
   overview and `setup` as an alias of `installation`, so the
   `Docs: sc-lint docs setup` pointer in setup and compatibility errors
@@ -38,6 +40,11 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
 - Every crate on crates.io ships its `LICENSE` and a README that points to
   the primary `sc-lint` crate and the repository; each crate has
   crate-level rustdoc.
+- The version-sync check has an opt-in `[version_sync.release_docs]` table
+  (`enabled`, `files`, `patterns`) with findings `release_docs.version` and
+  `release_docs.files`. sc-lint enables it for its own repository, so a stale
+  version literal in the README, crate manifests or the offline docs bundle
+  fails the check (lint-085.50).
 
 ### Changed
 
@@ -71,9 +78,11 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   imports, resolve per module and function scope for `SCB-RUNTIME-003`
   through `007`. A `use ...::sleep` in one module no longer leaks into a
   sibling module, so results no longer depend on item order, and statics
-  imported through `crate::` or `super::` stay tracked for `SCB-RUNTIME-007`.
+  imported through `crate::`, `super::` (including sibling modules such as
+  `use super::a::M`), `self::` or a glob stay tracked for `SCB-RUNTIME-007`.
   `SCB-RUNTIME-003` also resolves renamed `self` imports such as
-  `use std::thread::{self as thread}` (lint-085.39, lint-085.46).
+  `use std::thread::{self as thread}` (lint-085.39, lint-085.46,
+  lint-085.52).
 - The bootstrap usage lists each operation's own flags: `setup` accepts only
   `--dry-run`, and `--check` belongs to `upgrade`. `setup --check` is now a
   bootstrap usage error instead of being forwarded to `sc-lint setup`.
@@ -97,8 +106,28 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   recovery.
 - An unknown `--rule-filter` selector error lists the valid selectors for
   that analyzer.
-- A Python helper that fails to start (no stdout, error on stderr) is reported
-  as a backend failure that carries the stderr and suggests `just setup`.
+- **Behaviour-breaking:** an unsupported portability rule id in a site
+  allowance (any `PORT-*` id other than `PORT-010`) is reported as
+  `PORTABILITY.INVALID_SITE_ALLOW` with code
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` instead of `PORTABILITY.UNKNOWN_RULE`,
+  and every unknown id is reported, not only the first. The exit code stays 3.
+  Tooling that matches `PORTABILITY.UNKNOWN_RULE` must update (lint-085.52).
+- Site-allowance attributes that are not valid Rust attribute syntax report
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`; `UNKNOWN_ELEMENT` now means only an
+  unsupported element. `EMPTY_REASON`, `MALFORMED_RULE_ID` and `UNKNOWN_RULE`
+  use one recovery text each (lint-085.52).
+- **Behaviour-breaking:** a Python helper that fails to start (no stdout,
+  error on stderr) is reported as a backend failure (exit 5) that carries the
+  stderr and suggests `just setup`. It was a backend protocol error (exit 6).
+  Scripts that test for exit 6 from `sc-lint view findings` or another
+  Python-backed command must also accept 5.
+- `sc-lint init --just` human output reports `init: <status>` (`current`,
+  `would_create` or `created`) followed by `Created:` (`Would create:` under
+  `--dry-run`), `Preserved:` and `Version-only stale:` file lists, instead of
+  `init: ok`.
+- `sc-lint docs --path` prints the bare path without the
+  `Documentation root:` prefix, so the output can be used directly in
+  scripts; with a guide name, the bare path precedes the guide text.
 - The GitHub Action runs on Node 24. Its description and `operation` input
   state that `setup` only installs and preflights the release, and list the
   six supported runners.
@@ -128,13 +157,19 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   `AnalyzeOptions`, so `sc_lint_portability::AnalyzeOptions` and
   `sc_lint_runtime::AnalyzeOptions` keep their paths and fields;
   `sc-lint-boundary` keeps its own `AnalyzeOptions` with the `rule` filter.
-- New in `sc-lint-directives`: `is_sc_lint_attribute`, `unknown_owned_rule`,
-  `unknown_owned_rules`, `unknown_rule`, the `#[non_exhaustive]` `DirectiveCode`,
-  `DirectiveError::typed` and `DirectiveError::typed_code`, and
-  `AttributeInput::parse_tokens` and `AttributeInput::parse_attribute`.
-  `DirectiveError::from_diagnostic` stays as the
-  fallback for foreign `syn` errors, and existing `DirectiveError` parse
-  variants and constructors remain (lint-085.46).
+- New in `sc-lint-directives`: `is_sc_lint_attribute`, `unknown_owned_rules`,
+  `unknown_rule`, the `#[non_exhaustive]` `DirectiveCode` (including
+  `SyntaxError`), `DirectiveError::typed`, `DirectiveError::typed_code`,
+  `DirectiveError::from_diagnostic` (maps a foreign `syn` error to
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`), and `AttributeInput::parse_tokens` and
+  `AttributeInput::parse_attribute`. Existing `DirectiveError` parse variants
+  and constructors remain (lint-085.46, lint-085.52).
+- `sc-lint-portability`: `PortabilityError::UnknownRule` is removed. One
+  unknown rule id is `PortabilityError::InvalidSiteAllow` with code
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`; several site-allowance errors are
+  `PortabilityError::InvalidSiteAllows(SiteAllowErrors)`. New exported types:
+  `SiteAllowDiagnostic { path, line, error }` and
+  `SiteAllowErrors { diagnostics }` (lint-085.52).
 - `sc-lint-analyzer-support`: `PackageDependency.name` is the validated
   `PackageName` instead of `String` (`PackageTarget.name` is already
   `TargetName`). `PackageName` and `TargetName` keep `new`, `as_str`,
@@ -146,7 +181,9 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
 - Rust library consumers that build `AnalyzeOptions` by struct literal or
   import it from an analyzer crate need no change. Consumers that read
   `PackageDependency.name` as `String`, rely on `Deref` from `PackageName` or
-  `TargetName`, or call `count_scanned_crates` must update; use `as_str()`. CLI and Python users need no configuration migration.
+  `TargetName`, call `count_scanned_crates`, or match
+  `PortabilityError::UnknownRule` must update; use `as_str()` and match
+  `InvalidSiteAllow`/`InvalidSiteAllows`. CLI and Python users need no configuration migration.
 
 ### Fixed
 
@@ -170,14 +207,20 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
 - The Python bootstrap's default managed binary directory matches the native
   installer on Windows: it follows `%APPDATA%` (Roaming), not `%LOCALAPPDATA%`,
   so a fresh install without `SC_LINT_INSTALL_DIR` finds the released binary
-  (#833).
+  (#833). The bootstrap reads the home directory only when neither
+  `SC_LINT_INSTALL_DIR` nor `APPDATA` (Windows) or `XDG_DATA_HOME` supplies
+  the directory, so a host with no home directory and an explicit override no
+  longer fails with "Could not determine home directory" (lint-085.50).
 - `sc_lint.lint_common.rust_file_test_scope` classifies compound test cfgs such
   as `#[cfg(any(test, feature = "..."))]` and `#[cfg(all(test, ...))]` under
   `src/` as test scope; `cfg(not(test))` stays production (#837).
 - Analyzer binaries no longer fail when stdout is closed early, for example
   when piped into `head`.
-- `sc-lint init --just` still refreshes generated config files that carry the
-  0.8.4 generated header when only the version differs (lint-085.47).
+- `sc-lint init --just` classifies a `sc-lint.toml` generated by 0.8.4 and
+  otherwise unedited as version-only stale: it is preserved and reported, not
+  overwritten, instead of being reported as a user-owned conflict. A 0.8.4
+  config with edited steps still conflicts and stays user-owned (lint-085.47,
+  lint-085.51).
 - The Python bindings guide now says bootstrap `setup --check` is a usage
   error (exit 2), `setup --dry-run` is supported, and `upgrade --check` is the
   non-mutating probe (lint-085.47).
