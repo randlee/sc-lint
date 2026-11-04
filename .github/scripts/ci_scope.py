@@ -1,9 +1,9 @@
 """Classify whether a CI event's changed paths require the runtime CI matrix.
 
 Documentation-only pull requests skip the runtime jobs and still report the same
-check names. A path is runtime unless it is explicitly documentation or development
-metadata, so an unclassified new path, a README, a CHANGELOG or any file a test or lint
-reads runs the full matrix. Pushes to develop and main always run it.
+check names. A path is runtime unless it is under an explicitly exempt prefix; Python
+sources remain runtime even under documentation prefixes. Unclassified paths run the
+full matrix. Pushes to develop and main always run it.
 """
 
 from __future__ import annotations
@@ -16,8 +16,7 @@ from collections.abc import Iterable
 
 GIT_TIMEOUT_SECONDS = 60
 
-# Canonical non-runtime exemptions and their per-path provenance/reason. Keep
-# the path list here; policy and plan docs point here instead of copying it.
+# This is the canonical non-runtime prefix list.
 NON_RUNTIME_PATHS = (
     "site/reports/",  # Rand, 2026-11-04 (lint-085.79): explicitly approved.
     "docs/",  # lint-085.79: documentation-only direction; read files are reclassified.
@@ -25,17 +24,13 @@ NON_RUNTIME_PATHS = (
     ".atm-bd/",  # lint-085.79: local ATM state is development metadata.
     ".triage/",  # lint-085.79: finding records are development metadata.
 )
-# Paths under a non-runtime prefix that tests or lints read, so they stay runtime.
-# docs/sc-lint is covered by adoption and CLI-contract readers; requirements.md
-# is read by test suites. The closure test verifies tracked readers too.
-RUNTIME_EXCEPTIONS = ("docs/sc-lint/", "docs/requirements.md")
 REVISION_RE = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 
 
 def is_runtime(path: str) -> bool:
     """Return whether one changed path can change the Rust build, the artifacts or a check."""
     # Python sources are code wherever they sit, so they are never documentation.
-    if path.endswith(".py") or path.startswith(RUNTIME_EXCEPTIONS):
+    if path.endswith(".py") or path.startswith("docs/sc-lint/") or path == "docs/requirements.md":
         return True
     return not path.startswith(NON_RUNTIME_PATHS)
 

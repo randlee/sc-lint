@@ -49,17 +49,6 @@ feature; record why in the bead. A function may stay long only as a flat,
 ordered checklist with no shared mutable state, named in the baseline with a
 one-line reason in the commit message.
 
-## CI Scope
-
-- Documentation-only pull requests skip the runtime matrix. The classifier is
-  `.github/scripts/ci_scope.py`; it is the canonical source for each exemption
-  and its provenance. Tracked paths read by tests or lints are runtime. The
-  tracked-source closure test covers Rust include macros and common `fs::read`
-  expressions (including manifest-directory joins and concatenated paths),
-  pytest repository-root reads, and configured lint file globs.
-- All other paths are runtime by default. Pushes to `develop` and `main` always
-  run the full runtime matrix.
-
 ## Plan Naming
 
 | Thing | Form | Example |

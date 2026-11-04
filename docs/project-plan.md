@@ -426,11 +426,13 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
   `lint-085.69`, fix `lint-085.70`, QA `lint-085.71`), merged through the
   version-bump PR #842
 - CI scope for PR #850 (`lint-085.79`, QA round 1 `lint-085.83`): documentation-only
-  pull requests skip the runtime matrix according to the canonical exemptions
-  and per-exemption provenance in `.github/scripts/ci_scope.py`. Tracked paths
-  read by tests or lints remain runtime, enforced by a tracked-source closure
-  test. Pushes to `develop` and `main` always run the full matrix, and the
-  documentation-only lint leg still runs codespell under the same check names.
+  pull requests skip the runtime matrix according to the canonical prefix
+  exemptions in `.github/scripts/ci_scope.py`. Pushes to `develop` and `main`
+  always run the full matrix, and the documentation-only lint leg still runs
+  codespell under the same check names.
+  Follow-up simplification (`lint-085.102`, QA `lint-085.90`): keep a small
+  classification suite and workflow skip guard; route docs-only adoption and
+  release-smoke matrices to Ubuntu and remove the read-closure scanner.
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 The REQ-CLI-022 prior-release refresh exception and the ADR-022 runtime
