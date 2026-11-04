@@ -225,6 +225,12 @@ struct ConsumerIntegrationFile {
     kind: ManagedFileKind,
 }
 
+pub(crate) fn consumer_integration_path(root: &Path, components: &[&str]) -> PathBuf {
+    components
+        .iter()
+        .fold(root.to_path_buf(), |path, component| path.join(component))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ManagedFileKind {
     Config,
@@ -235,17 +241,17 @@ enum ManagedFileKind {
 fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
     vec![
         ConsumerIntegrationFile {
-            path: root.join(CONFIG_FILENAME),
+            path: consumer_integration_path(root, &[CONFIG_FILENAME]),
             contents: canonical_consumer_config(),
             kind: ManagedFileKind::Config,
         },
         ConsumerIntegrationFile {
-            path: root.join("Justfile"),
+            path: consumer_integration_path(root, &["Justfile"]),
             contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}"),
             kind: ManagedFileKind::Static,
         },
         ConsumerIntegrationFile {
-            path: root.join(".sc-lint/bootstrap.py"),
+            path: consumer_integration_path(root, &[".sc-lint", "bootstrap.py"]),
             contents: CONSUMER_BOOTSTRAP_ASSET.to_string(),
             kind: ManagedFileKind::Bootstrap,
         },
@@ -441,18 +447,19 @@ mod tests {
         ] {
             let crlf = legacy_config.contains("\r\n");
             let fixture = tempfile::TempDir::new().expect("fixture");
-            let config_path = fixture.path().join(CONFIG_FILENAME);
+            let config_path = consumer_integration_path(fixture.path(), &[CONFIG_FILENAME]);
             fs::write(&config_path, &legacy_config).expect("legacy config");
-            let justfile_path = fixture.path().join("Justfile");
+            let justfile_path = consumer_integration_path(fixture.path(), &["Justfile"]);
             let justfile = if crlf {
                 to_crlf(legacy_justfile)
             } else {
                 legacy_justfile.to_owned()
             };
             fs::write(&justfile_path, &justfile).expect("legacy Justfile");
-            let bootstrap_dir = fixture.path().join(".sc-lint");
+            let bootstrap_dir = consumer_integration_path(fixture.path(), &[".sc-lint"]);
             fs::create_dir(&bootstrap_dir).expect("bootstrap directory");
-            let bootstrap_path = bootstrap_dir.join("bootstrap.py");
+            let bootstrap_path =
+                consumer_integration_path(fixture.path(), &[".sc-lint", "bootstrap.py"]);
             let bootstrap = if crlf {
                 to_crlf(legacy_bootstrap)
             } else {
@@ -470,6 +477,7 @@ mod tests {
                 },
             )
             .expect("dry-run recognizes prior bootstrap");
+            assert_no_mixed_path_separators(&dry_run);
             assert_eq!(dry_run["status"], "would_update");
             assert_eq!(
                 dry_run["would_refresh_files"],
@@ -490,6 +498,7 @@ mod tests {
                 },
             )
             .expect("legacy generated config should be recognized");
+            assert_no_mixed_path_separators(&result);
             assert_eq!(result["status"], "updated");
             assert_eq!(
                 result["refreshed_files"],
@@ -524,6 +533,7 @@ mod tests {
             )
             .expect_err("edited legacy Justfile remains user-owned");
             assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+            assert_no_mixed_path_separators(&error.details["conflicts"]);
             fs::write(&justfile_path, &justfile).expect("restore legacy Justfile");
 
             let edited_bootstrap = legacy_bootstrap.replace(
@@ -585,6 +595,47 @@ mod tests {
 
     fn to_crlf(contents: &str) -> String {
         normalize_line_endings(contents).replace('\n', "\r\n")
+    }
+
+    fn assert_no_mixed_path_separators(paths: &Value) {
+        let path_lists = paths.as_array().map_or_else(
+            || {
+                paths
+                    .as_object()
+                    .expect("init result is an object")
+                    .values()
+                    .filter(|value| value.is_array())
+                    .collect::<Vec<_>>()
+            },
+            |_| vec![paths],
+        );
+        for path_list in path_lists {
+            for path in path_list
+                .as_array()
+                .expect("path list is an array")
+                .iter()
+                .filter_map(Value::as_str)
+            {
+                assert!(
+                    !(path.contains('/') && path.contains('\\')),
+                    "path mixes separator styles: {path}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn current_created_and_preserved_init_paths_use_consistent_separators() {
+        let fixture = tempfile::TempDir::new().expect("fixture");
+        let create_request = ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: false,
+        };
+        let created = run_consumer_init_at(fixture.path(), create_request).expect("create files");
+        assert_no_mixed_path_separators(&created);
+        let current = run_consumer_init_at(fixture.path(), create_request).expect("current files");
+        assert_no_mixed_path_separators(&current);
     }
 
     #[test]
