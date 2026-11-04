@@ -1,10 +1,12 @@
 //! Shared, rule-neutral support for `sc-lint` AST analyzer crates.
 
+mod analyze_options;
 mod analyzer_config;
 mod relative_path;
 mod render;
 mod source_scan;
 
+pub use analyze_options::AnalyzeOptions;
 pub use analyzer_config::AnalyzerConfigError;
 pub use analyzer_config::AnalyzerName;
 pub use analyzer_config::AnalyzerSettings;
@@ -15,6 +17,9 @@ pub use analyzer_config::load_analyzer_settings;
 pub use analyzer_config::read_config_document;
 pub use relative_path::RelativePathError;
 pub use relative_path::RepoRelativePath;
+pub use relative_path::RepoRelativeSourcePathError;
+pub use relative_path::relative_path_under_root;
+pub use relative_path::repo_relative_source_path;
 pub use render::render_findings_report;
 pub use source_scan::FileContext;
 pub use source_scan::PackageDependency;
@@ -33,6 +38,7 @@ pub use source_scan::count_scanned_crates;
 pub use source_scan::count_scanned_crates_with_metadata;
 pub use source_scan::discover_source_files;
 pub use source_scan::discover_source_files_with_metadata;
+pub use source_scan::is_test_only;
 pub use source_scan::item_attrs;
 pub use source_scan::item_identifier;
 pub use source_scan::item_name_hint_is_tests;

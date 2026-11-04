@@ -1,3 +1,5 @@
+use crate::api::{Api, lookup};
+use crate::scope::is_test_only;
 use sc_lint_analyzer_support::span_start_line;
 use std::collections::BTreeSet;
 use syn::spanned::Spanned;
@@ -63,7 +65,7 @@ impl CallVisitor {
             .iter()
             .map(|segment| segment.ident.to_string())
             .collect::<Vec<_>>();
-        names == ["std", "thread", "sleep"]
+        lookup(&names.join("::")) == Some(Api::ThreadSleep)
             || (names.len() == 2
                 && names[1] == "sleep"
                 && self.bindings.thread_modules.contains(&names[0]))
@@ -76,7 +78,9 @@ impl CallVisitor {
 impl<'ast> Visit<'ast> for ImportVisitor {
     fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
         if !is_test_only(&item.attrs) {
-            import_tree(&mut self.bindings, &item.tree, Vec::new());
+            crate::imports::visit_use_tree(&item.tree, &mut |import| {
+                self.bindings.import(import);
+            });
         }
     }
 
@@ -198,48 +202,35 @@ impl<'ast> Visit<'ast> for CallVisitor {
     }
 }
 
-fn import_tree(bindings: &mut SleepBindings, tree: &syn::UseTree, mut prefix: Vec<String>) {
-    match tree {
-        syn::UseTree::Path(path) => {
-            prefix.push(path.ident.to_string());
-            import_tree(bindings, &path.tree, prefix);
-        }
-        syn::UseTree::Name(name) => {
-            let name = name.ident.to_string();
-            if name == "self" && prefix == ["std", "thread"] {
-                bindings.thread_modules.insert("thread".into());
-            } else {
-                prefix.push(name);
-                bind_import(bindings, &prefix, None);
+impl SleepBindings {
+    fn import(&mut self, import: crate::imports::Import) {
+        match import {
+            crate::imports::Import::Name { path, rename } => {
+                if rename.is_none() && path == ["std", "thread", "self"] {
+                    self.thread_modules.insert("thread".into());
+                } else {
+                    bind_import(self, &path, rename);
+                }
             }
-        }
-        syn::UseTree::Rename(rename) => {
-            prefix.push(rename.ident.to_string());
-            bind_import(bindings, &prefix, Some(rename.rename.to_string()));
-        }
-        syn::UseTree::Glob(_) => {
-            if prefix == ["std", "thread"] {
-                bindings.glob_thread = true;
-            }
-            if prefix == ["std"] {
-                bindings.thread_modules.insert("thread".into());
-            }
-        }
-        syn::UseTree::Group(group) => {
-            for item in &group.items {
-                import_tree(bindings, item, prefix.clone());
+            crate::imports::Import::Glob(path) => {
+                if lookup(&path.join("::")) == Some(Api::Thread) {
+                    self.glob_thread = true;
+                }
+                if lookup(&path.join("::")) == Some(Api::Std) {
+                    self.thread_modules.insert("thread".into());
+                }
             }
         }
     }
 }
 
 fn bind_import(bindings: &mut SleepBindings, path: &[String], rename: Option<String>) {
-    if path == ["std", "thread"] {
+    if lookup(&path.join("::")) == Some(Api::Thread) {
         bindings
             .thread_modules
             .insert(rename.clone().unwrap_or_else(|| "thread".into()));
     }
-    if path == ["std", "thread", "sleep"] {
+    if lookup(&path.join("::")) == Some(Api::ThreadSleep) {
         bindings
             .sleeps
             .insert(rename.unwrap_or_else(|| "sleep".into()));
@@ -248,47 +239,4 @@ fn bind_import(bindings: &mut SleepBindings, path: &[String], rename: Option<Str
 
 fn has_arguments(segment: &syn::PathSegment) -> bool {
     !matches!(segment.arguments, syn::PathArguments::None)
-}
-
-pub(crate) fn is_test_only(attributes: &[syn::Attribute]) -> bool {
-    attributes
-        .iter()
-        .any(|attribute| attr_is_test(attribute) || cfg_is_test(attribute))
-}
-
-/// `#[test]`, or a path of two or more segments ending in `test`
-/// (`#[tokio::test]`, `#[async_std::test]`): both expand to a `#[test]` fn.
-fn attr_is_test(attribute: &syn::Attribute) -> bool {
-    let path = attribute.path();
-    path.is_ident("test")
-        || (path.segments.len() >= 2
-            && path
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "test"))
-}
-
-fn cfg_is_test(attribute: &syn::Attribute) -> bool {
-    if !attribute.path().is_ident("cfg") {
-        return false;
-    }
-    attribute
-        .parse_args::<syn::Meta>()
-        .is_ok_and(|meta| meta_is_test_only(&meta))
-}
-
-fn meta_is_test_only(meta: &syn::Meta) -> bool {
-    if meta.path().is_ident("test") {
-        return true;
-    }
-    let syn::Meta::List(list) = meta else {
-        return false;
-    };
-    if !list.path.is_ident("all") {
-        return false;
-    }
-    let nested = list.parse_args_with(
-        syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-    );
-    nested.is_ok_and(|items| items.iter().any(meta_is_test_only))
 }

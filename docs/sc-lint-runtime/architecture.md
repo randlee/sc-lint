@@ -57,8 +57,12 @@ from the existing collector.
 
 `practices.rs` owns the 004–007 syntax walk and lexical guard state. Its
 `bindings` module resolves file-local use aliases and recognized receiver
-types, and `allowances` parses the shared reasoned directive model through
-`sc-lint-directives`. It has no Tokio crate dependency or runtime executor.
+types using the runtime-owned `api.rs` canonical registry. `imports.rs` walks
+use trees for both practices and the legacy sleep pass; their adapters preserve
+the distinct alias/glob recognition contracts. `scope.rs` calls analyzer support's shared test-attribute recognition and
+scope classification while preserving rule 003's lack
+of name-based test exemption. The `allowances` module parses the shared
+reasoned directive model through `sc-lint-directives`. It has no Tokio crate dependency or runtime executor.
 Rule 004 reuses `SleepScope` unchanged; 005–007 cover all non-test source.
 Function/async-region boundaries isolate guard state, block boundaries remove
 locals, explicit drops release guards, and branch states conservatively join.
@@ -75,3 +79,10 @@ An internal four-variant PracticeRule makes conversion into runtime findings
 exhaustive, without an unreachable fallback. Shared directive helpers own
 attribute-path matching and analyzer-owned unknown-rule checks. Runtime
 allowances cache parsed attributes and aggregate located errors in source order.
+
+Lock-result Ok patterns introduce scoped guard bindings in if-let, let-else,
+match and while-let. Match arms also track poison errors and unbound
+scrutinee resources, and direct guard-valued match results transfer into
+receiving local bindings. `PoisonError::into_inner` transfers ownership from
+the error binding to its guard result. Break tokens inside opaque macro bodies conservatively
+keep a loop's exit reachable; macro bodies are not otherwise expanded.

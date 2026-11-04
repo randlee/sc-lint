@@ -16,8 +16,8 @@ runtime/concurrency-correctness rules.
 - ADR-020 decision 6 narrows ADR-007: Tokio-aware rules needing neither a Tokio
   crate dependency nor Tokio runtime semantics may live here; `sc-lint-tokio`
   remains reserved for rules that need either. The sleep pass uses flattened
-  imports, does not expand macros, and treats out-of-line `#[cfg(test)]` module
-  files as production files.
+  imports and does not expand macros. A separate test-module file must carry
+  its own inner `#![cfg(test)]` attribute to be classified as test code.
 - `SCB-RUNTIME-003` exclusions use the runtime analyzer table:
 
   ```toml
@@ -35,7 +35,8 @@ runtime/concurrency-correctness rules.
     an imported name, such as a local `sleep`, is not shadow-checked
   - macros are not expanded, so a sleep call produced by macro expansion is not
     seen
-  - out-of-line `#[cfg(test)] mod x;` files are production files
+  - an out-of-line module's parent `#[cfg(test)] mod x;` attribute is not
+    propagated; put `#![cfg(test)]` at the top of the separate file
 - the crate must keep its machine contract stable through the top-level CLI
   normalization surface
 
@@ -62,8 +63,13 @@ Rule IDs and this analyzer's JSON output are stable consumer contracts
   Tokio dependency. `yield_now` remains legal.
 - Existing ScopeKind classification and the sleep pass's test-attribute
   handling exempt test targets/files, `tests/`, inline `cfg(test)` (including
-  `all(test, ...)`), bare and framework test attributes. Out-of-line test-module
-  parent context remains a known limitation.
+  `all(test, ...)`), bare and framework test attributes. A separate test-module
+  file whose first item is the inner attribute `#![cfg(test)]` is test code.
+  Put that marker at the top of the separate file; the parent module's
+  `#[cfg(test)] mod checks;` does not propagate into it.
+  Marker approval receipt: Rand, 2026-11-03: "Putting #![cfg(test)] at the top
+  of the separate file is acceptable." This receipt accepts only the marker;
+  REQ-RUNTIME-001 remains Pending.
 - Syntactic grouped/renamed/glob `use` aliases are recognized. Qualified
   calls and identifiable typed/inferred Runtime/Handle and Mutex receivers are
   checked. Macro expansion, Rust type/borrow checking, reexports/crate renames,

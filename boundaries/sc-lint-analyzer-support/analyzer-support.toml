@@ -18,6 +18,7 @@ roots = [
   "PackageName",
   "TargetName",
   "ScopeKind",
+  "is_test_only",
   "discover_source_files",
   "count_scanned_crates",
   "render_findings_report",

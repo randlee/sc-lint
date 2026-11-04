@@ -1,3 +1,4 @@
+use crate::api::{Api, known_glob_path, lookup};
 use std::collections::BTreeMap;
 use syn::visit::Visit;
 
@@ -43,8 +44,8 @@ impl Imports {
                 let mut candidate = glob.clone();
                 candidate.extend(path.iter().cloned());
                 let candidate = self.expand_aliases(candidate);
-                if known_path(&candidate)
-                    || (candidate.len() > 1 && known_path(&candidate[..candidate.len() - 1]))
+                if known_glob_path(&candidate)
+                    || (candidate.len() > 1 && known_glob_path(&candidate[..candidate.len() - 1]))
                 {
                     return candidate;
                 }
@@ -53,37 +54,22 @@ impl Imports {
         path
     }
 
-    fn tree(&mut self, tree: &syn::UseTree, mut prefix: Vec<String>) {
-        match tree {
-            syn::UseTree::Path(path) => {
-                prefix.push(path.ident.to_string());
-                self.tree(&path.tree, prefix);
-            }
-            syn::UseTree::Name(name) => {
-                if name.ident != "self" {
-                    prefix.push(name.ident.to_string());
+    fn tree(&mut self, tree: &syn::UseTree) {
+        crate::imports::visit_use_tree(tree, &mut |import| match import {
+            crate::imports::Import::Name { mut path, rename } => {
+                if path.last().is_some_and(|name| name == "self") {
+                    path.pop();
                 }
-                if let Some(name) = prefix.last() {
-                    self.aliases.insert(name.clone(), prefix.clone());
+                if let Some(name) = rename.or_else(|| path.last().cloned()) {
+                    self.aliases.insert(name, path);
                 }
             }
-            syn::UseTree::Rename(rename) => {
-                if rename.ident != "self" {
-                    prefix.push(rename.ident.to_string());
-                }
-                self.aliases.insert(rename.rename.to_string(), prefix);
-            }
-            syn::UseTree::Glob(_) => {
-                if !prefix.is_empty() {
-                    self.globs.push(prefix);
+            crate::imports::Import::Glob(path) => {
+                if !path.is_empty() {
+                    self.globs.push(path);
                 }
             }
-            syn::UseTree::Group(group) => {
-                for tree in &group.items {
-                    self.tree(tree, prefix.clone());
-                }
-            }
-        }
+        });
     }
 }
 
@@ -126,7 +112,7 @@ impl<'ast> Visit<'ast> for Imports {
 
     fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
         if super::production(&item.attrs, None) {
-            self.tree(&item.tree, Vec::new());
+            self.tree(&item.tree);
         }
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
@@ -143,6 +129,8 @@ pub(super) enum ValueKind {
     Handle,
     Builder,
     Guard,
+    BorrowedGuard,
+    PoisonedGuard,
     NeverCallable,
     Other,
 }
@@ -156,12 +144,12 @@ pub(super) fn type_kind(ty: &syn::Type, imports: &Imports) -> ValueKind {
         syn::Type::Paren(paren) => type_kind(&paren.elem, imports),
         syn::Type::Path(path) => {
             let resolved = imports.resolve(&path.path).join("::");
-            match resolved.as_str() {
-                "std::sync::Mutex" => ValueKind::Mutex,
-                "std::sync::MutexGuard" => ValueKind::Guard,
-                "tokio::runtime::Runtime" => ValueKind::Runtime,
-                "tokio::runtime::Handle" => ValueKind::Handle,
-                "tokio::runtime::Builder" => ValueKind::Builder,
+            match lookup(&resolved) {
+                Some(Api::Mutex) => ValueKind::Mutex,
+                Some(Api::MutexGuard) => ValueKind::Guard,
+                Some(Api::Runtime) => ValueKind::Runtime,
+                Some(Api::Handle) => ValueKind::Handle,
+                Some(Api::Builder) => ValueKind::Builder,
                 _ => wrapped_kind(path, imports),
             }
         }
@@ -172,18 +160,7 @@ pub(super) fn type_kind(ty: &syn::Type, imports: &Imports) -> ValueKind {
 fn wrapped_kind(path: &syn::TypePath, imports: &Imports) -> ValueKind {
     // Common ownership wrappers preserve the identity of their contained value.
     let name = imports.resolve(&path.path).join("::");
-    if !matches!(
-        name.as_str(),
-        "Arc"
-            | "Rc"
-            | "Box"
-            | "std::sync::Arc"
-            | "std::rc::Rc"
-            | "std::boxed::Box"
-            | "alloc::sync::Arc"
-            | "alloc::rc::Rc"
-            | "alloc::boxed::Box"
-    ) {
+    if lookup(&name) != Some(Api::Owner) {
         return ValueKind::Other;
     }
     if let Some(segment) = path.path.segments.last()
@@ -196,22 +173,4 @@ fn wrapped_kind(path: &syn::TypePath, imports: &Imports) -> ValueKind {
         }
     }
     ValueKind::Other
-}
-
-fn known_path(path: &[String]) -> bool {
-    matches!(
-        path.join("::").as_str(),
-        "std::thread::sleep_until"
-            | "std::sync::Mutex"
-            | "std::sync::MutexGuard"
-            | "std::sync::Arc"
-            | "std::rc::Rc"
-            | "std::mem::drop"
-            | "tokio::time::sleep"
-            | "tokio::time::sleep_until"
-            | "tokio::runtime::Runtime"
-            | "tokio::runtime::Handle"
-            | "tokio::runtime::Builder"
-            | "futures::executor::block_on"
-    )
 }
