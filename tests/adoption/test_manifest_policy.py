@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import runpy
-from sc_lint._toml import loads as toml_loads
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -122,7 +122,7 @@ def test_issue136_installer_roundtrip(product_artifacts: ProductArtifacts) -> No
     result = run("--input", str(input_path), str(consumer))
     assert result.returncode == 0, result.stderr
 
-    rendered = toml_loads((consumer / "sc-lint.toml").read_text())
+    rendered = tomllib.loads((consumer / "sc-lint.toml").read_text())
     parsed_policy = rendered["tool"]["sc-lint"]["analyzers"]["boundary"]
     assert parsed_policy == expected_policy
     assert json.loads((consumer / ".sc-lint" / "install.json").read_text())["analyzers"]["boundary"] == expected_policy
@@ -210,7 +210,7 @@ def test_issue136_installer_accepts_empty_allowlists_and_sections() -> None:
     input_path, expected_policy = policy_input(consumer, policy)
     result = run("--input", str(input_path), str(consumer))
     assert result.returncode == 0, result.stderr
-    rendered = toml_loads((consumer / "sc-lint.toml").read_text())
+    rendered = tomllib.loads((consumer / "sc-lint.toml").read_text())
     assert rendered["tool"]["sc-lint"]["analyzers"]["boundary"] == expected_policy
 
 

@@ -7,7 +7,7 @@ import runpy
 from pathlib import Path
 import stat
 import subprocess
-from sc_lint._toml import loads as toml_loads
+import tomllib
 from typing import Any
 
 import pytest
@@ -162,7 +162,7 @@ def test_issue372_installer_roundtrip() -> None:
     assert result.returncode == 0, result.stderr
     rendered = (consumer / "sc-lint.toml").read_text()
     assert "platform_adapters = [{" in rendered
-    parsed = toml_loads(rendered)["tool"]["sc-lint"]["analyzers"]["portability"]
+    parsed = tomllib.loads(rendered)["tool"]["sc-lint"]["analyzers"]["portability"]
     assert parsed["platform_adapters"] == ADAPTERS
 
     installed_snapshot = tree_snapshot(consumer)
@@ -228,7 +228,7 @@ def test_issue372_installer_renders_semantic_cases_for_rust_rejection(
     install = run("--input", str(input_path), str(consumer))
     assert install.returncode == 0, install.stderr
     rendered = (consumer / "sc-lint.toml").read_text()
-    assert toml_loads(rendered)["tool"]["sc-lint"]["analyzers"]["portability"]["platform_adapters"] == adapters
+    assert tomllib.loads(rendered)["tool"]["sc-lint"]["analyzers"]["portability"]["platform_adapters"] == adapters
 
     analyzer = run_subprocess(
         [

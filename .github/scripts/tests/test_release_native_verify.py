@@ -119,13 +119,15 @@ def host(monkeypatch, target):
     monkeypatch.setattr(native.platform, "machine", lambda: "ARM64" if arch == "aarch64" else "AMD64")
 
 
-def commands(*, wrong_version=None, pip_error=False):
+def commands(*, wrong_version=None, pip_error=False, wheel_version="3.11"):
     seen = []
 
     def run(argv):
         seen.append(argv)
         if "pip" in argv and pip_error:
             raise ValueError("pip installation failed: controlled failure")
+        if "sys.version_info" in argv[-1]:
+            return wheel_version
         if argv[1:3] == ["-m", "venv"]:
             for relative in ("bin/python", "Scripts/python.exe"):
                 python = Path(argv[3]) / relative
@@ -145,10 +147,13 @@ def test_each_native_platform_checks_every_binary_and_installs_its_wheel(monkeyp
     assets = Assets(target)
     host(monkeypatch, target)
     seen, run = commands()
-    native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
+    wheel_python = "/controlled/python3.9"
+    native.verify_release(assets, "v1.2.3", target, tmp_path, wheel_python=wheel_python, run=run)
+    venv = next(argv for argv in seen if argv[1:3] == ["-m", "venv"])
+    assert venv[0] == wheel_python, "the wheel is installed under the wheel interpreter, not the tooling Python"
     versions = ["sc-lint" if "-c" in argv else Path(argv[0]).name.removesuffix(".exe") for argv in seen if argv[-1] == "--version"]
     assert versions == ["one", "two", "sc-lint"]
-    installed_cli = next(argv for argv in seen if "-c" in argv)
+    installed_cli = next(argv for argv in seen if "-c" in argv and "sc_lint.run" in argv[argv.index("-c") + 1])
     assert "-I" in installed_cli and "sc_lint.run" in installed_cli[installed_cli.index("-c") + 1]
     pip = next(argv for argv in seen if "pip" in argv)
     assert pip[-1] == str(tmp_path / assets.wheel_name)
@@ -294,17 +299,22 @@ def test_wheel_payload_must_match_native_target_before_pip(monkeypatch, tmp_path
     assert not any("pip" in argv for argv in seen)
 
 
-def test_python_39_is_accepted_off_win_arm64(monkeypatch):
-    host(monkeypatch, "x86_64-unknown-linux-gnu")
-    monkeypatch.setattr(native.sys, "version_info", (3, 9, 6))
-    native.assert_native("x86_64-unknown-linux-gnu")
+def test_python_39_is_accepted_off_win_arm64():
+    native.assert_wheel_python("x86_64-unknown-linux-gnu", (3, 9))
 
 
-def test_python_older_than_311_is_rejected_on_win_arm64(monkeypatch):
-    host(monkeypatch, "aarch64-pc-windows-msvc")
-    monkeypatch.setattr(native.sys, "version_info", (3, 10, 0))
+def test_python_older_than_311_is_rejected_on_win_arm64():
     with pytest.raises(ValueError, match="Python 3.11 or newer"):
-        native.assert_native("aarch64-pc-windows-msvc")
+        native.assert_wheel_python("aarch64-pc-windows-msvc", (3, 10))
+
+
+def test_wheel_python_version_is_queried_from_the_wheel_interpreter(monkeypatch, tmp_path):
+    target = "aarch64-pc-windows-msvc"
+    host(monkeypatch, target)
+    seen, run = commands(wheel_version="3.10")
+    with pytest.raises(ValueError, match="Python 3.11 or newer"):
+        native.verify_release(Assets(target), "v1.2.3", target, tmp_path, wheel_python="/controlled/python3.10", run=run)
+    assert any(argv[0] == "/controlled/python3.10" and "sys.version_info" in argv[-1] for argv in seen)
 
 
 def test_missing_run_artifact_is_not_silently_skipped():

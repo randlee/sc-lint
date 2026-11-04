@@ -46,7 +46,8 @@ WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-
 # bootstrap.py must list the same operations and arguments under its own name (AC3), plus the
 # l-6 `--fail-fast` lint flag and the test selector grammar.
 CC1D496_USAGE_GRAMMAR = (
-    "usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]",
+    "usage: .sc-lint/bootstrap.py setup --config sc-lint.toml [--dry-run]",
+    ".sc-lint/bootstrap.py upgrade --config sc-lint.toml [--check] [--dry-run]",
     ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
     ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
     ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml",

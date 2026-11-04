@@ -54,7 +54,14 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      # The verifier needs Python 3.11+ (tomllib); the wheel is installed and run
+      # under the target's Python from the matrix, which may be 3.9.
       - uses: actions/setup-python@v6
+        id: tooling
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-python@v6
+        id: wheel
         with:
           python-version: ${{ matrix.python_version }}
           architecture: ${{ matrix.python_arch }}
@@ -64,4 +71,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
           RELEASE_TARGET: ${{ matrix.target }}
-        run: python .github/scripts/release_native_verify.py verify --tag "$RELEASE_TAG" --target "$RELEASE_TARGET"
+          TOOLING_PYTHON: ${{ steps.tooling.outputs.python-path }}
+          WHEEL_PYTHON: ${{ steps.wheel.outputs.python-path }}
+        run: >-
+          "$TOOLING_PYTHON" .github/scripts/release_native_verify.py verify
+          --tag "$RELEASE_TAG" --target "$RELEASE_TARGET" --wheel-python "$WHEEL_PYTHON"
