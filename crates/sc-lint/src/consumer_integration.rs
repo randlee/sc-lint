@@ -31,6 +31,8 @@ const KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256: &[[u8; 32]] = &[[
     0x5e, 0x26, 0xb4, 0xab, 0x0d, 0x8f, 0xaf, 0xbe, 0x85, 0x6a, 0x94, 0x08, 0x9d, 0x3b, 0x57, 0x5b,
     0x10, 0x16, 0x42, 0x58, 0x77, 0x6c, 0x4c, 0x5c, 0x82, 0x8f, 0xec, 0xd9, 0x80, 0x2a, 0x76, 0xdb,
 ]];
+// This sequence is unique within the process; create_new protects against cross-process collisions.
+// Relaxed ordering suffices because the counter only supplies unique temporary-file names.
 static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const CONSUMER_JUSTFILE_ASSET: &str = include_str!("../assets/consumer-Justfile");
 const CANONICAL_CONSUMER_CONFIG_ASSET: &str = include_str!("../assets/consumer-config.toml");
@@ -271,6 +273,21 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
     reason = "Consumer file inspection returns the shared top-level CliError contract."
 )]
 fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, CliError> {
+    let is_symlink = match fs::symlink_metadata(&file.path) {
+        Ok(metadata) => metadata.file_type().is_symlink(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(ManagedFileState::Missing);
+        }
+        Err(error) => {
+            return Err(CliError::config(format!(
+                "failed to inspect consumer integration file `{}`",
+                file.path.display()
+            ))
+            .with_source(error)
+            .with_suggested_action("Check file permissions, then rerun `sc-lint init --just`.")
+            .with_documentation(DOCS_SETUP_REFERENCE));
+        }
+    };
     match fs::read_to_string(&file.path) {
         Ok(actual) if normalize_line_endings(&actual) == normalize_line_endings(&file.contents) => {
             Ok(ManagedFileState::Current)
@@ -292,6 +309,9 @@ fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, Cli
             Ok(ManagedFileState::RefreshablePriorRelease)
         }
         Ok(_) => Ok(ManagedFileState::UserModified),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && is_symlink => {
+            Ok(ManagedFileState::UserModified)
+        }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(ManagedFileState::Missing),
         Err(error) => Err(CliError::config(format!(
             "failed to inspect consumer integration file `{}`",
@@ -332,7 +352,15 @@ fn is_known_prior_release_bootstrap(actual: &str) -> bool {
 }
 
 fn write_file_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
-    write_file_atomically_with(path, contents, |file, contents| file.write_all(contents))
+    let destination = match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => fs::canonicalize(path)?,
+        Ok(_) => path.to_path_buf(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => path.to_path_buf(),
+        Err(error) => return Err(error),
+    };
+    write_file_atomically_with(&destination, contents, |file, contents| {
+        file.write_all(contents)
+    })
 }
 
 fn write_file_atomically_with(
@@ -352,19 +380,33 @@ fn write_file_atomically_with(
     let (temporary_path, mut temporary_file) = create_temporary_sibling(parent)?;
     let write_result = (|| {
         write_contents(&mut temporary_file, contents)?;
-        temporary_file.flush()?;
         if let Some(permissions) = permissions {
             temporary_file.set_permissions(permissions)?;
         }
+        temporary_file.sync_all()?;
         Ok(())
     })();
     drop(temporary_file);
 
-    let result = write_result.and_then(|()| fs::rename(&temporary_path, path));
-    if result.is_err() {
+    if let Err(error) = write_result {
         let _ = fs::remove_file(&temporary_path);
+        return Err(error);
     }
-    result
+    if let Err(error) = fs::rename(&temporary_path, path) {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error);
+    }
+    sync_parent_directory(parent)
+}
+
+#[cfg(unix)]
+fn sync_parent_directory(parent: &Path) -> io::Result<()> {
+    File::open(parent)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_parent_directory(_parent: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 fn create_temporary_sibling(parent: &Path) -> io::Result<(PathBuf, File)> {
@@ -821,6 +863,104 @@ mod tests {
                 "executable permission survives refresh"
             );
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn init_refreshes_symlink_target_without_replacing_managed_link() {
+        use std::os::unix::fs::symlink;
+
+        let fixture = tempfile::TempDir::new().expect("fixture");
+        let files = consumer_integration_files(fixture.path());
+        fs::write(&files[0].path, &files[0].contents).expect("current config");
+        fs::write(&files[1].path, &files[1].contents).expect("current Justfile");
+        let bootstrap_link = &files[2].path;
+        fs::create_dir_all(bootstrap_link.parent().expect("bootstrap parent"))
+            .expect("create bootstrap directory");
+        let bootstrap_target = bootstrap_link
+            .parent()
+            .expect("bootstrap parent")
+            .join("prior-bootstrap.py");
+        fs::write(
+            &bootstrap_target,
+            include_str!("../tests/fixtures/consumer-bootstrap-v0.8.4.py"),
+        )
+        .expect("v0.8.4 target");
+        symlink("prior-bootstrap.py", bootstrap_link).expect("link managed bootstrap");
+
+        let result = run_consumer_init_at(
+            fixture.path(),
+            ConsumerInitRequest {
+                just: true,
+                check: false,
+                dry_run: false,
+            },
+        )
+        .expect("refresh symlink target");
+
+        assert_eq!(result["status"], "updated");
+        assert_eq!(
+            result["refreshed_files"],
+            json!([bootstrap_link.display().to_string()])
+        );
+        assert!(
+            fs::symlink_metadata(bootstrap_link)
+                .expect("managed symlink remains")
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(
+            fs::read_link(bootstrap_link).expect("symlink target remains"),
+            PathBuf::from("prior-bootstrap.py")
+        );
+        assert_eq!(
+            fs::read_to_string(&bootstrap_target).expect("target refreshed"),
+            CONSUMER_BOOTSTRAP_ASSET
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn init_reports_dangling_managed_symlink_as_conflict() {
+        use std::os::unix::fs::symlink;
+
+        let fixture = tempfile::TempDir::new().expect("fixture");
+        let files = consumer_integration_files(fixture.path());
+        fs::write(&files[0].path, &files[0].contents).expect("current config");
+        fs::write(&files[1].path, &files[1].contents).expect("current Justfile");
+        let bootstrap_link = &files[2].path;
+        fs::create_dir_all(bootstrap_link.parent().expect("bootstrap parent"))
+            .expect("create bootstrap directory");
+        symlink("missing-bootstrap.py", bootstrap_link).expect("create dangling link");
+
+        let error = run_consumer_init_at(
+            fixture.path(),
+            ConsumerInitRequest {
+                just: true,
+                check: false,
+                dry_run: false,
+            },
+        )
+        .expect_err("dangling managed link is user-owned");
+
+        assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+        assert_eq!(
+            error.details["conflicts"],
+            json!([bootstrap_link.display().to_string()])
+        );
+        assert!(
+            fs::symlink_metadata(bootstrap_link)
+                .expect("dangling managed symlink remains")
+                .file_type()
+                .is_symlink()
+        );
+        assert!(
+            !bootstrap_link
+                .parent()
+                .expect("bootstrap parent")
+                .join("missing-bootstrap.py")
+                .exists()
+        );
     }
 
     #[test]

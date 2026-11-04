@@ -51,11 +51,12 @@ Preserved: /work/repo/sc-lint.toml, /work/repo/Justfile
 Version-only stale: /work/repo/sc-lint.toml
 ```
 
-`sc-lint --json init --just` reports `created_files`, `refreshed_files`,
-`preserved_files` and `version_only_stale_files`, plus `managed_files`. Every
-list is always present as an array. `refreshed_files` contains files that were
-refreshed on a real run or would be refreshed on `--dry-run`; `dry_run` and
-`status` distinguish the two cases.
+`sc-lint --json init --just` reports these nine data fields: `status`,
+`managed_files`, `preserved_files`, `created_files`, `refreshed_files`,
+`version_only_stale_files`, `check`, `dry_run` and `summary`. The file-list
+fields are always arrays. `refreshed_files` contains files that were refreshed
+on a real run or would be refreshed on `--dry-run`; `dry_run` and `status`
+distinguish the two cases.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an
