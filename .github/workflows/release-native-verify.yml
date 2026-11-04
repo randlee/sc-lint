@@ -1,14 +1,18 @@
 name: Release Native Verify
+# The run title names the verified tag so release-preflight can find it.
+run-name: Release Native Verify ${{ inputs.tag || github.event.workflow_run.head_branch }}
 
+# Verifies a published release (Release) and a prerelease (Prerelease Archive) on
+# the native matrix. A prerelease run gates its publish: see release/README.md.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Published release tag (for example v0.8.3)"
+        description: "Published release tag (for example v0.8.3) or prerelease tag (for example prerelease/v0.8.3)"
         required: true
         type: string
   workflow_run:
-    workflows: [Release]
+    workflows: [Release, Prerelease Archive]
     types: [completed]
 
 permissions:
@@ -39,7 +43,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
-        run: python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --run-id "$RELEASE_RUN_ID" --output "$GITHUB_OUTPUT"
+          RELEASE_RUN_WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --run-id "$RELEASE_RUN_ID" --workflow "$RELEASE_RUN_WORKFLOW" --output "$GITHUB_OUTPUT"
 
   native:
     if: ${{ needs.plan.outputs.verify == 'true' }}
@@ -76,3 +81,71 @@ jobs:
         run: >-
           "$TOOLING_PYTHON" .github/scripts/release_native_verify.py verify
           --tag "$RELEASE_TAG" --target "$RELEASE_TARGET" --wheel-python "$WHEEL_PYTHON"
+          --result "native-results/${RELEASE_TARGET}.json"
+      - name: Upload the native result for the report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-results-${{ matrix.target }}
+          path: native-results/${{ matrix.target }}.json
+          if-no-files-found: warn
+
+  report:
+    # Renders one panel per target into a durable report, even when a target failed.
+    name: Render native verification report
+    if: ${{ always() && needs.plan.outputs.verify == 'true' }}
+    needs: [plan, native]
+    runs-on: ubuntu-latest
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      SOURCE_WORKFLOW: ${{ github.event.workflow_run.name }}
+      SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+      MATRIX: ${{ needs.plan.outputs.matrix }}
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Download native results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-results-*
+          path: native-results
+          merge-multiple: true
+      - name: Provision the pinned sc-compose renderer
+        id: renderer
+        run: |
+          set -euo pipefail
+          renderer="$(python .github/scripts/bootstrap_sc_compose.py --venv "$RUNNER_TEMP/sc-compose-venv")"
+          echo "python-path=${renderer}" >> "$GITHUB_OUTPUT"
+      - name: Render the native verification report
+        id: report
+        env:
+          RENDERER_PYTHON: ${{ steps.renderer.outputs.python-path }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            trigger="workflow_dispatch with tag ${RELEASE_TAG}"
+          else
+            trigger="workflow_run of ${SOURCE_WORKFLOW} run ${SOURCE_RUN_ID}"
+          fi
+          targets="$(python3 -c 'import json, os; print(",".join(row["target"] for row in json.loads(os.environ["MATRIX"])["include"]))')"
+          report="$("$RENDERER_PYTHON" .github/scripts/release_native_report.py \
+            --results-dir native-results --expected-targets "$targets" \
+            --tag "$RELEASE_TAG" --commit "$COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --run-url "$RUN_URL" \
+            --trigger "$trigger" --site-root site/reports/release-native-verify)"
+          echo "report=${report}" >> "$GITHUB_OUTPUT"
+          printf 'Native verification report: `%s`\n' "$report" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the rendered report
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-verify-report
+          path: site/reports/release-native-verify
+          if-no-files-found: error

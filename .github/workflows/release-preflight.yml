@@ -280,6 +280,27 @@ jobs:
             '${{ steps.meta.outputs.release_version }}' "${RELEASE_ARTIFACT_MANIFEST}" \
             '${{ steps.build_plan.outputs.workspace_toml }}' "${ALREADY_PUBLISHED_CHANNELS}"
 
+      - id: native_matrix_gate
+        name: Require a verified native matrix run for an ancestor prerelease
+        if: ${{ always() && steps.meta.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          prerelease_tag="prerelease/${RELEASE_TAG}"
+          candidate_tag="release-candidate-${RELEASE_TAG}"
+          prerelease_commit="$(git rev-parse --verify --quiet "${prerelease_tag}^{commit}")" \
+            || { echo "${prerelease_tag} is not present; build and verify a prerelease from an ancestor of the candidate first." >&2; exit 1; }
+          candidate_commit="$(git rev-parse --verify --quiet "${candidate_tag}^{commit}")" \
+            || { echo "${candidate_tag} is not present; the release candidate must be cut first." >&2; exit 1; }
+          python3 .github/scripts/release_native_gate.py --tag "${prerelease_tag}" \
+            --prerelease-commit "${prerelease_commit}" --candidate-commit "${candidate_commit}" \
+            --output "${GITHUB_OUTPUT}"
+
       - id: unpublished
         name: Verify release version is unpublished on crates.io
         if: ${{ always() && steps.meta.outcome == 'success' }}
@@ -468,6 +489,9 @@ jobs:
           VERSION: ${{ steps.version.outcome }}
           VERSION_LOCKSTEP: ${{ steps.version_lockstep.outcome }}
           RELEASE_CANDIDATE_PROVENANCE: ${{ steps.release_candidate_provenance.outcome }}
+          NATIVE_MATRIX_GATE: ${{ steps.native_matrix_gate.outcome }}
+          NATIVE_VERIFY_RUN_ID: ${{ steps.native_matrix_gate.outputs.native_verify_run_id }}
+          NATIVE_VERIFIED_COMMIT: ${{ steps.native_matrix_gate.outputs.native_verified_commit }}
           UNPUBLISHED: ${{ steps.unpublished.outcome }}
           PACKAGE_CHECKS: ${{ steps.package_checks.outcome }}
           GITHUB_RELEASE_PERMISSIONS: ${{ steps.github_release_permissions.outcome }}
@@ -504,9 +528,12 @@ jobs:
           record version "${VERSION}"
           record version-lockstep "${VERSION_LOCKSTEP}"
           record release-candidate-provenance "${RELEASE_CANDIDATE_PROVENANCE}"
+          record native-matrix-gate "${NATIVE_MATRIX_GATE}"
           record unpublished-version "${UNPUBLISHED}"
           record github-release-permissions "${GITHUB_RELEASE_PERMISSIONS}"
           record channel-results "${CHANNEL_RESULTS}"
+          printf 'Native matrix verify run: %s on verified commit %s\n' \
+            "${NATIVE_VERIFY_RUN_ID:-none}" "${NATIVE_VERIFIED_COMMIT:-none}"
           printf 'Preflight complete: failed=[%s] blocked=[%s]\n' \
             "$(IFS=,; echo "${failed[*]}")" "$(IFS=,; echo "${blocked[*]}")"
           if [[ "${#failed[@]}" -gt 0 || "${#blocked[@]}" -gt 0 ]]; then

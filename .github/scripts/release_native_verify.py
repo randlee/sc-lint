@@ -34,12 +34,17 @@ NATIVE_RUNNERS = {
     ("Windows", "aarch64"): "windows-11-arm",
 }
 MANIFEST_PATH = "release/publish-artifacts.toml"
+RELEASE_WORKFLOW = "Release"
+PRERELEASE_WORKFLOW = "Prerelease Archive"
+PRERELEASE_TAG_PREFIX = "prerelease/v"
+RESULT_SCHEMA_VERSION = 1
 
 
 def release_version(tag: str) -> str:
-    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
-        raise ValueError(f"invalid release tag {tag!r}; expected vMAJOR.MINOR.PATCH")
-    return tag[1:]
+    match = re.fullmatch(r"(?:prerelease/)?v([0-9]+\.[0-9]+\.[0-9]+)", tag)
+    if match is None:
+        raise ValueError(f"invalid release tag {tag!r}; expected vMAJOR.MINOR.PATCH or prerelease/vMAJOR.MINOR.PATCH")
+    return match.group(1)
 
 
 def native_host(target: str) -> tuple[str, str]:
@@ -129,7 +134,7 @@ class GitHub:
         return tomllib.loads(base64.b64decode(entry["content"]).decode("utf-8"))
 
 
-def tag_from_run(client: GitHub, manifest: dict, run_id: str) -> str:
+def tag_from_run(client: GitHub, manifest: dict, run_id: str, *, prerelease: bool = False) -> str:
     if not run_id.isdecimal():
         raise ValueError("automatic verification requires the triggering Release run id")
     targets = manifest.get("release_targets", [])
@@ -152,13 +157,13 @@ def tag_from_run(client: GitHub, manifest: dict, run_id: str) -> str:
         versions = [match[1] for name in archive.namelist() if (match := pattern.fullmatch(PurePosixPath(name).name))]
     if len(versions) != 1:
         raise ValueError(f"Release run {run_id}: archive artifact must identify exactly one release version")
-    return "v" + versions[0]
+    return (PRERELEASE_TAG_PREFIX if prerelease else "v") + versions[0]
 
 
-def production_release_run(client: GitHub, run_id: str) -> str | None:
-    """Return an established production job conclusion, or explain a non-production skip."""
+def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | None:
+    """Return an established release job conclusion, or explain a non-published skip."""
     if not run_id.isdecimal():
-        raise ValueError("automatic verification requires the triggering Release run id")
+        raise ValueError("automatic verification requires the triggering run id")
     jobs = []
     page = 1
     while True:
@@ -168,31 +173,36 @@ def production_release_run(client: GitHub, run_id: str) -> str | None:
             break
         page += 1
     if not jobs:
-        print(f"Skipping native verification: Release run {run_id} has no production release job.", flush=True)
+        print(f"Skipping native verification: {workflow} run {run_id} has no release job.", flush=True)
         return None
     if len(jobs) != 1:
-        raise ValueError(f"Release run {run_id}: cannot establish production status; expected one release job, found {len(jobs)}")
+        raise ValueError(f"{workflow} run {run_id}: cannot establish release status; expected one release job, found {len(jobs)}")
     conclusion = jobs[0].get("conclusion")
     if conclusion == "skipped":
-        print(f"Skipping native verification: Release run {run_id} did not run its production release job (conclusion: skipped).", flush=True)
+        print(f"Skipping native verification: {workflow} run {run_id} did not run its release job (conclusion: skipped).", flush=True)
         return None
     if conclusion not in {"success", "failure", "cancelled"}:
-        raise ValueError(f"Release run {run_id}: cannot establish production status; release job conclusion is {conclusion!r}")
+        raise ValueError(f"{workflow} run {run_id}: cannot establish release status; release job conclusion is {conclusion!r}")
     return conclusion
 
 
-def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str) -> tuple[str, dict] | None:
-    conclusion = "success" if tag else production_release_run(client, run_id)
+def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workflow: str = RELEASE_WORKFLOW) -> tuple[str, dict] | None:
+    """Select the published release, or prerelease, whose native matrix must run.
+
+    A prerelease run (workflow "Prerelease Archive") gates a publish: its tag is
+    prerelease/vX.Y.Z and its archives and wheels are verified like a release's.
+    """
+    conclusion = "success" if tag else run_release_conclusion(client, run_id, workflow)
     if conclusion is None:
         return None
-    tag = tag or tag_from_run(client, manifest, run_id)
+    tag = tag or tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
     release_version(tag)
     try:
         client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")
     except GitHubError as error:
         if error.status != 404 or conclusion == "success":
             raise
-        print(f"Skipping native verification: Release run {run_id} release job concluded {conclusion} and {tag} has no published release (HTTP 404).", flush=True)
+        print(f"Skipping native verification: {workflow} run {run_id} release job concluded {conclusion} and {tag} has no published release (HTTP 404).", flush=True)
         return None
     return tag, native_matrix(client.manifest(tag))
 
@@ -285,11 +295,25 @@ def assert_version(run, argv: list[str], binary: str, version: str) -> None:
         raise ValueError(f"{binary}: version mismatch; expected {expected!r}, got {actual!r}")
 
 
+def record(checks: list[dict] | None, name: str, detail: str) -> None:
+    if checks is not None:
+        checks.append({"name": name, "status": "pass", "detail": detail})
+
+
+def write_result(path: Path, *, tag: str, target: str, checks: list[dict], error: str) -> None:
+    """Write the per-target JSON result the native report renders; failures are recorded too."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"schema_version": RESULT_SCHEMA_VERSION, "tag": tag, "target": target, "checks": checks, "error": error}
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def verify_release(
-    client: GitHub, tag: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command
+    client: GitHub, tag: str, target: str, destination: Path, *, wheel_python: str = sys.executable, run=run_command,
+    checks: list[dict] | None = None,
 ) -> None:
     version = release_version(tag)
     assert_native(target)
+    record(checks, "native host", f"{target} on {native_host(target)[0]}")
     manifest = client.manifest(tag)
     assets = client.json(f"releases/tags/{urllib.parse.quote(tag, safe='')}")["assets"]
     archive_name, wheel_names = required_assets(manifest, target, tag, assets)
@@ -302,6 +326,7 @@ def verify_release(
             raise ValueError(f"{name}: SHA256 mismatch or missing checksum; expected {checksums.get(name)!r}, got {actual}")
         (destination / name).write_bytes(payload)
         print(f"SHA256 verified: {name}", flush=True)
+        record(checks, f"sha256 {name}", "matches checksums.txt")
     extract_archive(destination / archive_name, destination)
     stage = archive_name.removesuffix(".tar.gz").removesuffix(".zip")
     suffix = ".exe" if native_host(target)[0] == "Windows" else ""
@@ -313,10 +338,12 @@ def verify_release(
         if machine(executable.read_bytes()) != EXPECTED[target]:
             raise ValueError(f"{binary['name']}: payload architecture does not match {target}")
         assert_version(run, [str(executable)], binary["name"], version)
+        record(checks, f"binary {binary['name']}", f"architecture matches {target}; --version reports {version}")
     for index, name in enumerate(wheel_names):
         wheel = destination / name
         verify_wheel_arch(wheel, target)
-        assert_wheel_python(target, wheel_python_version(run, wheel_python))
+        python_version = wheel_python_version(run, wheel_python)
+        assert_wheel_python(target, python_version)
         environment = destination / f"wheel-env-{index}"
         run([wheel_python, "-m", "venv", str(environment)])
         scripts = environment / ("Scripts" if suffix else "bin")
@@ -325,6 +352,7 @@ def verify_release(
         # The wheel exposes the native CLI through its Python binding, not a console script.
         code = "import sys, sc_lint; raise SystemExit(sc_lint.run(['sc-lint', *sys.argv[1:]]))"
         assert_version(run, [str(python), "-I", "-c", code], manifest["project"]["name"], version)
+        record(checks, f"wheel {name}", f"installs and reports {version} under Python {python_version[0]}.{python_version[1]}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -332,16 +360,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("plan", "verify"))
     parser.add_argument("--tag", default="")
     parser.add_argument("--run-id", default="")
+    parser.add_argument("--workflow", default="", help=f"workflow that produced --run-id: {RELEASE_WORKFLOW!r} (default) or {PRERELEASE_WORKFLOW!r}")
     parser.add_argument("--target")
     parser.add_argument("--wheel-python", help="interpreter the wheel is installed and run under (e.g. Python 3.9)")
     parser.add_argument("--manifest", type=Path, default=Path(MANIFEST_PATH))
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--result", type=Path, help="verify: write the per-target JSON result for the native report")
     args = parser.parse_args(argv)
     try:
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         if args.command == "plan":
             local_manifest = tomllib.loads(args.manifest.read_text(encoding="utf-8"))
-            plan = plan_release(client, local_manifest, args.tag, args.run_id)
+            workflow = args.workflow or RELEASE_WORKFLOW
+            if workflow not in {RELEASE_WORKFLOW, PRERELEASE_WORKFLOW}:
+                raise ValueError(f"unsupported verification workflow {workflow!r}")
+            plan = plan_release(client, local_manifest, args.tag, args.run_id, workflow=workflow)
             tag, matrix = plan if plan is not None else ("", {"include": []})
             enabled = "true" if plan is not None else "false"
             output = f"verify={enabled}\ntag={tag}\nmatrix={json.dumps(matrix, separators=(',', ':'))}\n"
@@ -354,8 +387,18 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("verify requires --target")
             if not args.wheel_python:
                 raise ValueError("verify requires --wheel-python")
-            with tempfile.TemporaryDirectory(prefix="release-native-verify-") as directory:
-                verify_release(client, args.tag, args.target, Path(directory), wheel_python=args.wheel_python)
+            checks: list[dict] = []
+            error = ""
+            try:
+                with tempfile.TemporaryDirectory(prefix="release-native-verify-") as directory:
+                    verify_release(client, args.tag, args.target, Path(directory), wheel_python=args.wheel_python, checks=checks)
+            except (ValueError, OSError, KeyError, tarfile.TarError, zipfile.BadZipFile) as caught:
+                error = str(caught)
+            if args.result:
+                write_result(args.result, tag=args.tag, target=args.target, checks=checks, error=error)
+            if error:
+                print(f"release-native-verify: {error}", file=sys.stderr)
+                return 1
         return 0
     except (ValueError, OSError, KeyError, tarfile.TarError, zipfile.BadZipFile) as error:
         print(f"release-native-verify: {error}", file=sys.stderr)

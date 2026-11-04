@@ -54,6 +54,31 @@ publishing. It must never silently treat them as metadata. `develop` commits
 made after the candidate tag are outside this comparison and do not delay the
 release.
 
+## Native Matrix Gate
+
+Before publishing `vX.Y.Z`, a prerelease built from an ancestor of the
+release-candidate commit must pass the native matrix. `Prerelease Archive` builds
+the archives and cp39-abi3 wheels for `prerelease/vX.Y.Z`; `Release Native Verify`
+then runs the same native matrix it runs for a published release (each release
+target, the wheel installed and run on Python 3.9, and 3.11 on win_arm64). The
+gate is satisfied only by a verify run that concludes `success`.
+
+Preflight does not demand a rerun for every commit. It passes when the verified
+prerelease commit `V` is an ancestor of the candidate `C` and the `V..C` diff
+touches no artifact input. Artifact inputs are the declared list in
+`.github/scripts/release_native_gate.py`. Changes to docs, `site/`, the CHANGELOG,
+publish or channel workflows, preflight or verify scripts, and tests never force a
+rerun. A change to an artifact input, or a `V` that is not an ancestor of `C`,
+fails the gate and names the offending paths; cut a new prerelease and rerun the
+native matrix.
+
+`publisher` preflight records the verify run id, the verified commit `V`, and
+the classified diff. The published-release run still verifies the published
+assets afterward.
+
+Each verify target writes a JSON result, and the verify run renders it into a
+durable HTML report. See the Native Verification Gate in `release/README.md`.
+
 ## Preflight and Recovery
 
 Run readiness preflight as early as the correct state permits; do not wait for

@@ -1,10 +1,12 @@
 """Deterministic native-release verification tests: synthetic assets and controlled commands."""
 import hashlib
 import io
+import json
 import struct
 import sys
 import tarfile
 import tomllib
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -58,8 +60,9 @@ def executable(target):
 
 
 class Assets:
-    def __init__(self, target, *, payload_target=None):
+    def __init__(self, target, *, payload_target=None, tag="v1.2.3"):
         self.target = target
+        self.tag = tag
         self.version = "1.2.3"
         windows = native.native_host(target)[0] == "Windows"
         extension = "zip" if windows else "tar.gz"
@@ -98,11 +101,11 @@ class Assets:
         self.downloads = []
 
     def manifest(self, tag):
-        assert tag == "v1.2.3"
+        assert tag == self.tag
         return self.manifest_data
 
     def json(self, endpoint):
-        assert endpoint == "releases/tags/v1.2.3"
+        assert endpoint == f"releases/tags/{urllib.parse.quote(self.tag, safe='')}"
         return {"assets": self.assets}
 
     def get(self, endpoint, *, binary):
@@ -267,11 +270,13 @@ def test_zip_path_traversal_fails(tmp_path):
         native.extract_archive(path, tmp_path / "output")
 
 
-def test_workflow_only_triggers_for_release_or_explicit_dispatch():
+def test_workflow_only_triggers_for_release_prerelease_or_explicit_dispatch():
     import yaml
     workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
     assert set(workflow["on"]) == {"workflow_dispatch", "workflow_run"}
-    assert workflow["on"]["workflow_run"]["workflows"] == ["Release"]
+    assert workflow["on"]["workflow_run"]["workflows"] == ["Release", "Prerelease Archive"]
+    plan_run = workflow["jobs"]["plan"]["steps"][-1]["run"]
+    assert '--workflow "$RELEASE_RUN_WORKFLOW"' in plan_run
     assert workflow["on"]["workflow_run"]["types"] == ["completed"]
     assert workflow["permissions"] == {"contents": "read"}
     plan = workflow["jobs"]["plan"]
@@ -378,17 +383,19 @@ def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
 
 
 class ReleaseRun(RunArtifact):
-    def __init__(self, conclusion="success", *, published=True):
+    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3"):
         super().__init__("tool_1.2.3_x86_64-unknown-linux-gnu.tar.gz")
         self.conclusion = conclusion
         self.published = published
+        self.tag = tag
+        self.tag_endpoint = f"releases/tags/{urllib.parse.quote(tag, safe='')}"
         self.manifest_data = Assets("x86_64-unknown-linux-gnu").manifest_data
 
     def json(self, endpoint):
         if "/jobs?" in endpoint:
             self.calls.append(endpoint)
             return {"total_count": 1, "jobs": [{"name": "release", "conclusion": self.conclusion}]}
-        if endpoint == "releases/tags/v1.2.3":
+        if endpoint == self.tag_endpoint:
             self.calls.append(endpoint)
             if not self.published:
                 raise native.GitHubError(endpoint, 404)
@@ -396,7 +403,7 @@ class ReleaseRun(RunArtifact):
         return super().json(endpoint)
 
     def manifest(self, tag):
-        assert tag == "v1.2.3"
+        assert tag == self.tag
         self.calls.append("manifest:" + tag)
         return self.manifest_data
 
@@ -444,8 +451,8 @@ def test_manual_dispatch_checks_the_release_even_if_no_run_id():
 def test_unknown_production_state_fails(jobs):
     client = ReleaseRun()
     client.json = lambda endpoint: {"total_count": len(jobs), "jobs": jobs}
-    with pytest.raises(ValueError, match="cannot establish production status"):
-        native.production_release_run(client, "42")
+    with pytest.raises(ValueError, match="cannot establish release status"):
+        native.run_release_conclusion(client, "42", native.RELEASE_WORKFLOW)
 
 
 @pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
@@ -503,7 +510,7 @@ def test_absent_release_job_skips_with_reason(capsys):
     client = ReleaseRun()
     client.json = lambda endpoint: {"total_count": 1, "jobs": [{"name": "build", "conclusion": "failure"}]}
     assert native.plan_release(client, {}, "", "42") is None
-    assert "has no production release job" in capsys.readouterr().out
+    assert "has no release job" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
@@ -517,3 +524,118 @@ def test_release_probe_errors_other_than_404_fail(conclusion):
     client.json = denied_release
     with pytest.raises(native.GitHubError, match="HTTP 403"):
         native.plan_release(client, client.manifest_data, "", "42")
+
+
+def test_release_version_accepts_release_and_prerelease_tags_only():
+    assert native.release_version("v1.2.3") == "1.2.3"
+    assert native.release_version("prerelease/v1.2.3") == "1.2.3"
+    for bad in ("1.2.3", "prerelease/1.2.3", "prerelease/v1.2", "release/v1.2.3", "v1.2.3-rc1"):
+        with pytest.raises(ValueError, match="invalid release tag"):
+            native.release_version(bad)
+
+
+def test_prerelease_run_plans_its_prerelease_tag_and_matrix():
+    client = ReleaseRun(tag="prerelease/v1.2.3")
+    tag, matrix = native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW)
+    assert tag == "prerelease/v1.2.3"
+    assert matrix["include"][0]["target"] == "x86_64-unknown-linux-gnu"
+    assert "releases/tags/prerelease%2Fv1.2.3" in client.calls
+    assert "manifest:prerelease/v1.2.3" in client.calls
+
+
+def test_prerelease_run_selects_archives_and_cp39_wheels_for_its_version():
+    target = "x86_64-unknown-linux-gnu"
+    assets = Assets(target, tag="prerelease/v1.2.3")
+    archive, wheels = native.required_assets(assets.manifest_data, target, "prerelease/v1.2.3", assets.assets)
+    assert archive == assets.archive_name
+    assert wheels == [assets.wheel_name]
+    assert "-cp39-abi3-" in wheels[0]
+
+
+def test_prerelease_wrong_version_wheel_is_not_selected():
+    target = "x86_64-unknown-linux-gnu"
+    assets = Assets(target, tag="prerelease/v1.2.3")
+    stale = [{"name": "sc_lint-1.2.2-cp39-abi3-manylinux_2_28_x86_64.whl", "id": 9}]
+    with pytest.raises(ValueError, match="expected one sc_lint wheel"):
+        native.required_assets(assets.manifest_data, target, "prerelease/v1.2.3", [assets.assets[0], assets.assets[2]] + stale)
+
+
+@pytest.mark.parametrize("target", ["x86_64-unknown-linux-gnu", "aarch64-pc-windows-msvc"])
+def test_prerelease_archives_and_wheels_are_verified_on_the_native_host(monkeypatch, tmp_path, target):
+    host(monkeypatch, target)
+    assets = Assets(target, tag="prerelease/v1.2.3")
+    seen, run = commands()
+    native.verify_release(assets, "prerelease/v1.2.3", target, tmp_path, run=run)
+    assert len(assets.downloads) == 3
+    assert any(argv[1:3] == ["-m", "venv"] for argv in seen)
+
+
+def test_prerelease_unsuccessful_unpublished_run_skips(capsys):
+    client = ReleaseRun("failure", published=False, tag="prerelease/v1.2.3")
+    assert native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW) is None
+    reason = capsys.readouterr().out
+    assert "Prerelease Archive run 42" in reason and "HTTP 404" in reason
+
+
+def test_prerelease_successful_run_without_published_prerelease_fails():
+    client = ReleaseRun(published=False, tag="prerelease/v1.2.3")
+    with pytest.raises(ValueError, match="HTTP 404"):
+        native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW)
+
+
+def test_prerelease_without_release_job_skips_with_reason(capsys):
+    client = ReleaseRun(tag="prerelease/v1.2.3")
+    client.json = lambda endpoint: {"total_count": 1, "jobs": [{"name": "build", "conclusion": "failure"}]}
+    assert native.plan_release(client, client.manifest_data, "", "42", workflow=native.PRERELEASE_WORKFLOW) is None
+    assert "Prerelease Archive run 42 has no release job" in capsys.readouterr().out
+
+
+def test_plan_command_selects_prerelease_run_and_rejects_unknown_workflow(monkeypatch, tmp_path):
+    client = ReleaseRun(tag="prerelease/v1.2.3")
+    monkeypatch.setattr(native, "GitHub", lambda *args: client)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('[project]\narchive_prefix="tool"\n[[release_targets]]\ntarget="x86_64-unknown-linux-gnu"\narchive="tar.gz"\n')
+    output = tmp_path / "outputs"
+    assert native.main(["plan", "--run-id", "42", "--workflow", "Prerelease Archive", "--manifest", str(manifest), "--output", str(output)]) == 0
+    assert output.read_text().startswith("verify=true\ntag=prerelease/v1.2.3\n")
+    assert native.main(["plan", "--run-id", "42", "--workflow", "Something Else", "--manifest", str(manifest), "--output", str(output)]) == 1
+
+
+def test_verify_records_each_passed_check_for_the_native_report(monkeypatch, tmp_path):
+    target = "x86_64-unknown-linux-gnu"
+    host(monkeypatch, target)
+    assets = Assets(target)
+    seen, run = commands()
+    checks = []
+    native.verify_release(assets, "v1.2.3", target, tmp_path, run=run, checks=checks)
+    assert [check["name"] for check in checks] == [
+        "native host",
+        f"sha256 {assets.archive_name}",
+        f"sha256 {assets.wheel_name}",
+        "binary one",
+        "binary two",
+        f"wheel {assets.wheel_name}",
+    ]
+    assert {check["status"] for check in checks} == {"pass"}
+    assert checks[-1]["detail"] == "installs and reports 1.2.3 under Python 3.11"
+
+
+def test_verify_writes_a_failing_result_with_the_checks_it_passed(monkeypatch, tmp_path, capsys):
+    target = "aarch64-unknown-linux-gnu"
+    host(monkeypatch, "x86_64-unknown-linux-gnu")
+    monkeypatch.setattr(native, "GitHub", lambda repository, token: Assets(target))
+    monkeypatch.setenv("GITHUB_REPOSITORY", "randlee/sc-lint")
+    monkeypatch.setenv("GH_TOKEN", "test-token")
+    result = tmp_path / "native-results" / f"{target}.json"
+
+    status = native.main([
+        "verify", "--tag", "v1.2.3", "--target", target, "--wheel-python", "/controlled/python3.9",
+        "--result", str(result),
+    ])
+
+    assert status == 1
+    payload = json.loads(result.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == native.RESULT_SCHEMA_VERSION
+    assert (payload["tag"], payload["target"], payload["checks"]) == ("v1.2.3", target, [])
+    assert "native runner required" in payload["error"]
+    assert "native runner required" in capsys.readouterr().err
