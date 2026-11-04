@@ -31,6 +31,7 @@ sc-lint-schema.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true
+sha2 = "0.10.9"
 toml.workspace = true
 
 [target.'cfg(unix)'.dependencies]
