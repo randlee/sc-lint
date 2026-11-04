@@ -80,6 +80,7 @@ fn is_windows_absolute(value: &str) -> bool {
     source_path.display(),
     root.display()
 )]
+#[non_exhaustive]
 pub struct RepoRelativeSourcePathError {
     pub source_path: PathBuf,
     pub root: PathBuf,

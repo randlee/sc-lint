@@ -1017,4 +1017,12 @@ fn root_alias_stripping_preserves_lexical_paths_and_rejects_outside_files() {
         ),
         None
     );
+    assert_eq!(
+        super::relative_path_under_root(
+            std::path::Path::new("a"),
+            std::path::Path::new("a/b/c"),
+            Some(std::path::Path::new("a/b"))
+        ),
+        Some(std::path::Path::new("b/c"))
+    );
 }
