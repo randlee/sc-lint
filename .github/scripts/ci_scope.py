@@ -9,23 +9,27 @@ reads runs the full matrix. Pushes to develop and main always run it.
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from collections.abc import Iterable
 
 GIT_TIMEOUT_SECONDS = 60
 
-# Documentation and development metadata that no test or lint reads. site/reports/ is
-# the only part of site/ that is exempt: the rest of the Pages site is runtime.
+# Canonical non-runtime exemptions and their per-path provenance/reason. Keep
+# the path list here; policy and plan docs point here instead of copying it.
 NON_RUNTIME_PATHS = (
-    "site/reports/",
-    "docs/",
-    ".beads/",
-    ".atm-bd/",
-    ".triage/",
+    "site/reports/",  # Rand, 2026-11-04 (lint-085.79): explicitly approved.
+    "docs/",  # lint-085.79: documentation-only direction; read files are reclassified.
+    ".beads/",  # lint-085.79: generated Beads issue data is development metadata.
+    ".atm-bd/",  # lint-085.79: local ATM state is development metadata.
+    ".triage/",  # lint-085.79: finding records are development metadata.
 )
 # Paths under a non-runtime prefix that tests or lints read, so they stay runtime.
-RUNTIME_EXCEPTIONS = ("docs/sc-lint/",)
+# docs/sc-lint is covered by adoption and CLI-contract readers; requirements.md
+# is read by test suites. The closure test verifies tracked readers too.
+RUNTIME_EXCEPTIONS = ("docs/sc-lint/", "docs/requirements.md")
+REVISION_RE = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 
 
 def is_runtime(path: str) -> bool:
@@ -52,7 +56,7 @@ def commit_exists(revision: str) -> bool:
 def changed_paths(base: str, head: str) -> list[str]:
     """Every path that differs, with renames split so both the old and new names are classified."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--no-renames", "-z", base, head],
+        ["git", "diff", "--name-only", "--no-renames", "-z", base, head, "--"],
         capture_output=True, check=True, timeout=GIT_TIMEOUT_SECONDS,
     )
     return result.stdout.decode("utf-8", errors="surrogateescape").split("\0")
@@ -67,9 +71,17 @@ def scope_requires_runtime(event: str, base: str, head: str) -> bool:
     """
     if event != "pull_request":
         return True
-    if not base or set(base) == {"0"} or not head or not commit_exists(base):
+    if not REVISION_RE.fullmatch(base) or set(base) == {"0"}:
         return True
-    return requires_runtime(changed_paths(base, head))
+    if not REVISION_RE.fullmatch(head) or set(head) == {"0"}:
+        return True
+    try:
+        if not commit_exists(base) or not commit_exists(head):
+            return True
+        return requires_runtime(changed_paths(base, head))
+    except (OSError, subprocess.SubprocessError):
+        # Any unreadable revision range must run CI, never skip it.
+        return True
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

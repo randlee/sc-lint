@@ -4,28 +4,32 @@ The git-backed tests run in a throwaway repository with a private HOME, no inher
 GIT_* variables, fixed commit dates, and no global, system or hook configuration, so
 their results never depend on the developer's or the runner's git setup.
 """
-import glob
 import os
-import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ci_scope
+from ci_scope_test_helpers import (
+    _pytest_root_read_paths,
+    _rust_read_expression_paths,
+    parse_workflow,
+    prefix_literal_read_paths,
+    read_paths,
+    tracked_paths,
+)
 
 FIXED_DATE = "2026-11-04T12:00:00+0000"
-EXCLUDED_DIRS = {".git", "target", ".venv", "node_modules", "__pycache__"}
 
 
 @pytest.mark.parametrize("path", [
     "site/reports/release-native-verify/index.html",
     "site/reports/release-native-verify/20261104T180000Z-prerelease-v1.2.3-run4242/index.json",
-    "docs/requirements.md",
     "docs/project-plan.md",
     ".beads/issues.jsonl",
     ".atm-bd/sc-lint.bd-cache.sqlite3",
@@ -43,6 +47,7 @@ def test_documentation_and_metadata_paths_do_not_require_runtime(path):
     "CHANGELOG.md",
     "docs/sc-lint/adoption.md",
     "docs/sc-lint/cli-contract.md",
+    "docs/requirements.md",
     ".atm.toml",
     ".claude/agents/publisher.md",
     ".claude/skills/publishing/ref/release-state-strategy.md",
@@ -122,6 +127,36 @@ def test_a_pull_request_whose_base_is_not_in_the_clone_requires_runtime(monkeypa
     assert ci_scope.scope_requires_runtime("pull_request", "a" * 40, "b" * 40) is True
 
 
+@pytest.mark.parametrize("base, head", [("not-a-sha", "b" * 40), ("a" * 40, "--output=/tmp/out"), ("0" * 40, "b" * 40)])
+def test_a_pull_request_with_invalid_sha_inputs_requires_runtime(base, head, monkeypatch):
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError("invalid SHA inputs must not reach git")
+
+    monkeypatch.setattr(ci_scope, "commit_exists", should_not_run)
+    assert ci_scope.scope_requires_runtime("pull_request", base, head) is True
+
+
+def test_a_pull_request_with_an_unreadable_range_requires_runtime(monkeypatch):
+    def timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("git", 60)
+
+    monkeypatch.setattr(ci_scope, "commit_exists", lambda _revision: True)
+    monkeypatch.setattr(ci_scope, "changed_paths", timeout)
+    assert ci_scope.scope_requires_runtime("pull_request", "a" * 40, "b" * 40) is True
+
+
+def test_git_diff_places_revision_delimiter_after_valid_revisions(monkeypatch):
+    captured = {}
+
+    def run(command, **_kwargs):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0, stdout=b"docs/example.md\0")
+
+    monkeypatch.setattr(ci_scope.subprocess, "run", run)
+    assert ci_scope.changed_paths("a" * 40, "b" * 40) == ["docs/example.md", ""]
+    assert captured["command"][-3:] == ["a" * 40, "b" * 40, "--"]
+
+
 def test_a_pull_request_without_a_head_requires_runtime(monkeypatch):
     monkeypatch.setattr(ci_scope, "commit_exists", lambda _revision: True)
     assert ci_scope.scope_requires_runtime("pull_request", "a" * 40, "") is True
@@ -135,8 +170,13 @@ def hermetic_repo(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    xdg_config = home / ".config"
+    xdg_config.mkdir()
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config))
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     monkeypatch.setenv("GIT_AUTHOR_DATE", FIXED_DATE)
     monkeypatch.setenv("GIT_COMMITTER_DATE", FIXED_DATE)
     repo = tmp_path / "repo"
@@ -165,7 +205,7 @@ def _commit(repo, path, text):
 
 @pytest.mark.parametrize("path, runtime", [
     ("site/reports/release-native-verify/index.html", False),
-    ("docs/requirements.md", False),
+    ("docs/requirements.md", True),
     ("docs/sc-lint/adoption.md", True),
     ("README.md", True),
     ("CHANGELOG.md", True),
@@ -177,6 +217,13 @@ def test_main_classifies_a_real_pull_request_range(hermetic_repo, capsys, path, 
     head = _commit(hermetic_repo, path, "change\n")
     assert ci_scope.main(["--event", "pull_request", "--base", base, "--head", head]) == 0
     assert capsys.readouterr().out == f"runtime={str(runtime).lower()}\n"
+
+
+def test_hermetic_git_fixture_sets_cross_platform_config_paths(hermetic_repo):
+    assert os.environ["USERPROFILE"] == str(hermetic_repo.parent / "home")
+    assert os.environ["XDG_CONFIG_HOME"] == str(hermetic_repo.parent / "home" / ".config")
+    assert os.environ["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert os.environ["GIT_CONFIG_SYSTEM"] == os.devnull
 
 
 def test_main_classifies_a_range_with_a_docs_commit_then_a_crates_commit(hermetic_repo, capsys):
@@ -207,96 +254,161 @@ def test_main_requires_an_event(capsys):
     assert "--event" in capsys.readouterr().err
 
 
-def _file_globs(node):
-    if isinstance(node, dict):
-        for key, value in node.items():
-            if key == "files" and isinstance(value, list):
-                yield from value
-            else:
-                yield from _file_globs(value)
-    elif isinstance(node, list):
-        for item in node:
-            yield from _file_globs(item)
-
-
-def _rel(path):
-    return path.relative_to(REPO).as_posix()
-
-
-def _walk_files(top):
-    """Every file under top, pruning build output and VCS directories before descending."""
-    for root, dirs, names in os.walk(top):
-        dirs[:] = [name for name in dirs if name not in EXCLUDED_DIRS]
-        for name in names:
-            yield Path(root, name)
-
-
-INCLUDE_READ = re.compile(r'include_(?:str|bytes)!\(\s*"([^"]+)"\s*\)')
-
-
-def include_read_paths():
-    """Paths named by include_str!/include_bytes! in crates, resolved from the source file."""
-    for source in _walk_files(REPO / "crates"):
-        if source.suffix != ".rs":
-            continue
-        for match in INCLUDE_READ.finditer(source.read_text(encoding="utf-8")):
-            target = (source.parent / match.group(1)).resolve()
-            if target.is_file():
-                yield _rel(target)
-
-
-def lint_glob_read_paths():
-    """Files matched by a `files` glob in the lint configuration."""
-    config = tomllib.loads((REPO / ".just/lint-config.toml").read_text(encoding="utf-8"))
-    for pattern in _file_globs(config):
-        for match in glob.glob(str(REPO / pattern), recursive=True):
-            if Path(match).is_file():
-                yield _rel(Path(match))
-
-
-PYTEST_READ = re.compile(r'\b(?:ROOT|REPO_ROOT|PACKAGE_ROOT|repo_root\(\))\s*((?:/\s*"[^"]+"\s*)+)')
-
-
-def pytest_read_paths():
-    """Repo paths that pytest suites join onto their root, resolved against the repository root."""
-    for source in _walk_files(REPO):
-        if source.suffix != ".py":
-            continue
-        parts = source.relative_to(REPO).parts
-        if not (source.name.startswith("test_") or source.name == "conftest.py" or "tests" in parts):
-            continue
-        for match in PYTEST_READ.finditer(source.read_text(encoding="utf-8")):
-            segments = re.findall(r'"([^"]+)"', match.group(1))
-            target = REPO.joinpath(*segments)
-            if target.is_file():
-                yield _rel(target)
-            elif target.is_dir():
-                for child in _walk_files(target):
-                    yield _rel(child)
-
-
-READ_SOURCES = {
-    "include_str!/include_bytes! in crates": include_read_paths,
-    "files glob in .just/lint-config.toml": lint_glob_read_paths,
-    "pytest repo-root read": pytest_read_paths,
-}
-
-
-@pytest.mark.parametrize("source", list(READ_SOURCES))
-def test_each_read_source_finds_paths_in_this_repository(source):
-    assert set(READ_SOURCES[source]()), f"no reads found for {source}; the scanner is out of date"
-
-
 def test_every_path_read_by_tests_or_lints_requires_runtime():
     reads = {}
-    for source, finder in READ_SOURCES.items():
-        for path in finder():
+    for source, paths in read_paths().items():
+        for path in paths:
             reads.setdefault(path, set()).add(source)
     not_runtime = {path: sorted(sources) for path, sources in sorted(reads.items()) if not ci_scope.is_runtime(path)}
     assert not not_runtime, f"read by tests or lints but classified non-runtime: {not_runtime}"
 
 
+def test_ci_workflow_parses_and_pins_conditions_runners_and_scope_env():
+    workflow = parse_workflow()
+    assert workflow["jobs"]["ci-scope"]["runs-on"] == "ubuntu-latest"
+    assert "if" not in workflow["jobs"]["adoption"]
+    assert "if" not in workflow["jobs"]["release-smoke"]
+
+    expected_job_conditions = {
+        "ci-scope": None,
+        "just-lint": None,
+        "test": None,
+        "adoption": None,
+        "wheel-runtime": "${{ needs.ci-scope.outputs.runtime != 'false' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}",
+        "release-smoke": None,
+    }
+    assert {name: job.get("if") for name, job in workflow["jobs"].items()} == expected_job_conditions
+
+    runner = "${{ needs.ci-scope.outputs.runtime != 'false' && matrix.os || 'ubuntu-latest' }}"
+    assert workflow["jobs"]["just-lint"]["runs-on"] == runner
+    assert workflow["jobs"]["test"]["runs-on"] == runner
+    assert workflow["jobs"]["adoption"]["runs-on"] == "${{ matrix.os }}"
+    assert workflow["jobs"]["release-smoke"]["runs-on"] == "${{ matrix.os }}"
+    assert workflow["jobs"]["wheel-runtime"]["runs-on"] == "ubuntu-latest"
+    assert workflow["jobs"]["just-lint"]["name"] == "Just lint (${{ matrix.os }})"
+    assert workflow["jobs"]["test"]["name"] == "Test (${{ matrix.os }})"
+    expected_os_matrix = ["ubuntu-latest", "macos-latest", "windows-latest"]
+    for job_name in ("just-lint", "test", "adoption", "release-smoke"):
+        assert workflow["jobs"][job_name]["strategy"]["matrix"]["os"] == expected_os_matrix
+
+    scope = next(step for step in workflow["jobs"]["ci-scope"]["steps"] if step.get("id") == "scope")
+    assert scope["env"] == {
+        "EVENT_NAME": "${{ github.event_name }}",
+        "BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+        "HEAD_SHA": "${{ github.sha }}",
+    }
+    assert "${{" not in scope["run"]
+    assert '--base "$BASE_SHA" --head "$HEAD_SHA"' in scope["run"]
+
+    lint_steps = workflow["jobs"]["just-lint"]["steps"]
+    spell_check = next(step for step in lint_steps if step.get("name") == "Documentation-only spell check")
+    assert spell_check["run"].strip() == "python -m pip install codespell\ncodespell"
+    assert spell_check["if"] == "${{ needs.ci-scope.outputs.runtime == 'false' }}"
+    runtime_true = "${{ needs.ci-scope.outputs.runtime != 'false' }}"
+    runtime_false = "${{ needs.ci-scope.outputs.runtime == 'false' }}"
+    push_only = "${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}"
+    runtime_push = "${{ needs.ci-scope.outputs.runtime != 'false' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}"
+    assert [step.get("if") for step in workflow["jobs"]["ci-scope"]["steps"]] == [None, None]
+    assert [step.get("if") for step in lint_steps] == [runtime_false, None, runtime_false, runtime_false, *([runtime_true] * 9)]
+    assert [step.get("if") for step in workflow["jobs"]["test"]["steps"]] == [runtime_false, *([runtime_true] * 9)]
+    assert [step.get("if") for step in workflow["jobs"]["adoption"]["steps"]] == [runtime_false, *([runtime_true] * 6)]
+    assert [step.get("if") for step in workflow["jobs"]["wheel-runtime"]["steps"]] == [None, None, None, push_only, None]
+    archive_only = "${{ needs.ci-scope.outputs.runtime != 'false' && github.event_name != 'push' && github.base_ref != 'develop' && github.base_ref != 'main' }}"
+    assert [step.get("if") for step in workflow["jobs"]["release-smoke"]["steps"]] == [
+        runtime_false, *([runtime_true] * 6), runtime_push, runtime_true, archive_only, runtime_push,
+    ]
+
+
+@pytest.mark.parametrize("job_name", ["adoption", "release-smoke"])
+def test_docs_only_jobs_keep_matrix_names_with_step_level_skip(job_name):
+    job = parse_workflow()["jobs"][job_name]
+    steps = job["steps"]
+    assert steps[0]["name"] == "Documentation-only skip"
+    assert steps[0]["if"] == "${{ needs.ci-scope.outputs.runtime == 'false' }}"
+    assert all(
+        step.get("if", "").startswith("${{ needs.ci-scope.outputs.runtime != 'false'")
+        for step in steps[1:]
+    )
+
+
+@pytest.mark.parametrize("source", ["tracked-source prefix literals", "Rust include/fs reads", "pytest repository-root reads", "lint files globs"])
+def test_each_read_source_finds_paths_in_this_repository(source):
+    assert read_paths()[source], f"no reads found for {source}; the scanner is out of date"
+
+
+def test_closure_scanner_uses_tracked_files_and_tolerates_non_utf8(tmp_path, monkeypatch):
+    for name in [name for name in os.environ if name.startswith("GIT_")]:
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    _git(repo, "init", "-q")
+    tracked = repo / "crates" / "vendor.rs"
+    tracked.parent.mkdir()
+    tracked.write_bytes(b"// invalid: \xff\n")
+    _git(repo, "add", "--all")
+    untracked = repo / "scratchpad" / "test_untracked.py"
+    untracked.parent.mkdir()
+    untracked.write_text('REPO / "docs" / "requirements.md"', encoding="utf-8")
+    paths = tracked_paths(repo)
+    assert paths == [tracked]
+    assert "docs/requirements.md" not in prefix_literal_read_paths(repo)
+
+
+def test_rust_read_scanner_covers_fs_reads_manifest_joins_and_concat(hermetic_repo):
+    repo = hermetic_repo
+    crate = repo / "crates" / "sample"
+    source = crate / "src" / "tests.rs"
+    source.parent.mkdir(parents=True)
+    (crate / "Cargo.toml").write_text("[package]\nname='sample'\nversion='0.1.0'\n", encoding="utf-8")
+    (repo / "docs" / "sc-lint").mkdir(parents=True)
+    expected = repo / "docs" / "sc-lint" / "contract.md"
+    expected.write_text("contract\n", encoding="utf-8")
+    source.write_text(
+        """
+const A: Vec<u8> = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/sc-lint/contract.md")).unwrap();
+const B: String = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("..")
+    .join("..")
+    .join("docs")
+    .join("sc-lint")
+    .join("contract.md")).unwrap();
+""",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+    assert _rust_read_expression_paths(repo) == {"docs/sc-lint/contract.md"}
+
+
+def test_python_read_scanner_covers_file_parent_roots_and_joinpath(hermetic_repo):
+    repo = hermetic_repo
+    source = repo / "tests" / "unit" / "test_reader.py"
+    source.parent.mkdir(parents=True)
+    contract = repo / "docs" / "sc-lint" / "contract.md"
+    contract.parent.mkdir(parents=True)
+    contract.write_text("contract\n", encoding="utf-8")
+    source.write_text(
+        """
+from pathlib import Path
+ROOTED = Path(__file__).resolve().parents[2] / "docs" / "sc-lint" / "contract.md"
+JOINED = Path(__file__).resolve().parents[2].joinpath("docs", "sc-lint", "contract.md")
+""",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "--all")
+    assert _pytest_root_read_paths(repo) == {"docs/sc-lint/contract.md"}
+
+
 def test_ci_workflow_skips_only_when_the_scope_output_is_false():
-    workflow = (REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    assert "outputs.runtime == 'true'" not in workflow
-    assert "outputs.runtime != 'true'" not in workflow
+    workflow = parse_workflow()
+    for name in ("just-lint", "test"):
+        conditions = [step.get("if") for step in workflow["jobs"][name]["steps"] if step.get("if")]
+        assert all(condition in {
+            "${{ needs.ci-scope.outputs.runtime == 'false' }}",
+            "${{ needs.ci-scope.outputs.runtime != 'false' }}",
+        } for condition in conditions)
+        assert "${{ needs.ci-scope.outputs.runtime == 'false' }}" in conditions
+        assert "${{ needs.ci-scope.outputs.runtime != 'false' }}" in conditions

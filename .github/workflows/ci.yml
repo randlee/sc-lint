@@ -27,8 +27,7 @@ on:
 
 # One live run per ref: a new push to a PR branch cancels the queued/running
 # run for the superseded commit instead of stacking a full matrix behind it.
-# Pushes to develop/main are never cancelled and always run the full matrix:
-# the scope gate reports runtime=true for every push, so every landed commit is verified.
+# Pushes to develop/main are never cancelled and always run the full matrix.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -198,32 +197,41 @@ jobs:
   adoption:
     name: Adoption kit (${{ matrix.os }})
     needs: [ci-scope]
-    if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Documentation-only skip
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
+        run: echo "Adoption tests are intentionally skipped for documentation-only changes."
+
       - uses: actions/checkout@v5
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
       - name: Install Python
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install just and pytest
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         shell: bash
         run: |
           cargo install just --locked
           python -m pip install pytest
       - name: Run adoption kit tests
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: just test-adoption
 
       - name: Install Rust toolchain
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.1"
 
       - name: Run adoption kit integration tests
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: just test-adoption-integration
 
   wheel-runtime:
@@ -282,7 +290,6 @@ jobs:
     # declared destinations. Then run the consumer recipes without source files.
     name: Release smoke (${{ matrix.os }})
     needs: [ci-scope]
-    if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
     strategy:
       fail-fast: false
       matrix:
@@ -291,29 +298,39 @@ jobs:
     env:
       RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
     steps:
+      - name: Documentation-only skip
+        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
+        run: echo "Release smoke tests are intentionally skipped for documentation-only changes."
+
       - uses: actions/checkout@v5
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
 
       - name: Install Rust toolchain
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.1"
           components: clippy, rustfmt
 
       - name: Install just
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         run: cargo install just --locked
 
       - name: Install Python
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Cache cargo build
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-cargo-release-smoke-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binaries
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -322,7 +339,7 @@ jobs:
           cargo build --release --target "${target}" ${bin_args}
 
       - name: Build the sc_lint wheel and its dependencies for offline install
-        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -330,6 +347,7 @@ jobs:
           python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
 
       - name: Package the manifest-declared publish-kit archive
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -382,7 +400,7 @@ jobs:
           PY
 
       - name: Run archive and docs smoke
-        if: ${{ github.event_name != 'push' && github.base_ref != 'develop' && github.base_ref != 'main' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' && github.event_name != 'push' && github.base_ref != 'develop' && github.base_ref != 'main' }}
         shell: bash
         run: >-
           python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"
@@ -390,7 +408,7 @@ jobs:
           --target "${SMOKE_TARGET}"
 
       - name: Run full release-archive smoke test
-        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+        if: ${{ needs.ci-scope.outputs.runtime != 'false' && (github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main') }}
         shell: bash
         run: >-
           python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"

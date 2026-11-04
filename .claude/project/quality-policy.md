@@ -52,13 +52,13 @@ one-line reason in the commit message.
 ## CI Scope
 
 - Documentation-only pull requests skip the runtime matrix. The classifier is
-  `.github/scripts/ci_scope.py`; its non-runtime paths are the only exemptions.
-- Non-runtime: `site/reports/**`, `docs/**` except `docs/sc-lint/**`, `.beads/**`,
-  `.atm-bd/**` and `.triage/**`. Rand, 2026-11-04: "I would exempt site/reports/**".
-- Runtime: everything else, including `README.md`, `AGENTS.md`, `CHANGELOG.md`,
-  `.claude/**`, `site/` outside `site/reports/`, and any file a test or lint reads.
-  A test checks the last rule against the repository's reads.
-- Pushes to `develop` and `main` always run the full runtime matrix.
+  `.github/scripts/ci_scope.py`; it is the canonical source for each exemption
+  and its provenance. Tracked paths read by tests or lints are runtime. The
+  tracked-source closure test covers Rust include macros and common `fs::read`
+  expressions (including manifest-directory joins and concatenated paths),
+  pytest repository-root reads, and configured lint file globs.
+- All other paths are runtime by default. Pushes to `develop` and `main` always
+  run the full runtime matrix.
 
 ## Plan Naming
 
