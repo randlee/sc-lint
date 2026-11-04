@@ -173,12 +173,11 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
             )
         return result, log
 
-    def test_setup_check_and_dry_run_reuse_an_incompatible_managed_binary_without_fetching(self) -> None:
+    def test_setup_rejects_check_and_dry_run_does_not_fetch(self) -> None:
         import tempfile
 
-        # With no helper venv present, --dry-run reports what it would do (exit 0)
-        # while --check reports the missing venv (exit 4); neither may fetch.
-        expected = {"--check": (4, "CLI.SC_LINT_PYTHON_UNAVAILABLE"), "--dry-run": (0, "")}
+        # `setup` supports --dry-run; --check belongs to `upgrade` and is a usage error.
+        expected = {"--check": (2, "usage:"), "--dry-run": (0, "")}
         for flag, (code, marker) in expected.items():
             with tempfile.TemporaryDirectory() as raw:
                 result, log = self._run_setup(flag, Path(raw))
@@ -187,7 +186,11 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
                 self.assertIn(marker, result.stderr, (flag, result.stderr))
                 self.assertNotIn("RELEASE_UNAVAILABLE", result.stderr, (flag, result.stderr))
                 self.assertNotIn("curl", calls, (flag, calls))
-                self.assertIn(f"setup {flag}", calls, (flag, calls))
+                if flag == "--check":
+                    self.assertEqual(calls, "", (flag, calls))
+                    self.assertIn("setup --config", result.stderr)
+                else:
+                    self.assertIn(f"setup {flag}", calls, (flag, calls))
 
 
 class PosixBootstrapConsumerStepEnvironmentTests(unittest.TestCase):

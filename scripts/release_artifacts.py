@@ -236,7 +236,15 @@ def validate_documentation_bundle_package_manifest(
                     f"documentation package manifest guides[{index}].package must be a non-empty string"
                 )
             documented_packages.add(package)
-    expected_guides = expected_files - {Path("manifest.toml")}
+    # Generated CLI Markdown/HTML files are published assets; only the
+    # CLI-reference README is an addressable offline guide.
+    cli_reference_assets = {
+        path
+        for path in expected_files
+        if path.parts[:1] == ("cli-reference",)
+        and path != Path("cli-reference/README.md")
+    }
+    expected_guides = expected_files - {Path("manifest.toml")} - cli_reference_assets
     if guide_paths != expected_guides:
         missing = sorted(expected_guides - guide_paths)
         unexpected = sorted(guide_paths - expected_guides)

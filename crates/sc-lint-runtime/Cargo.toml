@@ -35,5 +35,6 @@ syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }
 thiserror = "2.0.21"
 
 [dev-dependencies]
+sc-docli = "=0.2.0"
 dunce = "1.0.5"
 tempfile = "3.27.0"

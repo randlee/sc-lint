@@ -38,6 +38,10 @@ path = "best-practices.md"
 kind = "operator"
 
 [[guides]]
+path = "cli-reference/README.md"
+kind = "operator"
+
+[[guides]]
 path = "packages/sc-lint.md"
 kind = "package"
 package = "sc-lint"

@@ -1,3 +1,5 @@
+# User-owned configuration: edit lint/test steps as needed; `sc-lint init --just`
+# refreshes only missing files and generated version-only updates.
 [tool.sc-lint]
 minimum_version = "{{SC_LINT_VERSION}}"
 

@@ -74,12 +74,12 @@ metadata.
 
 ```sh
 sc-lint lint sc-boundary
-sc-lint view graph
 ```
 
 Findings identify rule, owner, path, and remediation context. The normalized
-CLI envelope is suitable for CI; graph views are intended for architecture
-inspection.
+CLI envelope is suitable for CI. `sc-lint view graph` is a reserved command
+surface and currently returns `CLI.CAPABILITY_ERROR`; it is not an available
+architecture-inspection view.
 
 ## CI and failures
 

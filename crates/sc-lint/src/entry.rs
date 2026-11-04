@@ -1,7 +1,6 @@
 //! Process entry points: argument parsing, command execution, and output
 //! emission shared by the binary and the Python bindings.
 
-#[cfg(test)]
 use clap::CommandFactory;
 use clap::Parser;
 use serde_json::Value;
@@ -200,9 +199,18 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
             exit_code: consts::EXIT_SUCCESS,
         },
         _ => {
-            let cli_error = CliError::usage(error.render().to_string()).with_suggested_action(
-                "Run `sc-lint --help` to inspect the supported command surface.",
-            );
+            let (usage, help_path) = parse_error_context(argv);
+            let message = error
+                .render()
+                .to_string()
+                .lines()
+                .filter(|line| !line.starts_with("Usage:"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let message = format!("{message}\n{usage}");
+            let cli_error = CliError::usage(message).with_suggested_action(format!(
+                "Run `{help_path} --help` to inspect the supported command surface."
+            ));
             ImmediateOutcome {
                 rendered: render_error(
                     consts::ACTION_CLI_PARSE_ERROR,
@@ -213,6 +221,47 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
             }
         }
     }
+}
+
+fn parse_error_context(argv: &[OsString]) -> (String, String) {
+    let mut command = Cli::command();
+    let mut path = Vec::new();
+    let mut args = argv.iter().skip(1).peekable();
+    while let Some(value) = args.next() {
+        let token = value.to_string_lossy();
+        if matches!(token.as_ref(), "--root" | "--config" | "--log-root") {
+            args.next();
+            continue;
+        }
+        if matches!(token.as_ref(), "--json" | "--version" | "--log-console")
+            || token.starts_with('-')
+        {
+            continue;
+        }
+        let Some(subcommand) = command.find_subcommand_mut(token.as_ref()) else {
+            break;
+        };
+        path.push(token.to_string());
+        command = subcommand.clone();
+    }
+    let help_path = if path.is_empty() {
+        "sc-lint".to_string()
+    } else {
+        format!("sc-lint {}", path.join(" "))
+    };
+    let usage = command.render_usage().to_string();
+    let usage = if path.is_empty() {
+        usage
+    } else {
+        let parent_path = path[..path.len() - 1].join(" ");
+        let prefix = if parent_path.is_empty() {
+            "sc-lint".to_string()
+        } else {
+            format!("sc-lint {parent_path}")
+        };
+        usage.replacen("Usage: ", &format!("Usage: {prefix} "), 1)
+    };
+    (usage, help_path)
 }
 
 fn render_success(

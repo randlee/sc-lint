@@ -80,3 +80,30 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
     logging::shutdown(logger);
     outcome.rendered.write(outcome.exit_code)
 }
+
+#[cfg(test)]
+mod cli_reference_tests {
+    use super::Cli;
+
+    #[test]
+    fn cli_reference_matches_real_clap_definition() {
+        use clap::CommandFactory;
+        let model = docli::from_clap(&Cli::command());
+        if let Ok(path) = std::env::var("SC_DOCLI_MODEL_OUT") {
+            std::fs::write(
+                path,
+                serde_json::to_vec_pretty(&model).expect("serialize cli model"),
+            )
+            .expect("write cli model");
+            return;
+        }
+        assert_eq!(
+            docli::render::markdown::render(&model),
+            include_str!("../../../docs-bundle/cli-reference/sc-lint.md")
+        );
+        assert_eq!(
+            docli::render::html::render(&model),
+            include_str!("../../../docs-bundle/cli-reference/sc-lint/index.html")
+        );
+    }
+}

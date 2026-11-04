@@ -37,5 +37,6 @@ toml.workspace = true
 libc = "0.2.191"
 
 [dev-dependencies]
+sc-docli = "=0.2.0"
 serial_test = "4.0.1"
 tempfile = "3.27.0"

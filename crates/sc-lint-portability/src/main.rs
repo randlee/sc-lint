@@ -21,21 +21,28 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Analyze Rust source for portability issues.
     Analyze {
+        /// Workspace root to inspect.
         #[arg(long, default_value = ".")]
         root: PathBuf,
+        /// Findings output format.
         #[arg(long, default_value = "text")]
         format: FormatArg,
+        /// Analyzer configuration file; defaults to discovery from the workspace root.
         #[arg(long)]
         config: Option<PathBuf>,
-        #[arg(long)]
+        /// Comma-separated PORT rule IDs; overrides configured excludes.
+        #[arg(long, value_name = "PORT-RULE-ID[,..]")]
         rule_filter: Option<String>,
     },
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum FormatArg {
+    /// Human-readable findings.
     Text,
+    /// JSON findings report.
     Json,
 }
 
@@ -55,7 +62,9 @@ fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
 fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
     match error {
         AnalyzerConfigError::Selector { analyzer, selector } => {
-            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+            format!(
+                "{analyzer}: unknown --rule-filter selector `{selector}`; valid rule IDs are PORT-001 through PORT-010"
+            )
         }
         _ => error.to_string(),
     }
@@ -126,12 +135,33 @@ mod tests {
             }),
             3
         );
+        let message = analyzer_config_message(&AnalyzerConfigError::Selector {
+            analyzer: "portability",
+            selector: "PORT-999".to_owned(),
+        });
+        assert!(message.contains("PORT-999"));
+        assert!(message.contains("PORT-001 through PORT-010"));
+    }
+
+    #[test]
+    fn cli_reference_matches_real_clap_definition() {
+        use clap::CommandFactory;
+        let model = docli::from_clap(&Cli::command());
+        if let Ok(path) = std::env::var("SC_DOCLI_MODEL_OUT") {
+            std::fs::write(
+                path,
+                serde_json::to_vec_pretty(&model).expect("serialize cli model"),
+            )
+            .expect("write cli model");
+            return;
+        }
         assert_eq!(
-            analyzer_config_message(&AnalyzerConfigError::Selector {
-                analyzer: "portability",
-                selector: "PORT-999".to_owned(),
-            }),
-            "portability: unknown --rule-filter selector `PORT-999`"
+            docli::render::markdown::render(&model),
+            include_str!("../../../docs-bundle/cli-reference/sc-lint-portability.md")
+        );
+        assert_eq!(
+            docli::render::html::render(&model),
+            include_str!("../../../docs-bundle/cli-reference/sc-lint-portability/index.html")
         );
     }
 }
