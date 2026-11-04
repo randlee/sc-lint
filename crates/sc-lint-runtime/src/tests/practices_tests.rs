@@ -168,7 +168,7 @@ fn missing_empty_and_unknown_allow_reasons_are_reported() {
     for (attribute, code) in [
         (
             "allow(SCB-RUNTIME-005)",
-            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+            sc_lint_directives::DirectiveCode::MissingReason.qualified(),
         ),
         (
             "allow(SCB-RUNTIME-005), reason=\"  \"",
@@ -176,7 +176,7 @@ fn missing_empty_and_unknown_allow_reasons_are_reported() {
         ),
         (
             "allow(SCB-RUNTIME-999), reason=\"unknown\"",
-            "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE",
+            sc_lint_directives::DirectiveCode::UnknownRule.qualified(),
         ),
     ] {
         let fixture = tokio_fixture(
@@ -375,12 +375,16 @@ fn allowance_errors_are_all_located_source_ordered_and_not_duplicated() {
         .unwrap_err()
         .to_string();
     assert_eq!(
-        error.matches("DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE").count(),
+        error
+            .matches(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+            .count(),
         1,
         "{error}"
     );
     assert_eq!(
-        error.matches("DIRECTIVE.SITE_ALLOW.MISSING_REASON").count(),
+        error
+            .matches(sc_lint_directives::DirectiveCode::MissingReason.qualified())
+            .count(),
         1,
         "{error}"
     );
@@ -494,9 +498,7 @@ fn macro_break_inside_loop_preserves_reachable_guard_state() {
 }
 
 #[test]
-fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
-    // Known limitation: rule 003 does not resolve renamed `self` imports.
-    // See the README and offline guide's syntactic coverage and limits.
+fn shared_resolver_supports_sleep_import_forms_and_preserves_name_hint_policy() {
     for (imports, expected) in [
         (
             "use std::thread::{self};",
@@ -504,7 +506,7 @@ fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
         ),
         (
             "use std::thread::{self as thread};",
-            vec![RuleId::ScbRuntime004],
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime004],
         ),
         (
             "use std::*;",
@@ -811,20 +813,20 @@ fn allowance_diagnostics_retain_typed_codes_and_source_positions() {
         .err()
         .unwrap();
     assert_eq!(errors.diagnostics.len(), 2);
-    assert_eq!(errors.diagnostics[0].line, 1);
+    assert_eq!(errors.diagnostics[0].position.line, 1);
     assert_eq!(
         errors.diagnostics[0].code,
-        "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE"
+        sc_lint_directives::DirectiveCode::UnknownRule.qualified()
     );
-    assert_eq!(errors.diagnostics[1].line, 2);
+    assert_eq!(errors.diagnostics[1].position.line, 2);
     assert_eq!(
         errors.diagnostics[1].code,
-        "DIRECTIVE.SITE_ALLOW.MISSING_REASON"
+        sc_lint_directives::DirectiveCode::MissingReason.qualified()
     );
     assert!(
         errors
             .to_string()
-            .contains("recovery: use a known runtime rule id")
+            .contains(sc_lint_directives::DirectiveCode::UnknownRule.recovery())
     );
 }
 
@@ -921,9 +923,99 @@ fn qualified_003_allow_requires_a_reason() {
         .unwrap_err()
         .to_string();
     assert!(
-        error.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"),
+        error.contains(sc_lint_directives::DirectiveCode::MissingReason.qualified()),
         "{error}"
     );
     assert!(error.contains("at line 1"), "{error}");
     assert!(error.contains("recovery:"), "{error}");
+}
+
+#[test]
+fn imported_root_statics_preserve_mutex_identity() {
+    let source = r#"
+        static M: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        mod a { use crate::M; async fn f() { let guard = M.lock().unwrap(); work().await; } }
+        mod b { use super::M; async fn f() { let guard = M.lock().unwrap(); work().await; } }
+    "#;
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007; 2]
+    );
+}
+
+#[test]
+fn sleep_imports_do_not_leak_between_modules_or_functions() {
+    let blocking = "mod a { use std::thread::sleep; fn f(){ sleep(()); } }";
+    let timer = "mod b { use tokio::time::sleep; fn f(){ sleep(()); } }";
+    for source in [
+        format!("{blocking}{timer}"),
+        format!("{timer}{blocking}"),
+        "fn a(){use std::thread::sleep; sleep(());} fn b(){use tokio::time::sleep; sleep(());}"
+            .into(),
+    ] {
+        assert_eq!(
+            rule_ids(&report(&source, true)),
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime005]
+        );
+    }
+}
+
+#[test]
+fn all_wait_rules_share_compound_and_framework_test_exemptions() {
+    let body = "fn f(c:&std::sync::Condvar,m:&std::sync::Mutex<()>){let g=m.lock().unwrap();c.wait(g);c.wait_timeout(g,d);}";
+    assert_eq!(
+        rule_ids(&report(body, false)),
+        vec![RuleId::ScbRuntime001, RuleId::ScbRuntime002]
+    );
+    for attr in [
+        "#[cfg(all(test,unix))]",
+        "#[tokio::test]",
+        "#[async_std::test]",
+    ] {
+        assert!(
+            report(&format!("{attr}{body}"), false).findings.is_empty(),
+            "{attr}"
+        );
+    }
+}
+
+#[test]
+fn runtime_allowances_reject_non_function_placement() {
+    for item in ["mod m {}", "struct S;", "impl S {}", "const C: () = ();"] {
+        let source = format!("#[sc_lint(allow(SCB-RUNTIME-003),reason=\"deliberate\")] {item}");
+        let fixture = tokio_fixture(&source, TOKIO);
+        let error = analyze_workspace(&analyze_options(&fixture)).unwrap_err();
+        assert!(error.to_string().contains("UNSUPPORTED_ITEM"), "{error}");
+    }
+}
+
+#[test]
+fn runtime_reports_every_unknown_owned_rule() {
+    let fixture = tokio_fixture(
+        "#[sc_lint(allow(SCB-RUNTIME-998,SCB-RUNTIME-999),reason=\"typos\")]fn f(){}",
+        TOKIO,
+    );
+    let error = analyze_workspace(&analyze_options(&fixture))
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        error
+            .matches(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+            .count(),
+        2,
+        "{error}"
+    );
+    assert!(error.contains("valid rule ids:"));
+}
+
+#[test]
+fn typed_runtime_inventory_matches_catalog() {
+    assert_eq!(
+        RuleId::ALL.iter().map(|id| id.as_str()).collect::<Vec<_>>(),
+        RUNTIME_CATALOG
+            .rules
+            .iter()
+            .map(|id| id.as_str())
+            .collect::<Vec<_>>()
+    );
 }

@@ -1,5 +1,5 @@
 //! One use-tree traversal, with binding policy supplied by each runtime pass.
-//! Keep `self` in leaf paths so legacy rule 003 can retain its alias contract.
+//! Scoped alias resolution is shared by every runtime rule.
 pub(crate) enum Import {
     Name {
         path: Vec<String>,
@@ -35,5 +35,40 @@ fn walk(tree: &syn::UseTree, mut path: Vec<String>, consume: &mut impl FnMut(Imp
                 walk(child, path.clone(), consume);
             }
         }
+    }
+}
+
+mod resolver;
+pub(crate) use resolver::Imports;
+
+pub(crate) fn qualified(module: &str, name: &str) -> String {
+    if module.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{module}::{name}")
+    }
+}
+
+pub(crate) trait ModuleScoped {
+    fn module_scope(&mut self) -> (&mut Imports, &mut String);
+
+    fn with_module(&mut self, item: &syn::ItemMod, visit: impl FnOnce(&mut Self))
+    where
+        Self: Sized,
+    {
+        let Some((_, items)) = &item.content else {
+            return;
+        };
+        let previous = {
+            let (imports, module) = self.module_scope();
+            let next = qualified(module, &item.ident.to_string());
+            let previous = std::mem::replace(module, next);
+            imports.push_items(items, false, module.as_str().into());
+            previous
+        };
+        visit(self);
+        let (imports, module) = self.module_scope();
+        imports.pop();
+        *module = previous;
     }
 }

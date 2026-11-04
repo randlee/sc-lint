@@ -1,20 +1,20 @@
 use crate::RuleId;
+use crate::position::SourcePosition;
 use sc_lint_directives::{
-    AttributeInput, Directive, DirectiveError, is_sc_lint_attribute, unknown_owned_rule,
+    AttributeInput, Directive, DirectiveCode, DirectiveError, is_sc_lint_attribute,
+    unknown_owned_rules, unknown_rule,
 };
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::OnceLock;
-use syn::spanned::Spanned;
 use syn::visit::Visit;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[error("{code} at line {line}: {cause}; recovery: {recovery}", cause = .directive.cause(), recovery = .directive.recovery())]
+#[error("{code} at line {line}: {cause}; recovery: {recovery}", line = .position.line, cause = .directive.cause(), recovery = .directive.recovery())]
 pub(crate) struct AllowanceDiagnostic {
     pub(crate) code: &'static str,
-    pub(crate) line: usize,
-    pub(crate) column: usize,
+    pub(crate) position: SourcePosition,
     #[source]
     pub(crate) directive: DirectiveError,
 }
@@ -38,16 +38,10 @@ impl std::error::Error for AllowanceErrors {}
 
 fn known_rules() -> &'static [&'static str] {
     static KNOWN: OnceLock<Vec<&'static str>> = OnceLock::new();
-    KNOWN.get_or_init(|| {
-        crate::RUNTIME_CATALOG
-            .rules
-            .iter()
-            .map(|rule| rule.as_str())
-            .collect()
-    })
+    KNOWN.get_or_init(|| RuleId::ALL.iter().map(|rule| rule.as_str()).collect())
 }
 
-type Position = (usize, usize);
+type Position = SourcePosition;
 struct Entry {
     start: Position,
     end: Position,
@@ -65,9 +59,7 @@ impl Allowances {
         let mut result = Self::default();
         result.visit_file(file);
         if !result.errors.is_empty() {
-            result
-                .errors
-                .sort_by_key(|error| (error.line, error.column));
+            result.errors.sort_by_key(|error| error.position);
             return Err(AllowanceErrors {
                 diagnostics: result.errors,
             });
@@ -77,13 +69,11 @@ impl Allowances {
     fn diagnostic(&mut self, position: Position, directive: DirectiveError) {
         self.errors.push(AllowanceDiagnostic {
             code: directive.code(),
-            line: position.0,
-            column: position.1,
+            position,
             directive,
         });
     }
-    pub(crate) fn allows(&self, rule: RuleId, line: usize, column: usize) -> bool {
-        let point = (line, column);
+    pub(crate) fn allows(&self, rule: RuleId, point: SourcePosition) -> bool {
         self.entries
             .iter()
             .rev()
@@ -100,49 +90,48 @@ impl Allowances {
         if !is_sc_lint_attribute(attr) {
             return Vec::new();
         }
-        let start = attr.span().start();
-        let position = (start.line, start.column);
+        let position = SourcePosition::start(attr);
         if let Some(rules) = self.parsed.get(&position) {
             return rules.clone();
         }
         let mut rules = Vec::new();
-        match attr.parse_args::<AttributeInput>() {
+        match AttributeInput::parse_attribute(attr) {
             Ok(input) => {
                 for directive in input.directives {
                     if let Directive::SiteAllow { rules: ids, .. } = directive {
-                        if let Some(rule) = unknown_owned_rule(&ids, "SCB-RUNTIME-", known_rules())
-                        {
-                            self.diagnostic(
-                                position,
-                                DirectiveError::new(
-                                    "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE",
-                                    rule.as_str(),
-                                    "use a known runtime rule id",
-                                ),
-                            );
-                        }
-                        rules.extend(
-                            ids.iter()
-                                .filter_map(|rule| RuleId::from_known(rule.as_str())),
-                        );
+                        rules.extend(self.site_allow_rules(&ids, position));
                     }
                 }
             }
             Err(error) => {
-                let error = DirectiveError::from_diagnostic(&error.to_string());
                 self.diagnostic(position, error);
             }
         }
         self.parsed.insert(position, rules.clone());
         rules
     }
+    fn site_allow_rules(
+        &mut self,
+        ids: &[sc_lint_directives::SiteRuleId],
+        position: Position,
+    ) -> Vec<RuleId> {
+        for rule in unknown_owned_rules(ids, "SCB-RUNTIME-", known_rules()) {
+            self.diagnostic(position, unknown_rule(rule, known_rules()));
+        }
+        ids.iter()
+            .filter(|id| known_rules().contains(&id.as_str()))
+            .map(|id| {
+                RuleId::from_known(id.as_str())
+                    .expect("runtime catalog and typed rule inventory agree")
+            })
+            .collect()
+    }
     fn function(&mut self, attrs: &[syn::Attribute], block: &syn::Block) {
         let rules = self.rules(attrs);
-        let start = block.span().start();
-        let end = block.span().end();
+
         self.entries.push(Entry {
-            start: (start.line, start.column),
-            end: (end.line, end.column),
+            start: SourcePosition::start(block),
+            end: SourcePosition::end(block),
             rules,
         });
     }
@@ -150,7 +139,18 @@ impl Allowances {
 
 impl<'ast> Visit<'ast> for Allowances {
     fn visit_attribute(&mut self, attr: &'ast syn::Attribute) {
-        self.attribute_rules(attr);
+        if is_sc_lint_attribute(attr) && !self.parsed.contains_key(&SourcePosition::start(attr)) {
+            let rules = self.attribute_rules(attr);
+            if !rules.is_empty() {
+                self.diagnostic(
+                    SourcePosition::start(attr),
+                    DirectiveError::typed(
+                        DirectiveCode::UnsupportedItem,
+                        "runtime allowances require a function or method",
+                    ),
+                );
+            }
+        }
     }
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
         if super::production(&item.attrs, Some(item.ident == "tests")) {

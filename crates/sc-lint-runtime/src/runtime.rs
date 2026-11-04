@@ -17,13 +17,14 @@ use syn::ItemImpl;
 use syn::ItemMod;
 use syn::Pat;
 use syn::Stmt;
-use syn::spanned::Spanned;
 
 use crate::CrateId;
 use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::position::SourcePosition;
+use crate::scope::classify as classify_scope;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageDependencyKind;
 use sc_lint_analyzer_support::PackageName;
@@ -32,19 +33,15 @@ use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::WorkspaceMetadata;
-use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::repo_relative_source_path;
-use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {
     rule_id: RuleId,
-    kind: &'static str,
     message: String,
     source_path: PathBuf,
-    line: usize,
-    column: usize,
+    position: SourcePosition,
     package: PackageName,
     target: TargetName,
     node_label: String,
@@ -58,18 +55,15 @@ impl RuntimeFinding {
     fn new(
         file: &FileContext,
         rule_id: RuleId,
-        kind: &'static str,
-        message: impl Into<String>,
-        position: (usize, usize),
+        message: impl AsRef<str>,
+        position: SourcePosition,
         function: &str,
     ) -> Self {
         Self {
             rule_id,
-            kind,
-            message: message.into(),
+            message: format!("{} {}", rule_id.as_str(), message.as_ref()),
             source_path: file.source_path.clone(),
-            line: position.0,
-            column: position.1,
+            position,
             package: file.package.clone(),
             target: file.target.clone(),
             node_label: node_label(file, function),
@@ -96,9 +90,8 @@ pub(crate) fn analyze_runtime_liveness(
             .as_str()
             .cmp(right.rule_id.as_str())
             .then_with(|| left.source_path.cmp(&right.source_path))
-            .then_with(|| left.line.cmp(&right.line))
+            .then_with(|| left.position.cmp(&right.position))
             .then_with(|| left.message.cmp(&right.message))
-            .then_with(|| left.kind.cmp(right.kind))
             .then_with(|| left.package.cmp(&right.package))
             .then_with(|| left.target.cmp(&right.target))
             .then_with(|| left.node_label.cmp(&right.node_label))
@@ -111,11 +104,11 @@ pub(crate) fn analyze_runtime_liveness(
             Ok((
                 Finding {
                     rule_id: finding.rule_id,
-                    kind: finding.kind.into(),
+                    kind: finding.rule_id.kind().into(),
                     message: format!(
                         "{}:{}: {}",
                         finding.source_path.display(),
-                        finding.line,
+                        finding.position.line,
                         finding.message
                     ),
                     owner_ids: vec![OwnerId::new(CrateId::from_parts(
@@ -175,7 +168,7 @@ fn analyze_file(
     }
     collector
         .findings
-        .retain(|site| !allowances.allows(site.rule_id, site.line, site.column));
+        .retain(|site| !allowances.allows(site.rule_id, site.position));
     Ok(collector.findings)
 }
 
@@ -186,25 +179,26 @@ fn blocking_sleep_finding(
     RuntimeFinding::new(
         file_context,
         RuleId::ScbRuntime003,
-        "blocking_thread_sleep_in_tokio_package",
         format!(
-            "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `{}`; use event-driven synchronization or `yield_now` instead",
+            concat!(
+                "std::thread::sleep blocks the thread in Tokio package `{}`; ",
+                "use event-driven synchronization or `yield_now` instead"
+            ),
             file_context.package
         ),
-        (site.line, site.column),
+        site.position,
         site.enclosing_fn.as_deref().unwrap_or("<module>"),
     )
 }
 
 fn practice_finding(file: &FileContext, site: crate::practices::Site) -> RuntimeFinding {
-    let (kind, recovery) = site.rule.explanation();
+    let recovery = site.rule.recovery();
     let rule_id = site.rule.id();
     RuntimeFinding::new(
         file,
         rule_id,
-        kind,
-        format!("{} {}; {}", rule_id.as_str(), site.detail, recovery),
-        (site.line, site.column),
+        format!("{}; {}", site.detail, recovery),
+        site.position,
         &site.function,
     )
 }
@@ -411,18 +405,32 @@ impl<'a> RuntimeCollector<'a> {
         }
         // This is an AST approximation over `.wait(...)` calls and does not
         // attempt receiver type resolution before flagging the pattern.
-        self.findings.push(RuntimeFinding::new(self.file_context, RuleId::ScbRuntime001, "condvar_wait_without_timeout",
-            "SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult",
-            (span_start_line(method_call.span()), method_call.span().start().column), label));
+        self.findings.push(RuntimeFinding::new(
+            self.file_context,
+            RuleId::ScbRuntime001,
+            concat!(
+                "bare Condvar::wait(...) in non-test production code; ",
+                "use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult"
+            ),
+            SourcePosition::start(method_call),
+            label,
+        ));
     }
 
     fn check_discarded_timeout_wait(&mut self, expr: &Expr, label: &str) {
         if !contains_timeout_wait_call(expr) {
             return;
         }
-        self.findings.push(RuntimeFinding::new(self.file_context, RuleId::ScbRuntime002, "discarded_wait_timeout_result",
-            "SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding",
-            (span_start_line(expr.span()), expr.span().start().column), label));
+        self.findings.push(RuntimeFinding::new(
+            self.file_context,
+            RuleId::ScbRuntime002,
+            concat!(
+                "wait_timeout* result discarded in non-test production code; ",
+                "inspect the returned WaitTimeoutResult before proceeding"
+            ),
+            SourcePosition::start(expr),
+            label,
+        ));
     }
 }
 
