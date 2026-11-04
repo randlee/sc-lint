@@ -106,3 +106,10 @@ its arguments and exit status; it does not recurse into a profile. On Windows,
 cargo tools and rustup targets with ordinary `just setup`; profile execution
 never installs them. See [using sc-lint](./using-sc-lint.md) for profile and
 platform selection.
+
+Lint, test and exec child commands inherit PATH in this order: the installed
+archive's bin directory, the managed `.sc-lint/venv/bin` directory (or
+`.sc-lint/venv/Scripts` on Windows), then the host PATH. Thus consumer steps
+using `python3 -m sc_lint.<helper>` on Unix or `python -m sc_lint.<helper>` on
+Windows use the managed interpreter. The venv is relative to the selected
+config file's directory. Exec uses the existing environment without provisioning it.

@@ -61,11 +61,18 @@ module/impl allows do not exempt members. Runtime configuration still supports
 
 Checks resolve grouped/renamed/glob use aliases, explicit receiver types,
 recognized constructors, and typed self fields. Guard liveness follows lexical
-blocks, explicit drop aliases and branches; temporaries do not stay live.
+blocks, explicit drop aliases and branches. Temporaries end with their
+expression; lock-result match scrutinees stay live through each arm.
 The tracker recognizes `Arc::clone`/`Rc::clone`, typed file-local static
 Mutexes, poison recovery through `lock().unwrap_or_else(|e| e.into_inner())`,
-glob-qualified `Mutex::new`/`Runtime::new`, and `if let Ok(g) = m.lock()`
-bindings inside the then-body. Diverging return/break/continue branches,
+glob-qualified `Mutex::new`/`Runtime::new`, and `Ok(g) = m.lock()` patterns
+in if-let, let-else, match and while-let. Guards stay within their binding
+scope and explicit drops release them. Match arms track `Ok(g)` guards,
+`Err(p)` poison errors that own guards, and unbound scrutinee resources in
+`Ok(_)` or fallback arms. A guard returned by
+`match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }` stays live in its
+receiving local binding. Visible `break` tokens inside macros
+(including `tokio::select!`) keep loop exits reachable for guard-state joins. Diverging return/break/continue branches,
 built-in panic/unreachable/todo/unimplemented macros and statically known `!`
 calls do not contribute to an if/match guard join.
 
@@ -76,9 +83,34 @@ bindings/containers/captures. File-flattened imports/type/static names and unpro
 control-flow exits can cause conservative false positives. In particular,
 `consume(g); other().await` and `loop { drop(g); break; } other().await` may
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
-proved. Known `!` declarations are matched by unambiguous file-local names.
-Unresolved callable return types are not assumed to diverge. Out-of-line
-`#[cfg(test)]` parent-module context is not propagated to a separate file.
+proved. Rule 003's legacy resolver does not recognize renamed `self` imports
+such as `use std::thread::{self as thread}`; use a direct module alias instead.
+For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
+including `Ok(_)` and `Ok(..)` scrutinees. Explicit
+`Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined
+`Err(p)` and wildcard fallback arms is a known limitation; those arms are not
+assumed to hold a guard. Move bindings of an entire scrutinee use the binding
+name, so `drop(name)` releases the tracked resource. Blocking lock-result
+rest and or-patterns retain their scrutinee resources. Dropping a nested
+`ref` binding does not release the scrutinee-held guard.
+Known `!` declarations are matched by unambiguous file-local names.
+Unresolved callable return types are not assumed to diverge. For an out-of-line
+`#[cfg(test)] mod checks;` in `src/lib.rs`, put `#![cfg(test)]` at the top of
+`src/checks.rs`:
+
+```rust
+// src/checks.rs
+#![cfg(test)]
+
+#[test]
+fn checks_behavior() {
+    assert_eq!(2 + 2, 4);
+}
+```
+
+The file-level marker classifies the separate file as test code and exempts
+rules 004–007. The parent module's `cfg(test)` attribute alone does not
+propagate into it.
 
 ## Finding interpretation and CI
 

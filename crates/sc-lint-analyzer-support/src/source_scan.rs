@@ -13,10 +13,12 @@ use syn::Attribute;
 use syn::Ident;
 use syn::Item;
 
+use crate::relative_path::relative_path_under_root;
+
 pub fn relative_slash_path(root: &Path, path: &Path) -> String {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    path.strip_prefix(&root)
+    relative_path_under_root(&root, &path, None)
         .unwrap_or(&path)
         .to_string_lossy()
         .replace('\\', "/")
@@ -291,17 +293,59 @@ pub fn span_start_line(span: Span) -> usize {
 }
 
 pub fn attr_is_cfg_test(attr: &Attribute) -> bool {
-    let path = attr.path();
-    if !path.is_ident("cfg") {
-        return false;
-    }
-    attr.parse_args::<syn::Ident>()
-        .map(|ident| ident == "test")
-        .unwrap_or(false)
+    cfg_is_test(attr, false)
 }
 
 pub fn attr_is_test(attr: &Attribute) -> bool {
-    attr.path().is_ident("test")
+    test_attribute(attr, false)
+}
+
+/// Recognize test-only attributes, including qualified test macros and
+/// `cfg(all(test, ...))`. Other cfg expressions are not evaluated.
+/// Unlike `classify_scope`, this does not apply item-name conventions.
+pub fn is_test_only(attributes: &[Attribute]) -> bool {
+    attributes
+        .iter()
+        .any(|attr| test_attribute(attr, true) || cfg_is_test(attr, true))
+}
+
+fn test_attribute(attr: &Attribute, qualified: bool) -> bool {
+    let path = attr.path();
+    path.is_ident("test")
+        || (qualified
+            && path.segments.len() >= 2
+            && path
+                .segments
+                .last()
+                .is_some_and(|part| part.ident == "test"))
+}
+
+fn cfg_is_test(attr: &Attribute, nested_all: bool) -> bool {
+    if !attr.path().is_ident("cfg") {
+        return false;
+    }
+    if !nested_all {
+        return attr
+            .parse_args::<syn::Ident>()
+            .is_ok_and(|ident| ident == "test");
+    }
+    attr.parse_args::<syn::Meta>()
+        .is_ok_and(|meta| meta_is_test_only(&meta))
+}
+
+fn meta_is_test_only(meta: &syn::Meta) -> bool {
+    if meta.path().is_ident("test") {
+        return true;
+    }
+    let syn::Meta::List(list) = meta else {
+        return false;
+    };
+    list.path.is_ident("all")
+        && list
+            .parse_args_with(
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+            )
+            .is_ok_and(|items| items.iter().any(meta_is_test_only))
 }
 
 pub fn item_attrs(item: &Item) -> &[Attribute] {

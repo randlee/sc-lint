@@ -81,7 +81,10 @@ def parse(argv):
 
 def run(argv, **kwargs):
     try:
-        return subprocess.run([str(item) for item in argv], check=False, **kwargs).returncode
+        command = [str(item) for item in argv]
+        # Windows otherwise searches the parent Python directory before PATH.
+        command[0] = shutil.which(command[0]) or command[0]
+        return subprocess.run(command, check=False, **kwargs).returncode
     except OSError as error:
         print(f"{argv[0]}: {error}", file=sys.stderr)
         return 127
@@ -184,12 +187,26 @@ def install_release(config, operation, flags):
             fail(f"setup: could not extract {archive}: {error} (CLI.SC_LINT_RELEASE_UNAVAILABLE)", 4)
 
 
+def venv_directory(config):
+    return Path(config).resolve().parent / ".sc-lint" / "venv"
+
+
+def venv_scripts(config):
+    directory = venv_directory(config)
+    return Path(sysconfig.get_path("scripts", scheme="venv", vars={"base": str(directory), "platbase": str(directory)}))
+
+
+def activate(binary, config):
+    os.environ["SC_LINT_BIN"] = str(binary)
+    os.environ["PATH"] = os.pathsep.join([str(Path(binary).parent), str(venv_scripts(config)), os.environ.get("PATH", "")])
+
+
 class Bootstrap:
     def __init__(self, config):
         self.config = config
         self.managed = managed_path()
-        self.directory = Path(config).resolve().parent / ".sc-lint" / "venv"
-        scripts = Path(sysconfig.get_path("scripts", scheme="venv", vars={"base": str(self.directory), "platbase": str(self.directory)}))
+        self.directory = venv_directory(config)
+        scripts = venv_scripts(config)
         self.python = scripts / ("python.exe" if os.name == "nt" else "python3")
         self.install_input = self.directory.parent / "install.json"
         self.binary = None
@@ -257,10 +274,6 @@ class Bootstrap:
             return 4
         return run([self.python, "-m", "sc_lint.setup_tools", "--config", self.config, *([] if mode == "install" else ["--check"])])
 
-    def activate(self):
-        os.environ["SC_LINT_BIN"] = str(self.binary)
-        os.environ["PATH"] = str(Path(self.binary).parent) + os.pathsep + os.environ.get("PATH", "")
-
 
 def main(argv=None):
     operation, config, flags, positional, command = parse(sys.argv[1:] if argv is None else argv)
@@ -271,8 +284,7 @@ def main(argv=None):
         if not binary or not Path(binary).is_file() or (os.name != "nt" and not os.access(binary, os.X_OK)):
             fail(f"sc-lint binary is unavailable at {override or managed}; run just setup", 1)
         binary = os.path.abspath(binary)
-        os.environ["SC_LINT_BIN"] = binary
-        os.environ["PATH"] = str(Path(binary).parent) + os.pathsep + os.environ.get("PATH", "")
+        activate(binary, config or "sc-lint.toml")
         if command[0] == "sc-lint":
             command = [binary, *(["--config", config] if config else []), *command[1:]]
         return run(command)
@@ -293,7 +305,7 @@ def main(argv=None):
     if operation == "setup":
         status = run([bootstrap.binary, "--config", config, "setup", *flags])
         return status or bootstrap.provision_venv(mode) or bootstrap.provision_tools(mode)
-    bootstrap.activate()
+    activate(bootstrap.binary, config)
     status = bootstrap.provision_venv("install")
     if status:
         return status

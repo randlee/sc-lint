@@ -210,7 +210,21 @@ impl<'ast> Visit<'ast> for Breaks {
             self.seen = true;
         }
     }
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        // Macro bodies are opaque to syn's expression visitor. A visible break
+        // can escape this loop (e.g. tokio::select!); retain the path rather
+        // than incorrectly proving that it diverges. Labels stay conservative.
+        self.seen |= tokens_have_break(mac.tokens.clone());
+    }
     fn visit_expr_closure(&mut self, _: &'ast syn::ExprClosure) {}
     fn visit_expr_async(&mut self, _: &'ast syn::ExprAsync) {}
     fn visit_item_fn(&mut self, _: &'ast syn::ItemFn) {}
+}
+
+fn tokens_have_break(tokens: proc_macro2::TokenStream) -> bool {
+    tokens.into_iter().any(|token| match token {
+        proc_macro2::TokenTree::Ident(ident) => ident == "break",
+        proc_macro2::TokenTree::Group(group) => tokens_have_break(group.stream()),
+        _ => false,
+    })
 }

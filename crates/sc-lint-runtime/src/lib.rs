@@ -2,6 +2,9 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
+/// Shared analysis inputs from `sc-lint-analyzer-support`.
+#[doc(inline)]
+pub use sc_lint_analyzer_support::AnalyzeOptions;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
@@ -13,14 +16,17 @@ use sc_lint_schema::CrateId;
 use sc_lint_schema::Finding as SchemaFinding;
 use sc_lint_schema::FindingsReport as SchemaFindingsReport;
 use sc_lint_schema::NodeId;
-use sc_lint_schema::OutputFormat;
+
 use sc_lint_schema::OwnerId;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod api;
+mod imports;
 mod practices;
 mod runtime;
+mod scope;
 mod sleep;
 #[cfg(test)]
 mod tests;
@@ -60,12 +66,6 @@ pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
     ],
     own_keys: &[],
 };
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AnalyzeOptions {
-    pub root: PathBuf,
-    pub format: OutputFormat,
-}
 
 pub type FindingsReport = SchemaFindingsReport<RuleId>;
 pub type Finding = SchemaFinding<RuleId>;

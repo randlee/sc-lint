@@ -24,33 +24,19 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::scope::ScopeKind;
+use crate::scope::classify_scope;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageDependencyKind;
 use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::PackageTargetKind;
 use sc_lint_analyzer_support::RepoRelativePath;
-use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::WorkspaceMetadata;
-use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-use sc_lint_analyzer_support::relative_slash_path;
+pub(super) use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
-
-pub(super) fn repo_relative_source_path(
-    root: &Path,
-    source_path: &Path,
-) -> Result<RepoRelativePath> {
-    let relative = relative_slash_path(root, source_path);
-    RepoRelativePath::parse(&relative).with_context(|| {
-        format!(
-            "failed to build repository-relative source path for `{}` under `{}`",
-            source_path.display(),
-            root.display()
-        )
-    })
-}
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {

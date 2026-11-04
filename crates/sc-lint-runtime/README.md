@@ -148,14 +148,23 @@ Grouped, renamed and glob `use` imports are resolved syntactically, as in rule
 parameters, inferred constructors/builders/handles, and typed `self` fields.
 Mutex tracking recognizes typed Mutex/Arc<Mutex> parameters, local constructors,
 typed `self` fields and explicit MutexGuard bindings, including `lock`/
-`try_lock`, `unwrap`/`expect`/`?`. Temporary guards are not retained. Nested
+`try_lock`, `unwrap`/`expect`/`?`. Temporary guards are released at the end
+of their expression; lock-result match temporaries remain live through the arm.
+Nested
 block exit and explicit `drop` (including `std::mem::drop` aliases) release a
 binding; branch analysis retains a guard if a continuing branch can keep it alive.
 
 The tracker also recognizes `Arc::clone`/`Rc::clone` of Mutex owners,
 file-local typed static Mutexes, `lock().unwrap_or_else(|e| e.into_inner())`,
 constructors reached through globs (`use std::sync::*`, `Mutex::new`), and
-`if let Ok(g) = m.lock()` bindings scoped to the then-body. If/match joins
+`Ok(g) = m.lock()` patterns in if-let, let-else, match and while-let.
+Pattern bindings live only within their scope; explicit drops release them.
+Match arms track guards owned by `Ok(g)`, poisoned guards owned by `Err(p)`,
+and unbound scrutinee guards in `Ok(_)` or fallback arms. A guard returned by
+`match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }` stays live in its
+receiving local binding until dropped or the scope ends.
+A visible `break` inside macro tokens (including `tokio::select!`) keeps a
+loop exit reachable when joining guard states. If/match joins
 exclude diverging branches (`return`, `break`, `continue`, built-in
 `panic!`/`unreachable!`/`todo!`/`unimplemented!`, and statically known `!` calls).
 A branch that reaches the following statement with a live guard still fails.
@@ -170,17 +179,38 @@ control-flow exits are not proved; consumed guards or branch/loop exits may
 produce conservative findings. In particular, `consume(g); other().await`
 and `loop { drop(g); break; } other().await` may still report rule 007;
 interprocedural ownership and loop/labeled-block exit guard transfer are not proved.
+Rule 003's legacy resolver does not recognize renamed `self` imports such as
+`use std::thread::{self as thread}`; use a direct module alias instead.
+For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
+including `Ok(_)` and `Ok(..)` scrutinees. Explicit
+`Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined
+`Err(p)` and wildcard fallback arms is a known limitation; those arms are not
+assumed to hold a guard. Move bindings of an entire scrutinee use the binding
+name, so `drop(name)` releases the tracked resource. Blocking lock-result
+rest and or-patterns retain their scrutinee resources. Dropping a nested
+`ref` binding does not release the scrutinee-held guard.
 Known `!` declarations are matched by unambiguous file-local names.
 Unresolved callable return types are not assumed to diverge. Other `cfg`
 conditions are not evaluated.
 
 Runtime source discovery scans Rust files under production target source roots.
 It does not resolve Rust module declarations when deciding whether a file is
-test-only. An out-of-line `#[cfg(test)] mod checks;` declared in `src/lib.rs`
-therefore does not mark `src/checks.rs` as a test file; blocking sleeps in that
-file may be reported as production code. Keep test modules inline or place
-them under a Cargo test target until module-aware source classification is
-available.
+test-only. For an out-of-line `#[cfg(test)] mod checks;` declared in
+`src/lib.rs`, put the inner attribute `#![cfg(test)]` at the top of
+`src/checks.rs` so that the separate file is classified as test code:
+
+```rust
+// src/checks.rs
+#![cfg(test)]
+
+#[test]
+fn checks_behavior() {
+    assert_eq!(2 + 2, 4);
+}
+```
+
+The file-level marker exempts rules 004–007. A parent module's `cfg(test)`
+attribute alone does not propagate into the separate file.
 
 If a future exception model is added, it must be backend-owned and documented
 explicitly before users rely on it.

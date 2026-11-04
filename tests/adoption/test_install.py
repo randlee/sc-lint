@@ -263,7 +263,7 @@ def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) 
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
     template = kit / "templates" / "sc-lint.toml.tmpl"
-    template.write_text(template.read_text().replace("{{ minimum_version }}", "{{minimum_version}}"))
+    template.write_text(template.read_text().replace("{{ tool_settings }}", "{{tool_settings}}"))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
 
@@ -277,7 +277,7 @@ def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) 
     assert result.returncode == 0, result.stderr
     rendered = (consumer / "sc-lint.toml").read_text()
     assert 'minimum_version = "0.5.0"' in rendered
-    assert "{{minimum_version}}" not in rendered
+    assert "{{tool_settings}}" not in rendered
 
 
 def test_unspaced_windows_shell_variable_is_substituted_in_second_pass(tmp_path: Path) -> None:
