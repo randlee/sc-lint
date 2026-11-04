@@ -408,14 +408,18 @@ held across `.await` (#838). Follow-ups in the same release:
 - #841: adoption fixes from the sc-compose adoption (wheel excludes
   repository-only tests, Action ARM64 targets, kit helper-policy tables and
   `default_lint_profile`, bootstrap PATH order)
+- issues Rand pulled into 0.8.5: #833 (Windows bootstrap and installer agree
+  on the default binary directory, `lint-085.42`), #836 (item-level
+  `SCB-RUNTIME-003` allowances, `lint-085.43`) and #837 (compound test `cfg`
+  expressions classified in `rust_file_test_scope`, `lint-085.42`)
 - phase-end review and documentation fixes (`lint-085.35`, `lint-085.37`,
-  `lint-085.39`, `lint-085.40`), merged through the version-bump PR #842
+  `lint-085.39`, `lint-085.40`, `lint-085.44`), merged through the
+  version-bump PR #842
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker
-ruling, which Rand accepted on 2026-11-03. Open issues #783, #832, #833, #835,
-#836 and #837 are not addressed by 0.8.5; team-lead confirms their deferral to
-the next release.
+ruling, which Rand accepted on 2026-11-03. Open issues #783, #832 and #835
+are not addressed by 0.8.5 and are deferred to 0.8.6.
 
 ## Planning Conventions
 
