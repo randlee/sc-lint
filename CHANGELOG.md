@@ -24,9 +24,6 @@ All notable changes to sc-lint are documented here.
   rest/or patterns and nested reference bindings more accurately (#840).
 - Analyzer crates share common analysis options and repository-relative
   source-path helpers, preserving existing public options shapes (#840).
-- The Python package requires Python 3.11 or newer (`requires-python`), matching
-  the helper modules' `tomllib` import and the consumer bootstrap; the abi3-py39
-  wheel tag is unchanged.
 - Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
   opt-outs (#840).
 - Runtime test exemption: a source file whose inner attributes mark it
@@ -84,6 +81,10 @@ All notable changes to sc-lint are documented here.
 
 ### Fixed
 
+- The Python helpers and consumer bootstrap run on Python 3.9 (the abi3-py39
+  wheel floor, GitHub #778). TOML parsing uses the workspace `toml` crate through
+  `sc_lint._native.toml_loads` instead of `tomllib`; Windows ARM64 wheels still
+  require Python 3.11.
 - Make analyzer dependency-boundary test output draining deterministic (#839).
 - Published Python wheels exclude repository-only contract, lifecycle,
   orchestration and release tests; release verification rejects leaked tests

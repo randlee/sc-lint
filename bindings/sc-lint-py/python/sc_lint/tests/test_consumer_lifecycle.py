@@ -21,7 +21,7 @@ import http.server
 import json
 import tarfile
 import threading
-import tomllib
+from sc_lint import _toml
 import unittest
 import venv
 from unittest import mock
@@ -65,7 +65,7 @@ class WheelConsumerTests(unittest.TestCase):
             venv.EnvBuilder(with_pip=True).create(environment)
             python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
             wheels = os.environ.get("SC_LINT_WHEEL_DIR", str(ROOT / ".sc-lint/wheels"))
-            project = tomllib.loads((ROOT / "bindings/sc-lint-py/pyproject.toml").read_text())
+            project = _toml.loads((ROOT / "bindings/sc-lint-py/pyproject.toml").read_text())
             version = project["project"]["version"]
             excluded = project["tool"]["maturin"]["exclude"]
             modules = {Path(pattern).stem for pattern in excluded if Path(pattern).stem.startswith("test_")}
@@ -933,7 +933,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             "macOS": ("aarch64-apple-darwin", ".tar.gz", "sc-lint"),
             "Windows": ("x86_64-pc-windows-msvc", ".zip", "sc-lint.exe"),
         }
-        manifest = tomllib.loads(
+        manifest = _toml.loads(
             (ROOT / "release/publish-artifacts.toml").read_text(encoding="utf-8")
         )
         release_targets = {entry["target"] for entry in manifest["release_targets"]}

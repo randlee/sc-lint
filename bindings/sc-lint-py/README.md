@@ -5,7 +5,8 @@ repository-maintenance helper modules used by the project. It does not install
 the Rust CLI executables. Install those separately with Homebrew or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases).
 
-Current release: **0.8.5**. Python 3.11 or newer is required.
+Current release: **0.8.5**. Python 3.9 or newer is required (3.11 or newer on
+Windows ARM64).
 
 ## Install
 
@@ -37,6 +38,10 @@ binary = sc_lint.binary_path()
 
 `run(argv)` returns the CLI exit code instead of terminating the Python
 interpreter. It does not add a command-line entry point to the wheel.
+
+The native extension also provides `toml_loads(text)`, which the helper modules
+use so TOML is parsed by the same Rust parser as the CLI on every supported
+Python version.
 
 ## Links
 

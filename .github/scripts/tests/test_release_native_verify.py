@@ -25,6 +25,7 @@ def test_matrix_uses_manifest_targets_and_native_hosts():
     assert hosts["aarch64-unknown-linux-gnu"]["runner"] == "ubuntu-24.04-arm"
     assert hosts["aarch64-pc-windows-msvc"] == {
         "target": "aarch64-pc-windows-msvc", "runner": "windows-11-arm", "python_arch": "arm64",
+        "python_version": "3.11",
     }
     assert hosts["x86_64-apple-darwin"]["runner"] == "macos-15-intel"
     manifest["release_targets"] = manifest["release_targets"][-1:]
@@ -291,6 +292,12 @@ def test_wheel_payload_must_match_native_target_before_pip(monkeypatch, tmp_path
     with pytest.raises(ValueError, match="expected"):
         native.verify_release(assets, "v1.2.3", target, tmp_path, run=run)
     assert not any("pip" in argv for argv in seen)
+
+
+def test_python_39_is_accepted_off_win_arm64(monkeypatch):
+    host(monkeypatch, "x86_64-unknown-linux-gnu")
+    monkeypatch.setattr(native.sys, "version_info", (3, 9, 6))
+    native.assert_native("x86_64-unknown-linux-gnu")
 
 
 def test_python_older_than_311_is_rejected_on_win_arm64(monkeypatch):

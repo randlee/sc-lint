@@ -1112,6 +1112,8 @@ version = "0.8.5"
 dependencies = [
  "pyo3",
  "sc-lint",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

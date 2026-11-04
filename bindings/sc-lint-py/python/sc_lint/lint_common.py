@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 import time
-import tomllib
+from sc_lint import _toml
 from typing import Callable, TextIO
 
 
@@ -157,7 +157,7 @@ def load_lint_config(repo_root: Path, config_path: str | None = None) -> dict:
     config_path = candidate if candidate.is_absolute() else repo_root / candidate
     if not config_path.exists():
         return {}
-    return tomllib.loads(config_path.read_text(encoding="utf-8"))
+    return _toml.loads(config_path.read_text(encoding="utf-8"))
 
 
 class ConfigError(Exception):
@@ -197,8 +197,8 @@ def resolve_table(name: str, explicit: Path | None, root: Path) -> tuple[dict, P
             continue
         display = _config_display(path, root)
         try:
-            config = tomllib.loads(path.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError) as error:
+            config = _toml.loads(path.read_text(encoding="utf-8"))
+        except (OSError, _toml.TOMLDecodeError) as error:
             raise AdapterError("config", f"failed to parse {display}: {error}") from error
         if name not in config:
             continue
@@ -220,7 +220,7 @@ def table_missing_error(error: ConfigError):
 
 
 def workspace_manifest_paths(repo_root: Path) -> list[Path]:
-    root_manifest = tomllib.loads((repo_root / "Cargo.toml").read_text(encoding="utf-8"))
+    root_manifest = _toml.loads((repo_root / "Cargo.toml").read_text(encoding="utf-8"))
     workspace = root_manifest.get("workspace", {})
     if not isinstance(workspace, dict):
         return []
@@ -260,7 +260,7 @@ def workspace_manifest_paths(repo_root: Path) -> list[Path]:
 def workspace_crates(repo_root: Path) -> list[WorkspaceCrate]:
     crates: list[WorkspaceCrate] = []
     for manifest_path in workspace_manifest_paths(repo_root):
-        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = _toml.loads(manifest_path.read_text(encoding="utf-8"))
         package = manifest.get("package", {})
         package_name = package.get("name")
         if not isinstance(package_name, str):
@@ -291,7 +291,7 @@ def iter_workspace_rust_files(repo_root: Path) -> list[Path]:
 
 
 def workspace_target_args(manifest_path: Path) -> list[str]:
-    manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = _toml.loads(manifest_path.read_text(encoding="utf-8"))
     lib = manifest.get("lib")
     if isinstance(lib, dict):
         return ["--lib"]

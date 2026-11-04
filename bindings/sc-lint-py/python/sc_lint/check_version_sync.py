@@ -5,7 +5,7 @@ import argparse
 from dataclasses import dataclass
 import re
 import sys
-import tomllib
+from sc_lint import _toml
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -47,10 +47,10 @@ def read_text(path: Path, root: Path) -> str:
 def read_toml(path: Path, root: Path) -> dict[str, Any]:
     rel = _relative_display(path, root)
     try:
-        return tomllib.loads(path.read_text(encoding="utf-8"))
+        return _toml.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError) as error:
         raise AdapterError("config", f"cannot read {rel}: {error}") from error
-    except tomllib.TOMLDecodeError as error:
+    except _toml.TOMLDecodeError as error:
         raise AdapterError("config", f"failed to parse {rel}: {error}") from error
 
 

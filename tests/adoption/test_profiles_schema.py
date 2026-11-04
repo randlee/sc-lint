@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 import runpy
-import tomllib
+from sc_lint._toml import loads as toml_loads
 from pathlib import Path
 from typing import Any
 
@@ -131,7 +131,7 @@ def test_install_accepts_and_renders_schema_valid_profile_fields() -> None:
 
     installed_fragment = consumer / "plugins" / "sc-lint" / "schema.d" / "profiles.json"
     assert json.loads(installed_fragment.read_text()) == json.loads((KIT / "schema.d" / "profiles.json").read_text())
-    config = tomllib.loads((consumer / "sc-lint.toml").read_text())["tool"]["sc-lint"]
+    config = toml_loads((consumer / "sc-lint.toml").read_text())["tool"]["sc-lint"]
     assert config["lint"] == [
         {
             "name": "clippy",

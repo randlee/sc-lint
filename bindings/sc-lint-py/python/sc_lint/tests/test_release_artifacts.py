@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import tomllib
+from sc_lint import _toml
 import unittest
 import zipfile
 
@@ -59,8 +59,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def test_python_package_version_works_with_release_build_composite(self) -> None:
         workspace_toml = REPO_ROOT / "Cargo.toml"
         pyproject = REPO_ROOT / "bindings" / "sc-lint-py" / "pyproject.toml"
-        version = tomllib.loads(workspace_toml.read_text(encoding="utf-8"))["workspace"]["package"]["version"]
-        metadata = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]
+        version = _toml.loads(workspace_toml.read_text(encoding="utf-8"))["workspace"]["package"]["version"]
+        metadata = _toml.loads(pyproject.read_text(encoding="utf-8"))["project"]
 
         self.assertEqual(metadata["version"], version)
         self.assertNotIn("version", metadata.get("dynamic", []))
@@ -257,8 +257,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
             )
 
     def test_release_smoke_reads_the_pinned_kit_archive_layout_from_publish_manifest(self) -> None:
-        manifest = tomllib.loads(PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8"))
-        workspace = tomllib.loads((REPO_ROOT / "Cargo.toml").read_text(encoding="utf-8"))
+        manifest = _toml.loads(PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8"))
+        workspace = _toml.loads((REPO_ROOT / "Cargo.toml").read_text(encoding="utf-8"))
         version = workspace["workspace"]["package"]["version"]
         target = "x86_64-unknown-linux-gnu"
         config = json.loads(

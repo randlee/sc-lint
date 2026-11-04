@@ -33,6 +33,6 @@ if manifest["project"]["name"] == "sc-lint":
         python_config = tomllib.load(source)
     with Path(distributions[0]["cargo_manifest"]).open("rb") as source:
         cargo_config = tomllib.load(source)
-    if python_config["project"]["requires-python"] != ">=3.11" or "abi3-py39" not in cargo_config["dependencies"]["pyo3"]["features"]:
-        raise SystemExit("sc-lint wheels must require Python >=3.11 and enable abi3-py39")
+    if python_config["project"]["requires-python"] != ">=3.9" or "abi3-py39" not in cargo_config["dependencies"]["pyo3"]["features"]:
+        raise SystemExit("sc-lint wheels must require Python >=3.9 and enable abi3-py39")
     print("sc-lint six-platform archive and wheel contract verified")
