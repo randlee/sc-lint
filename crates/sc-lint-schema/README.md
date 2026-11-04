@@ -1,7 +1,13 @@
 # `sc-lint-schema`
 
-`sc-lint-schema` defines the shared findings and report schema used across the
-`sc-lint` analyzer crates and top-level CLI.
+`sc-lint-schema` is an internal building block of the
+[`sc-lint` product](https://crates.io/crates/sc-lint). It defines the shared
+finding and report types used across the analyzer crates and top-level CLI; it
+is not a standalone lint command. See the
+[sc-lint repository](https://github.com/randlee/sc-lint).
+
+Current crate release: **0.8.5**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-schema/0.8.5).
 
 ## Purpose
 
@@ -23,8 +29,8 @@ Representative shared schema types include:
   Python adapter transport payload before normalization
 - `validate_analyzer_report` and `AnalyzerReportDrift` for checking Rust
   analyzer output against the published schema selected by `schema_version`:
-  [`analyzer-report-v1` for `0.1.0`](schema/analyzer-report-v1.schema.json) or
-  [`analyzer-report-v2` for `0.2.0`](schema/analyzer-report-v2.schema.json)
+  [`analyzer-report-v1` for `0.1.0`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-schema/schema/analyzer-report-v1.schema.json) or
+  [`analyzer-report-v2` for `0.2.0`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-schema/schema/analyzer-report-v2.schema.json)
 - finding records
   - stable rule id, location, message, and severity fields
 - analyzer report payloads
@@ -39,7 +45,7 @@ types, not analyzer execution policy.
 Backends depend on this crate for shared output types:
 
 ```toml
-sc-lint-schema = { version = "0.1.0", path = "../sc-lint-schema" }
+sc-lint-schema = "0.8"
 ```
 
 Example consumer path:
@@ -50,6 +56,7 @@ use sc_lint_schema::Finding;
 
 ## Further Reading
 
-- [Graph schema](../../docs/sc-lint/graph-schema.md)
-- [CLI contract](../../docs/sc-lint/cli-contract.md)
-- [Crate architecture](../../docs/sc-lint/crate-architecture.md)
+- [Graph schema](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint-boundary/graph-schema.md)
+- [CLI contract](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/cli-contract.md)
+- [Crate architecture](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/crate-architecture.md)
+- [MIT license](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-schema/LICENSE)

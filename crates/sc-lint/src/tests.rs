@@ -414,8 +414,11 @@ fn consumer_profile_schema_is_rejected_before_any_profile_step_runs() {
         "--consumer",
     ]);
     let context = CommandContext::from_cli(&cli).expect("context");
-    let error =
-        LoadedConfig::load(&cli, &context).expect_err("empty lint profile fails before execution");
+    let loaded = LoadedConfig::load(&cli, &context)
+        .expect("test-only config loads before checking the lint profile");
+    let error = crate::ExecutionOutcome::run(context, &loaded, true)
+        .error
+        .expect("empty lint profile fails before any configured step runs");
     assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
     assert_eq!(error.details["profile"], "lint");
 }
@@ -448,11 +451,11 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert_eq!(created["status"], "created");
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
-    assert!(root.join(".sc-lint/bootstrap.py").is_file());
+    let bootstrap_path =
+        crate::consumer_integration::consumer_integration_path(root, &[".sc-lint", "bootstrap.py"]);
+    assert!(bootstrap_path.is_file());
     assert_eq!(
-        fs::read(root.join(".sc-lint/bootstrap.py"))
-            .expect("bootstrap")
-            .get(..22),
+        fs::read(&bootstrap_path).expect("bootstrap").get(..22),
         Some(&b"#!/usr/bin/env python3"[..])
     );
     assert_eq!(
@@ -462,6 +465,7 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
 
     let current = crate::config::run_consumer_init_at(root, request).expect("idempotent");
     assert_eq!(current["status"], "current");
+    assert_eq!(current["refreshed_files"], json!([]));
     let checked = crate::config::run_consumer_init_at(
         root,
         ConsumerInitRequest {
@@ -931,7 +935,10 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         );
         return;
     }
-    let bootstrap = fixture.path().join(".sc-lint/bootstrap.py");
+    let bootstrap = crate::consumer_integration::consumer_integration_path(
+        fixture.path(),
+        &[".sc-lint", "bootstrap.py"],
+    );
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
     fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
@@ -1012,6 +1019,45 @@ fn parse_errors_use_the_documented_command_identifier() {
 
     assert_eq!(json["command"], "cli.parse_error");
     assert_eq!(json["error"]["code"], "CLI.USAGE_ERROR");
+
+    for (args, command_help) in [
+        (vec!["sc-lint", "--json", "--bogus"], "sc-lint --help"),
+        (
+            vec!["sc-lint", "--json", "lint", "bogus"],
+            "sc-lint lint --help",
+        ),
+        (
+            vec!["sc-lint", "--json", "docs", "nonesuch"],
+            "sc-lint docs --help",
+        ),
+    ] {
+        let ParsedInvocation::Immediate(outcome) = crate::parse_args(args) else {
+            panic!("invalid arguments should fail during parsing");
+        };
+        let rendered = outcome.rendered.stderr.expect("parse error emits stderr");
+        let envelope: Value = serde_json::from_str(&rendered).expect("parse error JSON");
+        let message = envelope["error"]["message"]
+            .as_str()
+            .expect("error message");
+        let action = envelope["error"]["suggested_action"]
+            .as_str()
+            .expect("help action");
+        assert!(
+            !message.contains("Usage: sc-lint --json"),
+            "argv leaked into usage: {message}"
+        );
+        let expected_usage = command_help.trim_end_matches(" --help");
+        assert!(
+            message
+                .lines()
+                .any(|line| line.starts_with(&format!("Usage: {expected_usage}"))),
+            "usage missing the selected command path: {message}"
+        );
+        assert!(
+            action.contains(command_help),
+            "wrong help suggestion: {action}"
+        );
+    }
 }
 
 #[test]
@@ -1194,6 +1240,7 @@ fn compatibility_config_failures_identify_the_canonical_file_and_field() {
     let missing_human = crate::render::render_error_human("compatibility.check", &missing_error);
     assert!(missing_human.contains(&missing.display().to_string()));
     assert!(missing_human.contains("[tool.sc-lint].minimum_version"));
+    assert!(missing_human.contains("sc-lint init --just"));
 
     let malformed = fixture.path().join("malformed.toml");
     fs::write(
@@ -2878,6 +2925,54 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
         ),
     );
     assert_eq!(view_output, "view.findings: 2 findings grouped by rule");
+
+    let init_cli = Cli::parse_from(["sc-lint", "init", "--just", "--dry-run"]);
+    let init_context = CommandContext::from_cli(&init_cli).expect("init context");
+    let init_output = crate::render::render_success_human(
+        &init_context,
+        &CommandEnvelope::success(
+            "init",
+            json!({
+                "status": "would_update",
+                "created_files": ["sc-lint.toml"],
+                "refreshed_files": [".sc-lint/bootstrap.py"],
+                "preserved_files": ["README.md"],
+                "version_only_stale_files": [],
+            }),
+        ),
+    );
+    assert_eq!(
+        init_output,
+        "init: would_update\nWould create: sc-lint.toml\nWould refresh: .sc-lint/bootstrap.py\nPreserved: README.md"
+    );
+
+    let refreshed_output = crate::render::render_success_human(
+        &init_context,
+        &CommandEnvelope::success(
+            "init",
+            json!({
+                "status": "updated",
+                "created_files": [],
+                "refreshed_files": [".sc-lint/bootstrap.py"],
+                "preserved_files": [],
+                "version_only_stale_files": [],
+            }),
+        ),
+    );
+    assert_eq!(
+        refreshed_output,
+        "init: updated\nRefreshed: .sc-lint/bootstrap.py"
+    );
+
+    let docs_cli = Cli::parse_from(["sc-lint", "docs", "--path"]);
+    let docs_context = CommandContext::from_cli(&docs_cli).expect("docs path context");
+    assert_eq!(
+        crate::render::render_success_human(
+            &docs_context,
+            &CommandEnvelope::success("docs", json!({"path":"/bundle/docs-bundle"})),
+        ),
+        "/bundle/docs-bundle"
+    );
 }
 
 #[test]
@@ -5913,7 +6008,10 @@ fn envelope_key_set_identical_across_families() {
         "--consumer",
     ]);
     let context = CommandContext::from_cli(&cli).expect("consumer lint context");
-    let error = LoadedConfig::load(&cli, &context).expect_err("lint profile is missing");
+    let loaded = LoadedConfig::load(&cli, &context).expect("test-only config loads for lint error");
+    let error = crate::ExecutionOutcome::run(context.clone(), &loaded, true)
+        .error
+        .expect("consumer lint without lint rows is rejected at execution");
     cases.push((
         failure_envelope_json(context.command_id(), error),
         false,
@@ -5970,6 +6068,36 @@ fn envelope_key_set_identical_across_families() {
     for (envelope, success, command, error_kind) in cases {
         assert_envelope_keys(&envelope, &command, success, error_kind);
     }
+}
+
+#[test]
+fn test_only_consumer_configuration_runs_test_listing_without_lint_rows() {
+    let fixture = TempDir::new().expect("test-only consumer root");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n",
+    )
+    .expect("write test-only consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().unwrap(),
+        "test",
+        "--list",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("test list context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("test-only consumer config loads");
+    let outcome = crate::ExecutionOutcome::run(context, &loaded, true);
+    assert!(
+        outcome.ok,
+        "test-only configuration should list selectors: {:?}",
+        outcome.error
+    );
+    let payload: Value =
+        serde_json::from_str(outcome.rendered.stdout.as_deref().expect("JSON output"))
+            .expect("test-list JSON");
+    assert_eq!(payload["data"]["selectors"][0]["name"], "unit");
 }
 
 #[test]
@@ -6037,7 +6165,7 @@ fn human_output_fields_present_in_json() {
             &["init", "--just"],
             json!({"status":"created","path":"x","count":3}),
             &["/command"],
-            true,
+            false,
         ),
         (
             "compatibility.check",

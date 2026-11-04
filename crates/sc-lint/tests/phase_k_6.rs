@@ -272,7 +272,12 @@ fn bootstrap_exec_does_not_reenter_consumer_profile() {
         );
         assert!(captured.contains("custom=kept with spaces\n"), "{captured}");
         assert!(
-            captured.contains(&format!("path={}:{}\n", managed.display(), search_path)),
+            captured.contains(&format!(
+                "path={}:{}:{}\n",
+                managed.display(),
+                canonical_root.join(".sc-lint/venv/bin").display(),
+                search_path
+            )),
             "{captured}"
         );
         assert!(captured.contains(&format!("arg=--config\narg={config}\narg=lint\narg=sc-boundary\narg=--rule-filter\narg=SCB-TEST\n")), "{captured}");
@@ -342,8 +347,8 @@ fn bootstrap_exec_uses_managed_product() {
 #[test]
 fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
     let fixture = TempDir::new().expect("fixture root");
-    let local_app_data = fixture.path().join("AppData/Local");
-    let managed = local_app_data.join("sc-lint/bin");
+    let app_data = fixture.path().join("AppData/Roaming");
+    let managed = app_data.join("sc-lint/bin");
     fs::create_dir_all(&managed).expect("managed directory");
     let managed_binary = managed.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &managed_binary).expect("managed product copy");
@@ -368,7 +373,7 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         let output = command
             .env_remove("SC_LINT_BIN")
             .env_remove("SC_LINT_INSTALL_DIR")
-            .env("LOCALAPPDATA", &local_app_data)
+            .env("APPDATA", &app_data)
             .output()
             .expect("run Python consumer bootstrap");
         assert!(
@@ -489,10 +494,7 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
         .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--", "sc-lint", "version"])
         .current_dir(&root)
-        .env(
-            "LOCALAPPDATA",
-            fixture.path().join("missing-local-app-data"),
-        )
+        .env("APPDATA", fixture.path().join("missing-app-data"))
         .env(
             "SC_LINT_INSTALL_DIR",
             fixture.path().join("missing-install-dir"),
@@ -668,7 +670,12 @@ fn bootstrap_exec_preserves_argv_and_exit_status() {
     );
     assert!(captured.contains("custom=preserved\n"), "{captured}");
     assert!(
-        captured.contains(&format!("path={}:{}\n", managed.display(), "/usr/bin:/bin")),
+        captured.contains(&format!(
+            "path={}:{}:{}\n",
+            managed.display(),
+            canonical_root.join(".sc-lint/venv/bin").display(),
+            "/usr/bin:/bin"
+        )),
         "{captured}"
     );
     assert!(captured.contains("arg=two words\narg=tail\n"), "{captured}");

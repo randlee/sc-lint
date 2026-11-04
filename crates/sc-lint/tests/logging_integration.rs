@@ -786,6 +786,7 @@ impl WorkspaceFixture {
             ".just/lint-config.toml".to_string(),
             format!("{PACKAGE_DIR}/__init__.py"),
             format!("{PACKAGE_DIR}/_binary.py"),
+            format!("{PACKAGE_DIR}/_toml.py"),
             format!("{PACKAGE_DIR}/lint_common.py"),
             format!("{PACKAGE_DIR}/python_adapter.py"),
             format!("{PACKAGE_DIR}/view_common.py"),

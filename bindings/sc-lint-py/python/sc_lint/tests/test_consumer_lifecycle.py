@@ -5,6 +5,10 @@ from sc_lint.tests.test_setup_tools import FakeToolchain
 from sc_lint.tests.test_setup_tools import WINDOWS_TARGET
 from sc_lint.tests.test_setup_tools import XWIN_TOOLS
 from sc_lint.tests.test_setup_tools import install_input
+from sc_lint.tests.test_setup_tools import HelperFixture, write_executable, WINDOWS_CHECK
+import sc_lint
+from sc_lint import setup_tools
+from typing import Optional, List
 
 import os
 from pathlib import Path
@@ -17,8 +21,9 @@ import http.server
 import json
 import tarfile
 import threading
-import tomllib
+from sc_lint import _toml
 import unittest
+import venv
 from unittest import mock
 import zipfile
 from contextlib import contextmanager
@@ -26,7 +31,10 @@ from functools import partial
 
 
 ROOT = discover_repo_root()
-VERSION = "0.8.4"
+BOOTSTRAP = ROOT / "crates/sc-lint/assets/bootstrap.py"
+ADOPTION_INSTALLER = ROOT / "packages/sc-lint-adoption/install.py"
+PACKAGE_ROOT = Path(sc_lint.__file__).resolve().parent.parent
+VERSION = "0.8.5"
 GUIDES = (
     "README.md",
     "installation",
@@ -45,6 +53,44 @@ GUIDES = (
     "sc-lint-runtime",
     "sc-lint-schema",
 )
+
+
+class WheelConsumerTests(unittest.TestCase):
+    def test_wheel_pytests_pass_in_a_consumer_without_repository_assets(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="sc-lint-wheel-consumer-") as directory:
+            root = Path(directory)
+            consumer = root / "consumer"
+            consumer.mkdir()
+            environment = root / "venv"
+            venv.EnvBuilder(with_pip=True).create(environment)
+            python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            wheels = os.environ.get("SC_LINT_WHEEL_DIR", str(ROOT / ".sc-lint/wheels"))
+            project = _toml.loads((ROOT / "bindings/sc-lint-py/pyproject.toml").read_text())
+            version = project["project"]["version"]
+            excluded = project["tool"]["maturin"]["exclude"]
+            modules = {Path(pattern).stem for pattern in excluded if Path(pattern).stem.startswith("test_")}
+            built_wheels = list(Path(wheels).glob(f"sc_lint-{version}-*.whl"))
+            self.assertEqual(len(built_wheels), 1, f"expected exactly one current source wheel: {built_wheels}")
+            wheel = built_wheels[0]
+            with zipfile.ZipFile(wheel) as archive:
+                self.assertFalse([name for name in archive.namelist() if Path(name).name.split(".")[0] in modules])
+            subprocess.run(
+                [str(python), "-m", "pip", "install", "--no-index", "--find-links", wheels, str(wheel)],
+                check=True, capture_output=True, text=True, timeout=120,
+            )
+            self.assertFalse((consumer / "scripts").exists())
+            self.assertFalse((consumer / "release").exists())
+            child_env = {key: value for key, value in os.environ.items()
+                         if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_BIN", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
+            result = subprocess.run(
+                [str(python), "-I", "-m", "sc_lint.run_pytests"], env=child_env,
+                cwd=consumer, capture_output=True, text=True, timeout=180,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("pytests fixtures total:", result.stdout)
+            self.assertIn("RunPytestsTests", result.stdout)
+            for module in modules:
+                self.assertNotIn(module + ".", result.stdout)
 
 
 class ConsumerLifecycleTests(unittest.TestCase):
@@ -887,7 +933,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             "macOS": ("aarch64-apple-darwin", ".tar.gz", "sc-lint"),
             "Windows": ("x86_64-pc-windows-msvc", ".zip", "sc-lint.exe"),
         }
-        manifest = tomllib.loads(
+        manifest = _toml.loads(
             (ROOT / "release/publish-artifacts.toml").read_text(encoding="utf-8")
         )
         release_targets = {entry["target"] for entry in manifest["release_targets"]}
@@ -895,6 +941,172 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertIn(target, release_targets, platform)
             self.assertTrue(extension.startswith("."), platform)
             self.assertTrue(binary.startswith("sc-lint"), platform)
+
+
+@unittest.skipIf(os.name == "nt", "POSIX bootstrap; Windows bootstrap runs in test_consumer_lifecycle and phase_k_7")
+class PosixBootstrapToolTests(HelperFixture):
+    """Drive the product bootstrap asset with a stub product and seeded venv."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.log = self.tmp / "interpreters.log"
+        self.managed = self.tmp / "managed"
+        write_executable(
+            self.managed / "sc-lint",
+            f"#!/bin/sh\nprintf 'product %s\\n' \"$*\" >> '{self.log}'\nexit 0\n",
+        )
+        self.seed = self.tmp / "seed-bin"
+        write_executable(
+            self.seed / "python3",
+            f"#!/bin/sh\nprintf 'seed %s\\n' \"$1\" >> '{self.log}'\nexec '{sys.executable}' \"$@\"\n",
+        )
+        (self.consumer / ".sc-lint" / "bootstrap.py").write_bytes(BOOTSTRAP.read_bytes())
+        self.version = sc_lint.__version__.split("+")[0]
+        self.config.write_text(f'[tool.sc-lint]\nminimum_version = "{self.version}"\n', encoding="utf-8")
+
+    def seed_venv(self, consumer: Optional[Path] = None) -> None:
+        """A ready `.sc-lint/venv` whose interpreter runs the sc_lint under test."""
+        python = (consumer or self.consumer) / ".sc-lint" / "venv" / "bin" / "python3"
+        write_executable(
+            python,
+            "#!/bin/sh\n"
+            f"if [ \"$1\" = -m ]; then printf 'venv %s\\n' \"$*\" >> '{self.log}'; "
+            f"else printf 'venv %s\\n' \"$1\" >> '{self.log}'; fi\n"
+            f"PYTHONPATH='{PACKAGE_ROOT}' exec '{sys.executable}' \"$@\"\n",
+        )
+
+    def bootstrap(self, *arguments: str, consumer: Optional[Path] = None) -> subprocess.CompletedProcess:
+        root = consumer or self.consumer
+        environment = dict(self.environment)
+        environment["PATH"] = f"{self.fake.bin}:{self.seed}:/usr/bin:/bin"
+        environment["SC_LINT_INSTALL_DIR"] = str(self.managed)
+        try:
+            return subprocess.run(
+                [sys.executable, str(root / ".sc-lint" / "bootstrap.py"), *arguments],
+                cwd=root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as error:
+            self.fail(f"bootstrap {arguments} timed out; stdout={error.stdout!r}; stderr={error.stderr!r}")
+
+    def interpreter_log(self) -> List[str]:
+        return self.log.read_text(encoding="utf-8").splitlines() if self.log.exists() else []
+
+    def test_issue_197_declared_missing_tool_reproduces_then_setup_provisions(self) -> None:
+        # The consumer is installed once by the adoption kit with a declared
+        # cross-target tool, persisting `.sc-lint/install.json`.
+        consumer = self.tmp / "issue-197-consumer"
+        consumer.mkdir()
+        data = install_input(XWIN_TOOLS)
+        data["minimum_version"] = self.version
+        data["profiles"] = {"clippy-windows": WINDOWS_CHECK}
+        input_path = self.tmp / "install-input.json"
+        input_path.write_text(json.dumps(data), encoding="utf-8")
+        install = subprocess.run(
+            [sys.executable, str(ADOPTION_INSTALLER), "--input", str(input_path), str(consumer)],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+        self.assertEqual(install.returncode, 0, install.stderr)
+        persisted = consumer / ".sc-lint" / "install.json"
+        self.assertEqual(json.loads(persisted.read_text(encoding="utf-8"))["tools"], XWIN_TOOLS)
+        persisted_before = persisted.read_bytes()
+        manifest_before = (consumer / ".sc-lint" / "installed.json").read_bytes()
+        self.seed_venv(consumer)
+        check_environment = dict(self.environment)
+        check_environment["PATH"] = f"{self.cargo_home / 'bin'}:{self.fake.bin}:/usr/bin:/bin"
+
+        def consumer_check() -> subprocess.CompletedProcess:
+            return subprocess.run(
+                WINDOWS_CHECK, cwd=consumer, env=check_environment, text=True, capture_output=True, check=False, timeout=60
+            )
+
+        # Red: issue #197 — the declared cross-target step cannot run because
+        # nothing provisioned cargo-xwin or the Windows target.
+        red = consumer_check()
+        self.assertEqual(red.returncode, 101, red.stderr)
+        self.assertIn("error: no such command: `xwin`", red.stderr)
+        self.assertNotIn("cargo-xwin", FakeToolchain.installs(self.cargo_home))
+        self.assertNotIn(WINDOWS_TARGET, self.fake.targets())
+
+        # Green: ordinary setup from the same persisted input provisions and
+        # verifies both declarations without rerunning install.py.
+        setup = self.bootstrap("setup", "--config", "sc-lint.toml", consumer=consumer)
+        self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
+        self.assertIn("+ cargo install --locked --version =0.18.4 cargo-xwin", setup.stdout)
+        self.assertIn(f"+ rustup target add {WINDOWS_TARGET}", setup.stdout)
+        self.assertIn("venv -m sc_lint.setup_tools --config sc-lint.toml", self.interpreter_log())
+        self.assertEqual(
+            self.fake.argvs("cargo")[-3:],
+            [["install", "--list"], ["install", "--locked", "--version", "=0.18.4", "cargo-xwin"], ["install", "--list"]],
+        )
+        self.assertEqual(self.fake.argvs("rustup")[-1], ["target", "list", "--installed"])
+        self.assertEqual(FakeToolchain.installs(self.cargo_home)["cargo-xwin"]["version"], "0.18.4")
+        self.assertEqual(self.fake.targets(), [WINDOWS_TARGET])
+        green = consumer_check()
+        self.assertEqual(green.returncode, 0, green.stderr)
+        self.assertIn("Finished", green.stderr)
+        self.assertEqual(persisted.read_bytes(), persisted_before)
+        self.assertEqual((consumer / ".sc-lint" / "installed.json").read_bytes(), manifest_before)
+
+        rerun = self.bootstrap("setup", "--config", "sc-lint.toml", consumer=consumer)
+        self.assertEqual(rerun.returncode, 0, rerun.stderr)
+        self.assertNotIn("+ ", rerun.stdout)
+
+    def test_dry_run_missing_helper_does_not_bootstrap(self) -> None:
+        self.declare(XWIN_TOOLS)
+        result = self.bootstrap("setup", "--config", str(self.config), "--dry-run")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("(SETUP_TOOLS.INSPECTION_UNAVAILABLE); run just setup", result.stderr)
+        self.assertIn("declares tools that cannot be inspected", result.stderr)
+        self.assertFalse((self.consumer / ".sc-lint" / "venv").exists())
+        log = self.interpreter_log()
+        self.assertNotIn("seed -m", log)
+        self.assertEqual(self.fake.calls(), [])
+
+        # With the managed helper present, dry-run forwards --check: inspect only.
+        self.seed_venv()
+        result = self.bootstrap("setup", "--config", str(self.config), "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"venv -m sc_lint.setup_tools --config {self.config} --check", self.interpreter_log())
+        self.assertIn("+ cargo install --locked --version =0.18.4 cargo-xwin", result.stdout)
+        self.assertNotIn(["install", "--locked", "--version", "=0.18.4", "cargo-xwin"], self.fake.argvs("cargo"))
+        self.assertNotIn(["target", "add", WINDOWS_TARGET], self.fake.argvs("rustup"))
+        self.assertFalse(self.cargo_home.exists())
+
+    def test_absent_and_empty_tools_keep_simple_consumer_setup_unchanged(self) -> None:
+        self.seed_venv()
+        install_json = self.consumer / ".sc-lint" / "install.json"
+        outcomes = []
+        for label, data in (
+            ("no installer input", None),
+            ("absent", install_input(include_tools=False)),
+            ("empty object", install_input({})),
+            ("empty collections", install_input({"cargo": {}, "rustup_targets": []})),
+        ):
+            with self.subTest(label):
+                if data is not None:
+                    install_json.write_text(json.dumps(data), encoding="utf-8")
+                for flags in ((), ("--dry-run",)):
+                    result = self.bootstrap("setup", "--config", "sc-lint.toml", *flags)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    outcomes.append((flags, result.stdout, result.stderr))
+        self.assertEqual(len({outcome for outcome in outcomes if outcome[0] == ()}), 1)
+        self.assertEqual(len({outcome for outcome in outcomes if outcome[0] == ("--dry-run",)}), 1)
+        self.assertFalse(any("sc_lint.setup_tools" in line for line in self.interpreter_log()))
+        self.assertEqual(self.fake.calls(), [])
+
+        install_json.write_text(json.dumps(install_input({"cargo": []})), encoding="utf-8")
+        result = self.bootstrap("setup", "--config", "sc-lint.toml")
+        self.assertEqual(result.returncode, setup_tools.EXIT_CONFIG, result.stdout + result.stderr)
+        self.assertIn("tools.cargo must be an object", result.stderr)
+        self.assertIn("venv -m sc_lint.setup_tools --config sc-lint.toml", self.interpreter_log())
 
 
 if __name__ == "__main__":

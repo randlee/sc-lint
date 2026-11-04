@@ -21,21 +21,28 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Analyze Rust source for runtime and async safety issues.
     Analyze {
+        /// Workspace root to inspect.
         #[arg(long, default_value = ".")]
         root: PathBuf,
+        /// Findings output format.
         #[arg(long, default_value = "text")]
         format: FormatArg,
+        /// Analyzer configuration file; defaults to discovery from the workspace root.
         #[arg(long)]
         config: Option<PathBuf>,
-        #[arg(long)]
+        /// Comma-separated rule IDs: SCB-RUNTIME-001 through SCB-RUNTIME-007. Rule families are not supported.
+        #[arg(long, value_name = "SCB-RUNTIME-001..007[,..]")]
         rule_filter: Option<String>,
     },
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum FormatArg {
+    /// Human-readable findings.
     Text,
+    /// JSON findings report.
     Json,
 }
 
@@ -55,7 +62,9 @@ fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> i32 {
 fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
     match error {
         AnalyzerConfigError::Selector { analyzer, selector } => {
-            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+            format!(
+                "{analyzer}: unknown --rule-filter selector `{selector}`; valid selectors are SCB-RUNTIME-001 through SCB-RUNTIME-007 (no rule families)"
+            )
         }
         _ => error.to_string(),
     }
@@ -101,6 +110,10 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
+
     #[test]
     fn analyzer_config_exit_codes_are_cli_owned() {
         assert_eq!(
@@ -117,12 +130,37 @@ mod tests {
             }),
             3
         );
+        let message = analyzer_config_message(&AnalyzerConfigError::Selector {
+            analyzer: "runtime",
+            selector: "SCB-RUNTIME-999".to_owned(),
+        });
+        assert!(message.contains("SCB-RUNTIME-999"));
+        assert!(message.contains("no rule families"));
+    }
+
+    #[test]
+    fn cli_reference_matches_real_clap_definition() {
+        use clap::CommandFactory;
+        let model = docli::from_clap(&Cli::command());
+        if let Ok(path) = std::env::var("SC_DOCLI_MODEL_OUT") {
+            std::fs::write(
+                path,
+                serde_json::to_vec_pretty(&model).expect("serialize cli model"),
+            )
+            .expect("write cli model");
+            return;
+        }
         assert_eq!(
-            analyzer_config_message(&AnalyzerConfigError::Selector {
-                analyzer: "runtime",
-                selector: "SCB-RUNTIME-999".to_owned(),
-            }),
-            "runtime: unknown --rule-filter selector `SCB-RUNTIME-999`"
+            normalize_line_endings(&docli::render::markdown::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-runtime.md"
+            ))
+        );
+        assert_eq!(
+            normalize_line_endings(&docli::render::html::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-runtime/index.html"
+            ))
         );
     }
 }

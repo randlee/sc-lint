@@ -1,7 +1,16 @@
-# `sc-runtime` User Guide
+# `sc-lint-runtime`
 
-`sc-runtime` is the shipped runtime-analysis tool for std
-concurrency/liveness checks.
+`sc-lint-runtime` is the Rust analyzer used by the
+[`sc-lint` product](https://crates.io/crates/sc-lint) for runtime and
+concurrency checks. The `sc-runtime` name is the analyzer target accepted by
+`sc-lint lint`.
+
+Current crate release: **0.8.5**. Install the product CLI with
+`brew install randlee/tap/sc-lint` or from
+[GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
+crate as a Rust library, run `cargo add sc-lint-runtime@0.8`. See the
+[repository](https://github.com/randlee/sc-lint) and
+[API documentation](https://docs.rs/sc-lint-runtime/0.8.5).
 
 ## Purpose
 
@@ -15,12 +24,29 @@ Current rule families:
   - discarded `Condvar::wait_timeout*` result
 - `SCB-RUNTIME-003`
   - blocking `std::thread::sleep` in production Tokio packages; use
-    `tokio::time::sleep(..).await`
+    event-driven synchronization or `yield_now`
 
-Sample `SCB-RUNTIME-003` finding:
+- `SCB-RUNTIME-004`
+  - `std::thread::sleep_until` in the same production Tokio-package scope as
+    rule 003 (normal/build Tokio dependency, production lib/bin targets)
+- `SCB-RUNTIME-005`
+  - `tokio::time::sleep` and `tokio::time::sleep_until` in all non-test source
+- `SCB-RUNTIME-006`
+  - `tokio::runtime::Runtime::block_on`, `Handle::block_on`, and
+    `futures::executor::block_on` in all non-test source
+- `SCB-RUNTIME-007`
+  - a bound `std::sync::Mutex` guard live at `.await` inside an async function
+    or async block, in all non-test source
+
+Rules 005–007 do not require a declared Tokio dependency. `yield_now` remains
+legal. Prefer event-driven synchronization; a timer is not a replacement for
+another forbidden sleep. The checks inspect syntax, not a running service.
+
+Rule details appear in the JSON `findings` array. For example, this is the
+message produced for `SCB-RUNTIME-003` by the 0.8.5 binary:
 
 ```text
-SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead
+/private/tmp/sc-lint-docs-085-A-sample/src/lib.rs:2: SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `docs-sample`; use event-driven synchronization or `yield_now` instead
 ```
 
 ## Invocation
@@ -32,8 +58,8 @@ sc-lint lint sc-runtime
 sc-lint --json lint sc-runtime
 ```
 
-There is no dedicated repo-local `just lint sc-runtime` wrapper in the current
-release line. Use the top-level CLI or the backend-local command directly.
+There is no dedicated repo-local `just lint sc-runtime` wrapper. In the
+sc-lint source repository, `just lint` runs the complete repository lint gate.
 
 Backend-local path:
 
@@ -61,12 +87,11 @@ pub fn wait_until_ready(condvar: &Condvar, state: &Mutex<bool>) {
 }
 ```
 
-Representative text result:
+Representative text result from the 0.8.5 binary on a one-crate workspace
+with no findings:
 
 ```text
-sc-lint-runtime: PASS
-scanned crates: 1
-findings: 0
+sc-lint-runtime 0.8.5 status=pass scanned_crates=1 findings=0
 ```
 
 ## Representative Fail
@@ -85,36 +110,121 @@ pub fn block(condvar: &Condvar, state: &Mutex<bool>) {
 Representative finding:
 
 ```text
-SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult
+/private/tmp/sc-lint-docs-085-A-sample/src/lib.rs:5: SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult
 ```
 
-Discarded timeout result:
+Discarding the timeout result is reported as `SCB-RUNTIME-002`; the JSON
+finding message includes the source path and line.
 
-```text
-SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding
+The backend `sc-lint-runtime analyze` returns exit code `0` after a completed
+analysis even when the report status is `fail`. The top-level
+`sc-lint lint sc-runtime` command returns exit code `10` for a configured lint
+failure.
+
+## Configuration and local allows
+
+The runtime analyzer supports the shared `enabled`, `exclude_rules`,
+`fail_rules`, `exclude_paths_by_rule`, and `--rule-filter` configuration.
+Every rule fails by default. A function or method can allow listed rules only
+with a non-empty reason, using the existing shared directive syntax.
+`SCB-RUNTIME-003` uses the same allowance path as rules 004–007, so a bounded
+synchronous helper can declare a narrow exception without excluding its file:
+
+```rust
+#[sc_lint_attributes::sc_lint(
+    allow(SCB-RUNTIME-003),
+    reason = "Bounded synchronous compatibility polling"
+)]
+fn bounded_sync_poll(poll_interval: std::time::Duration) {
+    std::thread::sleep(poll_interval);
+}
 ```
 
-## Disable Model
+The unqualified `#[sc_lint(...)]` form also works. The attribute macro comes
+from `sc-lint-attributes` and is a no-op on every OS. An allowance applies to
+that function/method's body and only its listed IDs; nested functions need
+their own allowance. Module/impl allowances do not authorize their members.
+Suppressed sites are omitted from findings; their reason remains in source.
+A missing or blank reason is an analyzer error with
+`DIRECTIVE.SITE_ALLOW.MISSING_REASON` or `DIRECTIVE.SITE_ALLOW.EMPTY_REASON`
+and recovery guidance. Unknown runtime rule IDs are also rejected.
 
-There is currently no approved rule-disable path in the shipped
-`sc-lint lint sc-runtime` surface.
+Test targets and `tests/` files, inline `#[cfg(test)]` (including
+`cfg(all(test, ...))`), `#[test]`, and qualified test attributes such as
+`#[tokio::test]` are exempt. Fixtures in the test suite are parsed and analyzed;
+none of their sleep/blocking calls are executed.
 
-Important limits:
+## Syntactic coverage and limits
 
-- no top-level CLI rule-disable flags
-- no documented backend-specific allowlist or source-annotation suppression
-  path in release `0.1.x`
+Grouped, renamed and glob `use` imports are resolved syntactically, as in rule
+003. Method `block_on` is recognized for explicitly typed Runtime/Handle
+parameters, inferred constructors/builders/handles, and typed `self` fields.
+Mutex tracking recognizes typed Mutex/Arc<Mutex> parameters, local constructors,
+typed `self` fields and explicit MutexGuard bindings, including `lock`/
+`try_lock`, `unwrap`/`expect`/`?`. Temporary guards are released at the end
+of their expression; lock-result match temporaries remain live through the arm.
+Nested
+block exit and explicit `drop` (including `std::mem::drop` aliases) release a
+binding; branch analysis retains a guard if a continuing branch can keep it alive.
+
+The tracker also recognizes `Arc::clone`/`Rc::clone` of Mutex owners,
+file-local typed static Mutexes, `lock().unwrap_or_else(|e| e.into_inner())`,
+constructors reached through globs (`use std::sync::*`, `Mutex::new`), and
+`Ok(g) = m.lock()` patterns in if-let, let-else, match and while-let.
+Pattern bindings live only within their scope; explicit drops release them.
+Match arms track guards owned by `Ok(g)`, poisoned guards owned by `Err(p)`,
+and unbound scrutinee guards in `Ok(_)` or fallback arms. A guard returned by
+`match m.lock() { Ok(g) => g, Err(p) => p.into_inner() }` stays live in its
+receiving local binding until dropped or the scope ends.
+A visible `break` inside macro tokens (including `tokio::select!`) keeps a
+loop exit reachable when joining guard states. If/match joins
+exclude diverging branches (`return`, `break`, `continue`, built-in
+`panic!`/`unreachable!`/`todo!`/`unimplemented!`, and statically known `!` calls).
+A branch that reaches the following statement with a live guard still fails.
+
+This is not type checking or borrow checking. Known false negatives include
+macro-generated calls, indirect function pointers, reexports and Cargo crate
+renames, type aliases, types returned by other functions, unrecognized receiver
+fields/chains, and guards moved through other bindings, containers or deferred
+captures. `use` bindings resolve by lexical module and function scope, so an
+import in one module does not change findings in another; struct names are
+flattened per file, and local name shadowing can cause false positives. Cross-function ownership transfer and
+control-flow exits are not proved; consumed guards or branch/loop exits may
+produce conservative findings. In particular, `consume(g); other().await`
+and `loop { drop(g); break; } other().await` may still report rule 007;
+interprocedural ownership and loop/labeled-block exit guard transfer are not proved.
+For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
+including `Ok(_)` and `Ok(..)` scrutinees. Explicit
+`Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined
+`Err(p)` and wildcard fallback arms is a known limitation; those arms are not
+assumed to hold a guard. Move bindings of an entire scrutinee use the binding
+name, so `drop(name)` releases the tracked resource. Blocking lock-result
+rest and or-patterns retain their scrutinee resources. Dropping a nested
+`ref` binding does not release the scrutinee-held guard.
+Known `!` declarations are matched by unambiguous file-local names.
+Unresolved callable return types are not assumed to diverge. Other `cfg`
+conditions are not evaluated.
 
 Runtime source discovery scans Rust files under production target source roots.
 It does not resolve Rust module declarations when deciding whether a file is
-test-only. An out-of-line `#[cfg(test)] mod checks;` declared in `src/lib.rs`
-therefore does not mark `src/checks.rs` as a test file; blocking sleeps in that
-file may be reported as production code. Keep test modules inline or place
-them under a Cargo test target until module-aware source classification is
-available.
+test-only. For an out-of-line `#[cfg(test)] mod checks;` declared in
+`src/lib.rs`, put the inner attribute `#![cfg(test)]` at the top of
+`src/checks.rs` so that the separate file is classified as test code:
 
-If a future exception model is added, it must be backend-owned and documented
-explicitly before users rely on it.
+```rust
+// src/checks.rs
+#![cfg(test)]
+
+#[test]
+fn checks_behavior() {
+    assert_eq!(2 + 2, 4);
+}
+```
+
+The file-level marker makes the whole file test code for every runtime rule,
+`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`tests/`. A parent module's `cfg(test)` attribute alone does not propagate into
+the separate file.
 
 ## Output And Logging
 
@@ -158,5 +268,5 @@ Delegated/backend normalization records also appear:
 
 See:
 
-- [logging.md](../../docs/sc-lint/logging.md)
-- [cli-contract.md](../../docs/sc-lint/cli-contract.md)
+- [logging.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/logging.md)
+- [cli-contract.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/cli-contract.md)

@@ -10,10 +10,27 @@ analyzers.
 
 - [ADR-004 — Structured boundary definitions](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 - [ADR-007 — Analyzer-crate partition](../sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [ADR-022 — Tools and consumer configuration](../sc-lint/adr/ADR-022-tools-and-consumer-configuration.md),
+  decision 4: the `PORT-010` site allowance
+- [REQ-PRODUCT-004E](../requirements.md) (Accepted): the same site allowance
+  for `SCB-RUNTIME-*` rules
 
 ## Boundary Rules
 
 - Parsing is shared; semantic rule ownership stays with the relevant analyzer.
+- `Directive::SiteAllow` carries unquoted rule ids and a mandatory non-empty
+  literal reason. The portability analyzer honors `PORT-010`; the runtime
+  analyzer honors known `SCB-RUNTIME-*` ids on functions and methods. Each
+  analyzer ignores ids owned by another analyzer.
+- Unknown-id checks are analyzer-owned: an analyzer passes its prefix and
+  known ids to `unknown_owned_rules`, which returns every miss. The runtime
+  and portability analyzers both report each miss as
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
+- `is_sc_lint_attribute` is the one place that decides which attribute paths
+  are `sc_lint` directives; typed parsing keeps each
+  `DIRECTIVE.SITE_ALLOW.*` code without decoding message text, and
+  `DirectiveError::from_diagnostic` maps a foreign `syn` error to
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`.
 - The crate must not depend on the CLI or analyzer implementations.
 
 ## Related Docs

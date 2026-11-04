@@ -1,7 +1,7 @@
 ---
 name: sc-lint-adoption
 description: Install or update the managed sc-lint contract in a Rust repository. Use when a repository needs unified `just setup`, `just lint`, and `just test` commands, or when reviewing adoption drift.
-version: 1.0.0
+version: 0.8.5
 ---
 
 # sc-lint adoption
@@ -16,8 +16,12 @@ the session to its actual installation directory; do not copy its Python code
 into the consumer repository.
 
 ```bash
-export SC_LINT_ADOPTION_ROOT="${CLAUDE_PLUGIN_ROOT:?Claude Code must provide the installed sc-lint-adoption package root}"
+export SC_LINT_ADOPTION_ROOT="${CLAUDE_PLUGIN_ROOT:-plugins/sc-lint}"
+test -f "$SC_LINT_ADOPTION_ROOT/install.py" || { echo "sc-lint-adoption root not found: set CLAUDE_PLUGIN_ROOT to the installed package or vendor the kit at plugins/sc-lint" >&2; exit 1; }
 ```
+
+Prerequisites: `just` and `rg` must be on `PATH`. The dry-run's Justfile collision
+check runs `just`, and the recipe scan below uses `rg`.
 
 ## 1. Collect facts
 
@@ -61,7 +65,9 @@ set `"justfile": {"windows_shell": false}` to omit it entirely. Never duplicate 
 ## 2. Write and validate `install.json`
 
 Create `install.json` at the consumer root. It has `minimum_version`,
-`profiles`, `ci`, `analyzers`, and optional `test` and `justfile` fields.
+`profiles`, `ci`, `analyzers`, and optional `test` and `justfile` fields. It may
+also set `lint_profiles`, `tools`, `default_lint_profile`, `line_counts`,
+`identities`, `version_sync`, `cargo_shear`, `logging`, and `artifacts`.
 `justfile.windows_shell` is a boolean that defaults to `true`; set it to
 `false` to omit the kit's `set windows-shell` line. The dry-run in step 3
 validates this input against the packaged `install.schema.json` before it
@@ -86,7 +92,11 @@ differing pre-existing kit targets absent from the prior installed manifest are
 listed, and nothing is written. The merged root `Justfile` and `.sc-lint/install.json` when selected as the input
 are exempt from that clash check. When CI is enabled, the generated workflow
 uses `./plugins/sc-lint/.github/actions/setup-sc-lint`, vendored at
-`plugins/sc-lint/.github/actions/setup-sc-lint/action.yml`.
+`plugins/sc-lint/.github/actions/setup-sc-lint/action.yml`. The sc-lint GitHub
+Action (`action.yml` at the sc-lint repository root) is an alternative that
+installs a verified release and runs the same lint or test contract; see
+`docs/sc-lint/github-action-requirements.md` in the sc-lint repository. Do not
+mix both in one workflow without a reason recorded in the consumer PR.
 
 ```bash
 set +e; python3 "$SC_LINT_ADOPTION_ROOT/install.py" --dry-run --input install.json .; dry_run_exit=$?; set -e; printf 'sc-lint adoption dry-run exit %s\n' "$dry_run_exit"; test "$dry_run_exit" -le 1
@@ -139,10 +149,12 @@ drift remains, include the new dry-run output instead of claiming convergence.
 - **Analyzers:** set `analyzers.<name>` in `install.json`; the kit renders it as
   `[tool.sc-lint.analyzers.<name>]`. The keys are listed in `configuration.md`,
   "Analyzer tables"; any other key fails the install.
-- **Test layers:** declare ordered `[tool.sc-lint.test.<layer>]` lists. `unit`
-  is the default; `just test <layer> *args` passes through and `just test all`
-  follows declared order.
-- **Lint profiles:** declare ordered `[tool.sc-lint.lint.<profile>]` steps.
+- **Test layers:** each `test` entry renders one `[[tool.sc-lint.test]]` row with
+  a `name`. `just test` with no selector runs every row in declared order;
+  `just test <name> *args` runs one row. No layer name is special.
+- **Lint steps and profiles:** each lint step renders one `[[tool.sc-lint.lint]]`
+  row with a `name`. `lint_profiles` renders the `[tool.sc-lint.lint_profiles]`
+  table, which maps a profile name to an ordered list of step names.
 - **Consumer-owned recipes:** add non-managed recipes outside the managed
   `Justfile` import block. Do not alter the marker block.
 

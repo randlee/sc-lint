@@ -1,64 +1,41 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from sc_lint.lint_common import discover_repo_root
-
-from pathlib import Path
-
-
 SECTIONS = (
     (
         "General",
         (
             ("help", "Show this help."),
             ("build", "Build the full workspace."),
-            ("test", "Run the full workspace test suite."),
+            ("test", "Run the full source-maintainer test suite."),
             ("clean", "Remove workspace build artifacts."),
-            ("version", "Show current workspace version state."),
-            ("version latest", "Show recommended direct dependency upgrades."),
-            ("ci", "Run the local CI-equivalent command set."),
+            ("setup", "Preview consumer setup against sc-lint.toml (dry run)."),
+            ("upgrade", "Check consumer upgrade state (dry run)."),
+            ("version [current|latest]", "Show workspace version state, or latest recommended dependency upgrades."),
+            ("test-adoption", "Run the consumer-adoption kit tests (needs pytest on the host Python)."),
+            ("test-adoption-integration", "Run the adoption tests against a product built into target/adoption-product."),
         ),
     ),
     (
         "Formatting",
         (
-            ("fmt", "Check Rust formatting."),
-            ("fmt check", "Check Rust formatting."),
-            ("fmt write", "Format the Rust workspace in place."),
-            ("fmt apply", "Format the Rust workspace in place."),
+            ("fmt [check|write]", "Check Rust formatting (default), or format the workspace in place."),
         ),
     ),
     (
         "Lint",
         (
-            ("lint", "Run the default full lint profile."),
-            ("lint fast", "Run the low-latency lint subset."),
-            ("lint full", "Run the stronger local full lint profile."),
-            ("lint ci", "Run the lint-only CI-parity profile."),
-            ("lint fmt", "Run only the format check."),
-            ("lint clippy", "Run only Clippy with warnings denied."),
-            ("lint modules", "Run cargo-modules internal acyclic checks (advisory/manual)."),
-            ("lint deny", "Run cargo-deny advisories/bans/source checks."),
-            ("lint shear", "Run cargo-shear unused-dependency checks."),
-            ("lint sc-boundary", "Run the syn-based boundary analyzer."),
-            ("lint sc-portability", "Run the syn-based portability analyzer."),
-            ("lint function-length", "Fail on new or grown Rust functions over the code-line cap."),
-            ("lint line-counts", "Run the extracted source-size inventory lint."),
-            ("lint identity-literals", "Run the configurable identity-literal lint."),
-            ("lint manifests", "Run the Cargo manifest policy checks."),
-            ("lint version", "Run only the version alignment checks."),
-            ("lint spell", "Run the spelling/content check."),
-            ("lint pytests", "Run the Python lint-tool unit tests."),
-            ("lint <selector>", "Consumer repositories: run one named lint step or lint profile."),
-            ("lint <selector> <scope>", "Consumer repositories: also select platform scope host, all, linux, macos, or windows."),
+            ("lint", "Run the default source lint profile through the consumer contract."),
+            ("lint <selector>", "Run one named lint step or profile from sc-lint.toml (the source repo defines source-full)."),
+            ("lint <selector> <scope>", "Also select the platform scope: host, all, linux, macos, or windows."),
         ),
     ),
 )
 
 
-def render_help(repo_name: str) -> str:
+def render_help() -> str:
     lines = [
-        f"{repo_name} task runner",
+        "sc-lint repository task runner",
         "",
         "Usage:",
         "  just <recipe>",
@@ -74,8 +51,7 @@ def render_help(repo_name: str) -> str:
 
 
 def main() -> int:
-    repo_name = discover_repo_root().name
-    print(render_help(repo_name), end="")
+    print(render_help(), end="")
     return 0
 
 

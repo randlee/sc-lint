@@ -446,10 +446,6 @@ fn bootstrap_setup_hands_declared_tools_to_the_managed_helper_with_exact_config(
                 vec!["setup", "--config", "sc-lint.toml", "--dry-run"],
                 json!(["--config", "sc-lint.toml", "--check"]),
             ),
-            (
-                vec!["setup", "--config", "sc-lint.toml", "--check"],
-                json!(["--config", "sc-lint.toml", "--check"]),
-            ),
         ] {
             let _ = fs::remove_file(&log);
             let output = bootstrap(
@@ -469,6 +465,24 @@ fn bootstrap_setup_hands_declared_tools_to_the_managed_helper_with_exact_config(
             assert!(same_path(&calls[0]["cwd"], &root), "{calls:?}");
             assert_eq!(calls[0]["cargo_home"], json!(cargo_home));
         }
+
+        let _ = fs::remove_file(&log);
+        let rejected = bootstrap(
+            fixture.path(),
+            &root,
+            &["setup", "--config", "sc-lint.toml", "--check"],
+            &[("SC_LINT_HELPER_LOG", log_path), ("CARGO_HOME", cargo_home)],
+        );
+        assert_eq!(rejected.status.code(), Some(2), "{}", stderr(&rejected));
+        assert!(
+            stderr(&rejected).contains("usage:"),
+            "{}",
+            stderr(&rejected)
+        );
+        assert!(
+            !log.exists(),
+            "setup --check must fail before helper startup"
+        );
 
         let _ = fs::remove_file(&log);
         let failed = bootstrap(

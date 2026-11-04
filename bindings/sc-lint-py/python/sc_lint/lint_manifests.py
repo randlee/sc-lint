@@ -7,6 +7,7 @@ from pathlib import Path
 import argparse
 import sys
 
+from sc_lint import _toml
 from sc_lint.lint_common import build_report
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import monotonic_now
@@ -35,14 +36,12 @@ class ManifestViolation:
         return f"{self.location}: {self.message}"
 
 
-def tomllib_load(path: Path) -> dict:
-    import tomllib
-
-    return tomllib.loads(path.read_text(encoding="utf-8"))
+def toml_load(path: Path) -> dict:
+    return _toml.loads(path.read_text(encoding="utf-8"))
 
 
 def workspace_version(repo_root: Path) -> str:
-    manifest = tomllib_load(repo_root / "Cargo.toml")
+    manifest = toml_load(repo_root / "Cargo.toml")
     package = manifest.get("workspace", {}).get("package", {})
     version = package.get("version")
     if not isinstance(version, str):
@@ -99,7 +98,7 @@ def collect_manifest_violations(repo_root: Path) -> list[ManifestViolation]:
     expected_versions: dict[Path, str] = {}
 
     for manifest_path in manifests:
-        manifest = tomllib_load(manifest_path)
+        manifest = toml_load(manifest_path)
         rel_manifest = relative_manifest_display(manifest_path, repo_root)
         expected_versions[manifest_path.parent.resolve()] = expected_package_version(
             manifest,
@@ -108,7 +107,7 @@ def collect_manifest_violations(repo_root: Path) -> list[ManifestViolation]:
         )
 
     for manifest_path in manifests:
-        manifest = tomllib_load(manifest_path)
+        manifest = toml_load(manifest_path)
         rel_manifest = relative_manifest_display(manifest_path, repo_root)
         package = manifest.get("package", {})
         if not isinstance(package, dict):

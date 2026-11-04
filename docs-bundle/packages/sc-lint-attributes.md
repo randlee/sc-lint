@@ -2,16 +2,18 @@
 
 ## Purpose and ownership
 
-`sc-lint-attributes` is the published procedural-macro crate that expands
-source-level `#[sc_lint(...)]` declarations into analyzer metadata. It is a
-library-only package owned by the Rust source authoring layer; it is not a
-consumer CLI.
+`sc-lint-attributes` is the published procedural-macro crate that provides the
+source-level `#[sc_lint(...)]` attribute. The macro checks the attribute's
+arguments with [sc-lint-directives](./sc-lint-directives.md) and returns the
+annotated item unchanged; it generates no code. The analyzers read the
+attribute from source. It is a library-only package, not a consumer CLI.
 
 ## Intended users
 
-Rust crates that annotate boundary policy use it as a development dependency.
-Analyzer and workspace maintainers own the declarations and review expanded
-policy alongside the source.
+Rust crates that annotate boundary or portability policy on production items
+add it under `[dependencies]`, because the attribute must compile wherever the
+annotated item does. Analyzer and workspace maintainers own the declarations
+and review them alongside the source.
 
 ## Configuration and API
 
@@ -21,14 +23,14 @@ near the item they govern and let the compiler report malformed arguments.
 
 ```toml
 [dependencies]
-sc-lint-attributes = "0.8.4"
+sc-lint-attributes = "0.8.5"
 ```
 
 ## Output and CI
 
-The macro emits Rust items and metadata consumed by boundary analysis; it does
-not produce a standalone report. CI should compile the annotated workspace and
-run the configured `sc-lint lint sc-boundary` profile.
+The macro emits only the original item; it does not produce a report. CI
+should compile the annotated workspace and run `sc-lint lint sc-boundary` or
+`sc-lint lint sc-portability`, which read the attributes from source.
 
 ## Common failures
 

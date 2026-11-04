@@ -1,6 +1,11 @@
 crates/sc-lint/assets/bootstrap.py text eol=lf
 packages/sc-lint-adoption/.sc-lint/bootstrap.py text eol=lf
 .sc-lint/bootstrap.py text eol=lf
+crates/sc-lint/assets/consumer-config.toml text eol=lf
+crates/sc-lint/assets/consumer-Justfile text eol=lf
+crates/sc-lint/tests/fixtures/consumer-Justfile-v0.8.4 text eol=lf
+crates/sc-lint/tests/fixtures/consumer-bootstrap-v0.8.4.py text eol=lf
+docs-bundle/cli-reference/** text eol=lf
 crates/sc-lint-portability/tests/fixtures/metadata-once/** text eol=lf
 crates/sc-lint-runtime/tests/fixtures/metadata-once/** text eol=lf
 tests/adoption/golden/** -text

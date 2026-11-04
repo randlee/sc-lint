@@ -195,6 +195,24 @@ The product should support both:
   ownership remain in their dedicated analyzer crates (ADR-013).
   (Amended 2026-10-10, Accepted, #201.)
 
+  Clarification (0.8.5, not an amendment): source discovery and scope
+  classification include the shared `AnalyzeOptions` input,
+  repository-relative source-path normalization, root-prefix stripping and
+  test-only attribute recognition. These are rule-neutral and fit ADR-013 as
+  written, so the Accepted text above is unchanged.
+
+- `REQ-PRODUCT-004E` — **Accepted** (0.8.5, #640)
+  Approval receipt: Rand, 2026-11-03: "004E approved (as long as consumer can
+  opt out w/ reason)".
+  Runtime rules 004–007 cover thread `sleep_until`, Tokio timer sleeps,
+  Runtime/Handle/futures `block_on`, and std Mutex guards held across await.
+  Rule 004 shares 003's production Tokio-package scope; 005–007 cover all
+  non-test source. Test code is exempt and `yield_now` remains legal.
+  Consumers can opt out per function using
+  `#[sc_lint(allow(SCB-RUNTIME-00N), reason = "...")]` with a mandatory
+  non-empty reason. The detailed contract and syntactic limits are in
+  [REQ-RUNTIME-001](./sc-lint-runtime/requirements.md).
+
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
   not materially improve correctness or noise characteristics.

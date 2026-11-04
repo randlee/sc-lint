@@ -29,7 +29,8 @@ silently from their pinned binary. `sc-publish` solves the same problem for
    time is analyzer behavior, not configuration.
 2. **The `sc-lint` Python wheel is the runtime for every consumer-run
    helper.** It is built with maturin from `bindings/sc-lint-py/` (pyo3
-   cdylib, ≤150 lines of bridge) plus the `sc_lint` Python package, published
+   cdylib, ≤150 lines of bridge; it exposes `version_json`, `run` and
+   `toml_loads`, see the amendment below) plus the `sc_lint` Python package, published
    to PyPI through the `sc-publish` channel and pinned by
    `[tool.sc-lint].minimum_version`. Nothing is copied from a source archive.
 3. **Kit entry points.** The kit owns the managed import block and its
@@ -69,6 +70,16 @@ managed block. Patterns observed independently in 2+ consumer repositories
 may be promoted into the kit (ADR-015). Consumer-owned domain-lint steps may
 reference repository-local scripts and are the primary extension point for
 repository-specific enforcement.
+
+## Amendment (2026-11-04)
+
+Rand ruled that Python 3.9 is supported (bd memory `python-39-support`), and
+that the helpers parse TOML with the workspace Rust `toml` crate through
+`sc_lint._native.toml_loads` instead of `tomllib`. The wheel floor follows
+GitHub #778 (`cp39-abi3` wheel tags; #778 documents the wheel tags, not the
+support policy). Windows ARM64 wheels still require Python 3.11 or newer.
+`toml_loads` is a parser exposed by the bridge, not configuration policy, so
+decision 1 is unchanged.
 
 ## Consequences
 

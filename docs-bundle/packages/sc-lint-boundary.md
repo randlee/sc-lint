@@ -30,6 +30,35 @@ configuration. atm-core keeps parity only for record-lock comparison of
 `allowed_dependencies` and `allowed_dev_dependencies`; the four-case oracle is
 in `crates/sc-lint-boundary/tests/issue136.rs`.
 
+## Rules
+
+Rule filters, `exclude_rules`, and `fail_rules` accept these IDs and the
+family names `cycles`, `boundaries`, `internal-only`, `forbid-external-impls`,
+`dependencies`, and `manifests`. Every rule fails by default except
+`SCB-CYCLE-002` and `SCB-CYCLE-003`, which report without failing.
+
+| Rule | Family | Reports |
+| --- | --- | --- |
+| `SCB-CYCLE-001` | cycles | An architectural cycle across two or more owners (modules, types, or traits). |
+| `SCB-CYCLE-002` | cycles | A type or method self-loop within one owner. |
+| `SCB-CYCLE-003` | cycles | A trait-impl self-loop within one owner. |
+| `SCB-BOUNDARY-001` | boundaries, internal-only | A `boundary.internal_only` item that is externally visible. |
+| `SCB-BOUNDARY-002` | boundaries, internal-only | A `boundary.internal_only` item referenced from outside its module. |
+| `SCB-BOUNDARY-003` | boundaries, forbid-external-impls | An impl of a `boundary.forbid_external_impls` trait from another module. |
+| `SCB-BOUNDARY-004` | boundaries, dependencies | An invalid boundary inventory record or field. |
+| `SCB-CALLER-001` | boundaries | A restricted symbol called by a caller not on its approved-caller list. |
+| `SCB-DEPENDENCY-001` | dependencies | A direct workspace-package dependency the owner's record does not allow. |
+| `SCB-DEPENDENCY-002` | dependencies | A direct dependent the target's record does not allow. |
+| `SCB-DEPENDENCY-003` | dependencies | A present edge listed in `forbidden_edges`. |
+| `SCB-DEPENDENCY-004` | dependencies | A stale incoming permission with no live edge. |
+| `SCB-FEATURE-001` | dependencies | Use of another package's features not listed in `allowed_feature_dependencies`. |
+| `SCB-MANIFEST-001` | manifests | A missing required workspace-inherited package field. |
+| `SCB-MANIFEST-002` | manifests | An internal path dependency whose version does not match its target. |
+| `SCB-MANIFEST-003` | manifests | A dependency not on its owner's configured allowlist. |
+| `SCB-MANIFEST-004` | manifests | A dependency declared or used outside its configured owner. |
+| `SCB-MANIFEST-005` | manifests | A dependency in a manifest section its rule does not allow. |
+| `SCB-MANIFEST-006` | manifests | Stale or inconsistent manifest policy, including record locks. |
+
 ## Recovering inventory and stale-policy findings
 
 For `SCB-BOUNDARY-004`, use the reported record and field to correct the
@@ -45,12 +74,12 @@ metadata.
 
 ```sh
 sc-lint lint sc-boundary
-sc-lint view graph
 ```
 
 Findings identify rule, owner, path, and remediation context. The normalized
-CLI envelope is suitable for CI; graph views are intended for architecture
-inspection.
+CLI envelope is suitable for CI. `sc-lint view graph` is a reserved command
+surface and currently returns `CLI.CAPABILITY_ERROR`; it is not an available
+architecture-inspection view.
 
 ## CI and failures
 

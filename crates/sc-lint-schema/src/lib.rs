@@ -1,3 +1,10 @@
+//! Shared finding, output-format and report types for `sc-lint` and its
+//! analyzers.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::fmt;
 use std::ops::Deref;
 

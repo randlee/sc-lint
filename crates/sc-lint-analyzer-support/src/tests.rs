@@ -939,3 +939,163 @@ fn non_table_intermediate_node_names_the_offending_path() {
         );
     }
 }
+
+#[test]
+fn test_attribute_helpers_preserve_direct_and_expanded_policies() {
+    for (source, direct, expanded) in [
+        ("#[test] fn f() {}", true, true),
+        ("#[tokio::test] fn f() {}", false, true),
+        ("#[cfg(test)] fn f() {}", true, true),
+        (
+            "#[cfg(all(unix, all(test, feature = \"a\")))] fn f() {}",
+            false,
+            true,
+        ),
+        ("#[cfg(any(test, unix))] fn f() {}", false, false),
+        ("#[cfg(not(test))] fn f() {}", false, false),
+        ("#[cfg_attr(test, test)] fn f() {}", false, false),
+        ("fn tests() {}", false, false),
+    ] {
+        let item: syn::ItemFn = syn::parse_str(source).unwrap();
+        assert_eq!(
+            item.attrs
+                .iter()
+                .any(|attr| super::attr_is_test(attr) || super::attr_is_cfg_test(attr)),
+            direct,
+            "{source}"
+        );
+        assert_eq!(super::is_test_only(&item.attrs), expanded, "{source}");
+    }
+}
+
+#[test]
+fn source_path_error_retains_paths_cause_and_display_contract() {
+    let root = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    let source_path = outside.path().join("outside.rs");
+    let error = super::repo_relative_source_path(root.path(), &source_path).unwrap_err();
+    assert_eq!(error.root, root.path());
+    assert_eq!(error.source_path, source_path);
+    assert_eq!(error.source, RelativePathError::Absolute);
+    let context = format!(
+        "failed to build repository-relative source path for `{}` under `{}`",
+        source_path.display(),
+        root.path().display()
+    );
+    assert_eq!(error.to_string(), context);
+    assert_eq!(
+        error.source().unwrap().to_string(),
+        RelativePathError::Absolute.to_string()
+    );
+    assert_eq!(
+        format!("{:#}", anyhow::Error::from(error)),
+        format!("{context}: {}", RelativePathError::Absolute)
+    );
+}
+
+#[test]
+fn root_alias_stripping_preserves_lexical_paths_and_rejects_outside_files() {
+    let root = std::path::Path::new("workspace");
+    let canonical_root = std::path::Path::new("resolved");
+    let relative = std::path::Path::new("src/lib.rs");
+    let direct = root.join(relative);
+    let alias = canonical_root.join(relative);
+    assert_eq!(
+        super::relative_path_under_root(root, &direct, None),
+        Some(relative)
+    );
+    assert_eq!(
+        super::relative_path_under_root(root, &alias, Some(canonical_root)),
+        Some(relative)
+    );
+    assert_eq!(super::relative_path_under_root(root, &alias, None), None);
+    assert_eq!(
+        super::relative_path_under_root(
+            root,
+            std::path::Path::new("outside/lib.rs"),
+            Some(canonical_root)
+        ),
+        None
+    );
+    assert_eq!(
+        super::relative_path_under_root(
+            std::path::Path::new("a"),
+            std::path::Path::new("a/b/c"),
+            Some(std::path::Path::new("a/b"))
+        ),
+        Some(std::path::Path::new("b/c"))
+    );
+}
+
+#[test]
+fn boundary_manifest_covers_the_complete_public_export_surface() {
+    fn names(tree: &syn::UseTree, out: &mut BTreeSet<String>) {
+        match tree {
+            syn::UseTree::Path(path) => names(&path.tree, out),
+            syn::UseTree::Name(name) => {
+                out.insert(name.ident.to_string());
+            }
+            syn::UseTree::Rename(rename) => {
+                out.insert(rename.rename.to_string());
+            }
+            syn::UseTree::Group(group) => {
+                for item in &group.items {
+                    names(item, out);
+                }
+            }
+            syn::UseTree::Glob(_) => {
+                panic!("public glob export cannot be checked against the boundary manifest")
+            }
+        }
+    }
+    let file = syn::parse_file(include_str!("lib.rs")).unwrap();
+    let mut actual = BTreeSet::new();
+    for item in &file.items {
+        if let syn::Item::Use(item) = item
+            && matches!(item.vis, syn::Visibility::Public(_))
+        {
+            names(&item.tree, &mut actual);
+        }
+        let declaration = match item {
+            syn::Item::Fn(item) => Some((&item.vis, &item.sig.ident)),
+            syn::Item::Struct(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Enum(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Type(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Trait(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Union(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Mod(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Const(item) => Some((&item.vis, &item.ident)),
+            syn::Item::Static(item) => Some((&item.vis, &item.ident)),
+            _ => None,
+        };
+        if let Some((syn::Visibility::Public(_), name)) = declaration {
+            actual.insert(name.to_string());
+        }
+    }
+    let manifest: toml::Table = toml::from_str(include_str!(
+        "../../../boundaries/sc-lint-analyzer-support/analyzer-support.toml"
+    ))
+    .unwrap();
+    let declared: BTreeSet<_> = manifest["composition"]["roots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        actual, declared,
+        "update the boundary roots for every public export"
+    );
+}
+
+#[test]
+#[should_panic(expected = "package names must not be empty")]
+fn package_names_reject_empty_values_in_all_build_modes() {
+    super::PackageName::new("");
+}
+
+#[test]
+#[should_panic(expected = "target names must not be empty")]
+fn target_names_reject_empty_values_in_all_build_modes() {
+    super::TargetName::new("");
+}

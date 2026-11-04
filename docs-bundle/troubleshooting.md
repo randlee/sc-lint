@@ -7,7 +7,7 @@ machine-readable error. The human form includes the same recovery guidance.
 
 | Code | Cause | Recovery |
 | --- | --- | --- |
-| `CLI.SC_LINT_CONFIG_MISSING` | `sc-lint.toml` or its tool section is absent | Run `sc-lint init --just`, then edit the minimum version. |
+| `CLI.SC_LINT_CONFIG_MISSING` | `sc-lint.toml` or its tool section is absent | Run `sc-lint init --just`; the generated minimum version already matches this binary. |
 | `CLI.SC_LINT_CONFIG_MALFORMED` | The minimum version or profile shape is invalid | Fix the named field and rerun `sc-lint compatibility check`. |
 | `CLI.SC_LINT_BINARY_NOT_FOUND` | A direct product command could not resolve the configured binary | Use `just setup` to install the configured verified release, or set `SC_LINT_BIN` to a compatible executable. |
 | `CLI.SC_LINT_BINARY_EXECUTION_FAILED` | The binary could not execute | Check permissions/platform and reinstall with `just setup`. |
@@ -24,9 +24,31 @@ machine-readable error. The human form includes the same recovery guidance.
 | `SETUP_TOOLS.INSPECTION_UNAVAILABLE` | Dry-run cannot inspect declared tools because the managed helper is unavailable | Run ordinary `just setup` to provision the helper and declared tools, then retry `setup --dry-run`. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
 | `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
-| `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more required product-managed integration files are absent | Run `sc-lint init --just` to create the named managed files, then rerun the check. |
+| `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more product-managed integration files are missing or are unedited files from a prior release | Run `sc-lint init --just` to create or refresh the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
-| `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, selector, or named profile is invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
+| `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, or profile declaration is structurally invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
+| `CLI.SC_LINT_CONFIG_MALFORMED` | A requested consumer lint step/profile or test selector is unknown or its configuration is malformed | Check the reported `details.available`, then fix the named `[tool.sc-lint]` entry and rerun. |
+| `CLI.USAGE_ERROR` | The command line is incomplete or uses an unsupported argument | Run the suggested command's `--help` and correct the invocation. |
+| `CLI.CONFIG_ERROR` | Repository discovery or configuration loading failed | Check the reported path and cause; pass `--root <path>` or `--config <path>` as appropriate. |
+| `CLI.CAPABILITY_ERROR` | The requested command is reserved or unavailable in this build | Use a listed implemented command or install the matching release capability. |
+| `CLI.BACKEND_EXEC_FAILURE` | An analyzer, adapter, or configured command failed to execute or returned a failing result | Inspect the named backend and stderr details, install missing dependencies, and retry. |
+| `CLI.BACKEND_PROTOCOL_ERROR` | A backend or Python adapter returned malformed output | Check the backend version and output, then repair the adapter environment with `just setup` if Python startup failed. |
+| `config.boundaries_dir_missing` | A configured boundaries directory is absent | Create the configured directory or correct its path in `sc-lint.toml`. |
+| `profile.steps_failed` | One or more configured lint/test steps failed | Fix each named failed step; inspect its exit code and captured output, then rerun the profile. |
+| `test.unknown_selector` | A requested test selector is not configured | Run `sc-lint test --list` and select one of the reported names. |
+| `view.findings` adapter startup | The Python findings adapter could not start or returned an error | Install the Python helper environment with `just setup`, then rerun `sc-lint view findings`. |
+
+## GitHub Action recovery codes
+
+The `sc-lint` GitHub Action reports these stable `ACTION.*` codes and prints
+the recovery text alongside each failure:
+
+| Code | Cause | Recovery |
+| --- | --- | --- |
+| `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE` | The requested release input, archive, or expected release layout is unavailable | Check the exact version and mirror URL, or use a supported runner and complete official release archive. |
+| `ACTION.SC_LINT_CHECKSUM_MISMATCH` | The checksum manifest lacks the selected archive entry or its SHA-256 differs | Discard the archive and retry with the checksum manifest published for the trusted release. |
+| `ACTION.SC_LINT_COMPATIBILITY_FAILED` | The selected binary does not satisfy the repository's configured minimum version | Align `sc-lint.toml` `minimum_version` with the selected release or select a newer release. |
+| `ACTION.SC_LINT_COMMAND_FAILED` | Setup documentation discovery or the requested lint/test operation failed | Use the complete verified archive for setup; for lint/test, inspect command output, fix the consumer profile, and rerun the Action. |
 
 ## Consumer lint configuration
 
@@ -59,7 +81,8 @@ retain literal `env_keys`. See [Configuration](./configuration.md) and
 `sc-lint init --just` reports
 `CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
 user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap.py`. Missing managed
-files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
+files, and unedited managed files from a prior release that init would
+refresh, produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
 conflicting file or reconcile it with [the canonical guide](./just-setup.md),
 then rerun initialization.
 

@@ -45,6 +45,10 @@ def source_fingerprint() -> str:
 
 
 def main() -> int:
+    if any(argument in ("-h", "--help") for argument in sys.argv[1:]):
+        print("usage: python3 bindings/sc-lint-py/python/sc_lint/source_venv.py\n"
+              "Provision .sc-lint/venv with this checkout's sc_lint wheel (no arguments).")
+        return 0
     python = venv_python()
     fingerprint = source_fingerprint()
     if python.is_file() and STAMP.is_file() and STAMP.read_text(encoding="utf-8").strip() == fingerprint:

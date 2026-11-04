@@ -19,6 +19,8 @@ roots = [
   "Finding",
   "RuleId",
   "PortabilityError",
+  "SiteAllowDiagnostic",
+  "SiteAllowErrors",
   "analyze_workspace",
   "render_findings_report",
 ]

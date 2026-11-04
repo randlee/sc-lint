@@ -259,7 +259,8 @@ Current command behavior:
   - fails only when a function at or over 80 code lines is new, or grew past its entry in `.just/function-length-baseline.tsv`
 - `lint line-counts`
   - succeeds through the Python Adapter Protocol
-  - loads line-count thresholds and exclusions from `.just/lint-config.toml`
+  - loads line-count thresholds and exclusions from `sc-lint.toml` first, with
+    per-table fallback to `.just/lint-config.toml`
 - `lint identity-literals`
   - succeeds through the Python Adapter Protocol
   - exposes a configurable framework rather than consumer-specific defaults
@@ -410,10 +411,11 @@ Current A.2 implementation notes:
 Current A.3 Python-adapter notes:
 
 - the adapter schema is `sc-lint-python-v1`
-- Python-backed commands use dedicated scripts under `.just/`
+- Python-backed commands run modules of the `sc_lint` package
+  (`bindings/sc-lint-py/python/sc_lint/`)
 - the CLI validates the adapter payload before exposing any result
-- Python tool config remains consumer-neutral and repo-local through
-  `.just/lint-config.toml`
+- Python tool config is consumer-neutral: each helper reads its table from
+  `sc-lint.toml` first, with per-table fallback to `.just/lint-config.toml`
 
 ## Output Model
 

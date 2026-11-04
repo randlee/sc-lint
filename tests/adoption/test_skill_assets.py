@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "packages" / "sc-lint-adoption"
-SKILL = PACKAGE / ".claude" / "skills" / "sc-lint-adoption" / "SKILL.md"
+SKILL = PACKAGE / "skills" / "sc-lint-adoption" / "SKILL.md"
 GUIDE = ROOT / "docs" / "sc-lint" / "adoption.md"
 ASSIGNMENT_TEMPLATE = SKILL.parent / "adopt.xml.j2"
 TEMPLATE_EXPRESSION = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.S)
@@ -69,7 +69,7 @@ def test_skill_has_the_seven_agent_run_steps() -> None:
 
 
 def test_package_assets_and_guide_stay_consumer_generic() -> None:
-    for path in [*PACKAGE.joinpath(".claude").rglob("*"), GUIDE]:
+    for path in [*PACKAGE.joinpath("skills").rglob("*"), *PACKAGE.joinpath("agents").rglob("*"), GUIDE]:
         if path.is_file():
             content = path.read_text()
             assert "sc-compose" not in content
@@ -88,7 +88,9 @@ def test_adoption_guide_covers_the_contract_boundaries() -> None:
         "Migrate existing named test recipes",
         "Offline documentation",
         "sc-lint docs --path",
-        "sole repository-specific *policy*",
+        "`line_counts`, `identities`, `version_sync`",
+        "`default_lint_profile` selects the default",
+        "The owning CLI/backend validates each policy.",
         '"justfile": {"windows_shell": true}',
         "The optional\n`justfile` object accepts `windows_shell`, a boolean that defaults to `true`",
         "Assignment template",

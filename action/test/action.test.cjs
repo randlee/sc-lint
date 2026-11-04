@@ -8,7 +8,7 @@ const path = require("node:path");
 const test = require("node:test");
 const zlib = require("node:zlib");
 
-const { ERROR, runAction } = require("../index.js");
+const { ActionError, ERROR, errorAnnotation, releaseTarget, runAction } = require("../index.js");
 
 function temporaryDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "sc-lint-action-test-"));
@@ -51,9 +51,11 @@ function zip(entries) {
 function fixture(platform, architecture, operation, layout = "nested") {
   const target = {
     "linux/x64": ["x86_64-unknown-linux-gnu", "tar.gz"],
+    "linux/arm64": ["aarch64-unknown-linux-gnu", "tar.gz"],
     "darwin/x64": ["x86_64-apple-darwin", "tar.gz"],
     "darwin/arm64": ["aarch64-apple-darwin", "tar.gz"],
     "win32/x64": ["x86_64-pc-windows-msvc", "zip"],
+    "win32/arm64": ["aarch64-pc-windows-msvc", "zip"],
   }[`${platform}/${architecture}`];
   const binary = platform === "win32" ? "sc-lint.exe" : "sc-lint";
   const archiveRoot = `sc-lint_0.4.0_${target[0]}`;
@@ -181,7 +183,7 @@ test("legacy flat archive remains accepted", async () => {
   assert.equal(result.docsPath, path.join(local.options.installRoot, "sc-lint-docs"));
 });
 
-for (const [platform, architecture] of [["linux", "x64"], ["darwin", "x64"], ["win32", "x64"]]) {
+for (const [platform, architecture] of [["linux", "x64"], ["linux", "arm64"], ["darwin", "x64"], ["darwin", "arm64"], ["win32", "x64"], ["win32", "arm64"]]) {
   for (const operation of ["setup", "lint", "test"]) {
     test(`published-layout ${platform}/${architecture} fixture runs ${operation}`, async () => {
       const local = fixture(platform, architecture, operation);
@@ -237,6 +239,22 @@ test("metadata declares the stable interface and required output contract", () =
   for (const name of ["operation:", "version:", "config-path:", "artifact-url:", "checksums-url:", "binary-path:", "docs-path:"]) {
     assert.match(metadata, new RegExp(`^  ${name}`, "m"));
   }
-  assert.match(metadata, /using: node20/);
+  assert.match(metadata, /using: node24/);
   assert.match(metadata, /main: action\/index\.js/);
+});
+
+test("all six published release target triples and archive extensions are exact", () => {
+  for (const [platform, architecture, triple, extension] of [
+    ["linux", "x64", "x86_64-unknown-linux-gnu", "tar.gz"],
+    ["linux", "arm64", "aarch64-unknown-linux-gnu", "tar.gz"],
+    ["darwin", "x64", "x86_64-apple-darwin", "tar.gz"],
+    ["darwin", "arm64", "aarch64-apple-darwin", "tar.gz"],
+    ["win32", "x64", "x86_64-pc-windows-msvc", "zip"],
+    ["win32", "arm64", "aarch64-pc-windows-msvc", "zip"],
+  ]) assert.deepEqual(releaseTarget(platform, architecture), { triple, extension });
+});
+
+test("failures are also emitted as GitHub error annotations with escaped newlines", () => {
+  const failure = new ActionError(ERROR.command, "line one\nline 100%", "Fix it.");
+  assert.equal(errorAnnotation(failure), "::error title=ACTION.SC_LINT_COMMAND_FAILED::line one%0Aline 100%25 Recovery: Fix it.");
 });

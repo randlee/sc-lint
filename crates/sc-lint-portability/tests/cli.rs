@@ -125,13 +125,13 @@ fn site_allow_errors_exit_as_configuration_errors() {
     for (source, code, recovery) in [
         (
             "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)] pub fn only_unix() {}\n",
-            "PORTABILITY.INVALID_SITE_ALLOW",
-            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+            sc_lint_directives::DirectiveCode::MissingReason.qualified(),
+            sc_lint_directives::DirectiveCode::MissingReason.recovery(),
         ),
         (
             "#[sc_lint(allow(PORT-001), reason = \"unsupported\")]\n#[cfg(unix)] pub fn only_unix() {}\n",
-            "PORTABILITY.UNKNOWN_RULE",
-            "recovery: use PORT-010",
+            sc_lint_directives::DirectiveCode::UnknownRule.qualified(),
+            sc_lint_directives::DirectiveCode::UnknownRule.recovery(),
         ),
     ] {
         let output = run_site_allow_error(source);
@@ -525,4 +525,23 @@ fn cli_excludes_per_rule_windows_separator_paths_with_a_rule_filter() {
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["status"], "pass");
     assert!(report["findings"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn plural_site_allow_errors_keep_configuration_exit_code() {
+    let output =
+        run_site_allow_error("#[sc_lint(allow(PORT-998,PORT-999),reason=\"typos\")]fn f(){}");
+    assert_eq!(output.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        stderr
+            .matches(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+            .count(),
+        2,
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("PORT-998") && stderr.contains("PORT-999"),
+        "{stderr}"
+    );
 }

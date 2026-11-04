@@ -170,9 +170,16 @@ pub(crate) fn compatibility_config_error(
     path: Option<&Path>,
     cause: Option<String>,
 ) -> CliError {
+    let recovery = if code == CompatibilityErrorCode::ConfigMissing {
+        "Run `sc-lint init --just` to create the consumer configuration and Just integration."
+    } else if code == CompatibilityErrorCode::ConfigMalformed {
+        "Correct the reported `sc-lint.toml` configuration error, then rerun the command."
+    } else {
+        BINARY_NOT_FOUND_RECOVERY
+    };
     let mut error = CliError::config(message)
         .with_code(code.as_str())
-        .with_suggested_action(BINARY_NOT_FOUND_RECOVERY)
+        .with_suggested_action(recovery)
         .with_documentation(DOCS_SETUP_REFERENCE)
         .with_detail("required_field", json!(MinimumVersion::FIELD_PATH));
     if let Some(path) = path {

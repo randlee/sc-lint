@@ -9,6 +9,9 @@ description = "Shared AST scanning, analyzer configuration parsing, and text ren
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-analyzer-support/0.8.5"
+keywords = ["rust", "sc-lint", "analyzer", "ast", "support"]
+categories = ["development-tools", "development-tools::procedural-macro-helpers", "parser-implementations"]
 
 [lib]
 name = "sc_lint_analyzer_support"
@@ -17,7 +20,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow.workspace = true
 cargo_metadata.workspace = true
-proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+proc-macro2.workspace = true
 sc-lint-schema.workspace = true
 serde.workspace = true
 syn = { version = "3.0.9", features = ["full", "parsing", "visit"] }

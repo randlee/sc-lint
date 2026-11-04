@@ -24,7 +24,7 @@ fn outside_source_path_reports_repository_relative_path_error() {
     let root = TempDir::new().unwrap();
     let outside_source = root.path().join("..\u{2f}outside.rs");
 
-    let error = super::runtime::repo_relative_source_path(root.path(), &outside_source)
+    let error = sc_lint_analyzer_support::repo_relative_source_path(root.path(), &outside_source)
         .expect_err("outside paths must produce a diagnostic");
     assert!(error.to_string().contains("outside.rs"));
     assert!(error.to_string().contains("repository-relative"));
@@ -624,7 +624,7 @@ fn assert_sleep_report(report: &FindingsReport, line: usize) {
         ("lib.rs".into(), line)
     );
     assert!(report.findings[0].message.ends_with(
-        "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead"
+        "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use event-driven synchronization or `yield_now` instead"
     ));
 }
 
@@ -682,7 +682,7 @@ fn tokio_sleep_report_matches_frozen_json_contract() {
 #[test]
 fn tokio_package_import_forms_rejected() {
     let dependency = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
-    let message_suffix = "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead";
+    let message_suffix = "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use event-driven synchronization or `yield_now` instead";
     let cases: [(&str, &[usize]); 5] = [
         (
             "use std::{thread as t};\npub fn blocks(d: std::time::Duration) {\n    t::sleep(d);\n}\n",
@@ -941,8 +941,11 @@ fn single_segment_test_path_other_than_test_attribute_is_checked() {
 }
 
 #[test]
-fn tokio_time_sleep_allowed() {
-    assert!(sleep_ids("fn f() { tokio::time::sleep(()); }", TOKIO_DEP).is_empty());
+fn tokio_time_sleep_rejected_by_runtime005() {
+    assert_eq!(
+        sleep_ids("fn f() { tokio::time::sleep(()); }", TOKIO_DEP),
+        vec![RuleId::ScbRuntime005]
+    );
 }
 
 #[test]
@@ -1236,10 +1239,19 @@ fn exclude_and_fail_rules_apply_to_runtime_findings() {
 fn catalog_lists_every_rule_id() {
     use RuleId::*;
 
-    let every = [ScbRuntime001, ScbRuntime002, ScbRuntime003];
+    let every = [
+        ScbRuntime001,
+        ScbRuntime002,
+        ScbRuntime003,
+        ScbRuntime004,
+        ScbRuntime005,
+        ScbRuntime006,
+        ScbRuntime007,
+    ];
     for id in every {
         match id {
-            ScbRuntime001 | ScbRuntime002 | ScbRuntime003 => {}
+            ScbRuntime001 | ScbRuntime002 | ScbRuntime003 | ScbRuntime004 | ScbRuntime005
+            | ScbRuntime006 | ScbRuntime007 => {}
         }
     }
     assert_eq!(
@@ -1270,3 +1282,5 @@ fn explicit_config_path_is_read() {
 
     assert!(rule_ids(&report).is_empty());
 }
+
+mod practices_tests;

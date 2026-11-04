@@ -1,7 +1,13 @@
 # `sc-lint-directives`
 
-`sc-lint-directives` provides the shared parsing and data types for
-`#[sc_lint(...)]` source directives.
+`sc-lint-directives` is an internal building block of the
+[`sc-lint` product](https://crates.io/crates/sc-lint). It provides the shared
+parsing and data types for `#[sc_lint(...)]` source directives; it is not a
+standalone lint command. See the
+[sc-lint repository](https://github.com/randlee/sc-lint).
+
+Current crate release: **0.8.5**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-directives/0.8.5).
 
 ## Purpose
 
@@ -28,7 +34,7 @@ This crate owns the directive parsing surface that both sibling crates consume:
 It is consumed by both the proc-macro crate and analyzer backends:
 
 ```toml
-sc-lint-directives = { version = "0.1.0", path = "../sc-lint-directives" }
+sc-lint-directives = "0.8"
 ```
 
 Example consumer path:
@@ -39,6 +45,7 @@ use sc_lint_directives::Directive;
 
 ## Further Reading
 
-- [Boundary enforcement model](../../docs/sc-lint/boundary-enforcement-model.md)
-- [Crate architecture](../../docs/sc-lint/crate-architecture.md)
-- [`sc-lint-attributes`](../sc-lint-attributes/README.md)
+- [Boundary enforcement model](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint-boundary/boundary-enforcement-model.md)
+- [Crate architecture](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/crate-architecture.md)
+- [`sc-lint-attributes`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-attributes/README.md)
+- [MIT license](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-directives/LICENSE)

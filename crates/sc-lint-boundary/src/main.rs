@@ -1,3 +1,4 @@
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -27,19 +28,31 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Analyze Rust dependencies and manifest policy in a workspace.
     Analyze {
+        /// Workspace root to inspect.
         #[arg(long, default_value = ".")]
         root: PathBuf,
+        /// Findings output format.
         #[arg(long, default_value = "text")]
         format: FormatArg,
-        #[arg(long = "rule-filter", alias = "rule")]
+        /// Comma-separated rule IDs or supported rule families; overrides configured excludes.
+        #[arg(
+            long = "rule-filter",
+            alias = "rule",
+            value_name = "RULE-ID|FAMILY[,..]"
+        )]
         rule_filter: Option<String>,
+        /// Analyzer configuration file; defaults to discovery from the workspace root.
         #[arg(long)]
         config: Option<PathBuf>,
     },
+    /// Export the workspace dependency graph.
     ExportGraph {
+        /// Workspace root to inspect.
         #[arg(long, default_value = ".")]
         root: PathBuf,
+        /// Graph serialization format.
         #[arg(long, default_value = "json")]
         format: GraphFormatArg,
     },
@@ -47,13 +60,17 @@ enum Command {
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum FormatArg {
+    /// Human-readable findings.
     Text,
+    /// JSON findings report.
     Json,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum GraphFormatArg {
+    /// Export the graph as JSON.
     Json,
+    /// Export the graph as Turtle.
     Turtle,
 }
 
@@ -82,7 +99,9 @@ fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
 fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
     match error {
         AnalyzerConfigError::Selector { analyzer, selector } => {
-            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+            format!(
+                "{analyzer}: unknown --rule-filter selector `{selector}`; valid selectors include rule IDs and families: cycles, boundaries, internal-only, forbid-external-impls, dependencies, manifests"
+            )
         }
         _ => error.to_string(),
     }
@@ -117,10 +136,10 @@ fn main() -> Result<ExitCode> {
             };
             match OutputFormat::from(format) {
                 OutputFormat::Text => {
-                    println!("{}", render_findings_report(&report));
+                    write_stdout(&render_findings_report(&report))?;
                 }
                 OutputFormat::Json => {
-                    println!("{}", serde_json::to_string_pretty(&report)?);
+                    write_stdout(&serde_json::to_string_pretty(&report)?)?;
                 }
             }
         }
@@ -128,10 +147,10 @@ fn main() -> Result<ExitCode> {
             let graph = export_workspace_graph(&ExportGraphOptions { root })?;
             match GraphOutputFormat::from(format) {
                 GraphOutputFormat::Json => {
-                    println!("{}", render_graph_export_json(&graph));
+                    write_stdout(&render_graph_export_json(&graph))?;
                 }
                 GraphOutputFormat::Turtle => {
-                    println!("{}", render_graph_export_turtle(&graph));
+                    write_stdout(&render_graph_export_turtle(&graph))?;
                 }
             }
         }
@@ -140,9 +159,28 @@ fn main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn write_stdout(value: &str) -> io::Result<()> {
+    let mut stdout = io::stdout().lock();
+    if let Err(error) = writeln!(stdout, "{value}")
+        && error.kind() != io::ErrorKind::BrokenPipe
+    {
+        return Err(error);
+    }
+    if let Err(error) = stdout.flush()
+        && error.kind() != io::ErrorKind::BrokenPipe
+    {
+        return Err(error);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
 
     #[test]
     fn analyze_cli_parses_rule_alias_rule_filter_and_config() {
@@ -203,12 +241,37 @@ mod tests {
             }),
             3
         );
+        let message = analyzer_config_message(&AnalyzerConfigError::Selector {
+            analyzer: "boundary",
+            selector: "SCB-NOPE-001".to_owned(),
+        });
+        assert!(message.contains("SCB-NOPE-001"));
+        assert!(message.contains("valid selectors"));
+    }
+
+    #[test]
+    fn cli_reference_matches_real_clap_definition() {
+        use clap::CommandFactory;
+        let model = docli::from_clap(&Cli::command());
+        if let Ok(path) = std::env::var("SC_DOCLI_MODEL_OUT") {
+            std::fs::write(
+                path,
+                serde_json::to_vec_pretty(&model).expect("serialize cli model"),
+            )
+            .expect("write cli model");
+            return;
+        }
         assert_eq!(
-            analyzer_config_message(&AnalyzerConfigError::Selector {
-                analyzer: "boundary",
-                selector: "SCB-NOPE-001".to_owned(),
-            }),
-            "boundary: unknown --rule-filter selector `SCB-NOPE-001`"
+            normalize_line_endings(&docli::render::markdown::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-boundary.md"
+            ))
+        );
+        assert_eq!(
+            normalize_line_endings(&docli::render::html::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint-boundary/index.html"
+            ))
         );
     }
 }

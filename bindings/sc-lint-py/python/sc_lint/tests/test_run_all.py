@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 import sys
@@ -31,3 +31,9 @@ class RunAllTests(unittest.TestCase):
         with redirect_stderr(stderr):
             self.assertEqual(run_all.main(["run_all", failing]), 1)
         self.assertIn("named cargo test failure", stderr.getvalue())
+
+    def test_help_prints_usage_and_runs_nothing(self) -> None:
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            self.assertEqual(run_all.main(["run_all", "--help"]), 0)
+        self.assertIn("usage: python -m sc_lint.run_all COMMAND", stdout.getvalue())

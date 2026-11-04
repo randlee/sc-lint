@@ -8,6 +8,21 @@ config_home_env = "SC_LINT_CONFIG_HOME"
 [version_sync.python]
 cargo_lock = true
 
+# QA round-2 finding 7 (lint-085.50): release-version literals in the README, crate
+# manifests and docs-bundle must track the workspace version. Each pattern
+# captures the version in group `version`; a stale literal is `release_docs.version`.
+[version_sync.release_docs]
+enabled = true
+files = ["README.md", "crates/*/README.md", "crates/*/Cargo.toml", "docs-bundle/**/*.md"]
+patterns = [
+  'docs\.rs/[A-Za-z0-9_-]+/(?P<version>\d+\.\d+\.\d+)',
+  'Current (?:crate )?release: \*\*(?P<version>\d+\.\d+\.\d+)\*\*',
+  'sc-lint_(?P<version>\d+\.\d+\.\d+)_',
+  '^\s*version: (?P<version>\d+\.\d+\.\d+)\s*$',
+  'sc-lint-[a-z-]+ = "(?P<version>\d+\.\d+\.\d+)"',
+  '^Version (?P<version>\d+\.\d+\.\d+)\s*$',
+]
+
 [cargo_shear.allowed_empty_files]
 
 [cargo_shear.allowed_unlinked_files]

@@ -1,206 +1,137 @@
 # sc-lint
 
-Rust lint tooling for repository policy enforcement, AST-sensitive boundary
-analysis, and portability checks.
+`sc-lint` checks Rust repositories for boundary, portability, runtime, and
+repository-policy problems. The Rust CLI is the product command surface; the
+separately published Python distribution provides bindings and repository
+helper modules.
 
-## Workspace
+Current release: **0.8.5**.
 
-This repository currently ships these primary crates:
+## Install
 
-- `sc-lint`
-  - top-level CLI crate and canonical machine-contract surface
-- `sc-lint-directives`
-  - shared parsing/types for `#[sc_lint(...)]` directives
-- `sc-lint-attributes`
-  - proc-macro crate that provides the `#[sc_lint(...)]` attribute namespace
-- `sc-lint-schema`
-  - shared findings/report schema used across analyzer crates
-- `sc-lint-boundary`
-  - CLI and library for `syn`-based analysis, findings output, and graph export
-- `sc-lint-portability`
-  - portability analyzer crate
-- `sc-lint-runtime`
-  - runtime/concurrency analyzer crate
-
-The workspace version is managed from the root `Cargo.toml` via `version.workspace = true` in each crate.
-
-The current end-user operator manual is [`docs-bundle/README.md`](docs-bundle/README.md)
-and ships with the release for offline use. It is the canonical guide for
-configuration, consumer profiles, setup, CI, and recovery.
-
-## Homebrew
-
-The primary supported Homebrew install path is:
+Install the CLI and its analyzer binaries with Homebrew:
 
 ```bash
 brew install randlee/tap/sc-lint
 ```
 
-That formula is intended to install the released end-user toolset together:
+Release archives are available from
+[GitHub Releases](https://github.com/randlee/sc-lint/releases). The `sc-lint`
+crate page is [on crates.io](https://crates.io/crates/sc-lint); crate API docs
+are on [docs.rs](https://docs.rs/sc-lint/0.8.5).
 
-- `sc-lint`
-- `sc-lint-boundary`
-- `sc-lint-portability`
-- `sc-lint-runtime`
-
-The older `randlee/tap/sc-lint-boundary` formula may remain as a legacy
-compatibility surface, but it is not the normal user install path.
-
-## Current Lint Surface
-
-The repo exposes its lint surface through `just lint`.
-
-Default CI-gated checks:
-
-- `fmt`
-  - `cargo fmt --all --check`
-- `clippy`
-  - `cargo clippy --workspace --all-targets -- -D warnings`
-- `deny`
-  - `cargo-deny` advisories, bans, licenses, and sources checks
-- `shear`
-  - `cargo-shear` unused-dependency and empty/unlinked file policy checks
-- `version`
-  - workspace version alignment and internal path dependency version pinning
-  - optional release wiring and packaging checks when configured
-- `manifests`
-  - Cargo manifest policy:
-    - required `[workspace.package]` inheritance fields
-    - internal path dependency version consistency
-- `spell`
-  - codespell content checks
-- `pytests`
-  - Python unit tests for the repo-local lint runner infrastructure
-
-Available but intentionally manual/advisory:
-
-- `modules`
-  - `cargo modules dependencies --acyclic`
-  - internal module dependency cycle detection per workspace crate
-- `sc-boundary`
-  - `sc-lint lint sc-boundary`
-  - preliminary `syn`-based architectural linting and boundary analysis
-- `sc-portability`
-  - `sc-lint lint sc-portability`
-  - preliminary portability analysis
-- `sc-runtime`
-  - `sc-lint lint sc-runtime`
-  - std runtime/concurrency analysis
-
-Fast local subset:
-
-- `just lint fast`
-  - `fmt`
-  - `version`
-  - `manifests`
-  - `spell`
-  - `pytests`
-
-## sc-lint-boundary
-
-`sc-lint-boundary` is the main shipped analyzer today.
-
-Current implemented rule families:
-
-- `SCB-CYCLE-001`
-  - multi-owner architectural cycles
-- `SCB-CYCLE-002`
-  - type/method self-loop classification
-- `SCB-CYCLE-003`
-  - trait-impl self-loop classification
-- `SCB-BOUNDARY-001`
-  - `boundary.internal_only` visibility violation
-- `SCB-BOUNDARY-002`
-  - `boundary.internal_only` external reference violation
-- `SCB-BOUNDARY-003`
-  - `boundary.forbid_external_impls` violation
-
-## sc-lint-portability
-
-`sc-lint-portability` owns the shipped portability rule family.
-
-Current implemented rule families:
-
-- `PORT-001`
-  - hardcoded Unix-only absolute paths in test code
-- `PORT-002`
-  - `dirs::home_dir()` without configured override handling
-- `PORT-003`
-  - `std::env::set_var()` in test code
-- `PORT-004`
-  - ungated `std::os::unix` imports in production code
-- `PORT-005`
-  - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
-
-Supported outputs:
-
-- findings:
-  - text
-  - JSON
-- graph export:
-  - JSON
-  - Turtle
-
-Example commands:
+The Python package is installed separately:
 
 ```bash
-just lint
-just lint fast
-just lint sc-boundary
-just lint sc-portability
+python -m pip install sc-lint
+```
+
+It does not install the Rust CLI binaries. Install the CLI from Homebrew or a
+release archive before using Python helpers that locate or invoke `sc-lint`.
+See the [Python bindings guide](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md).
+
+Other supported distribution and integration channels are
+[Scoop](https://github.com/randlee/scoop-bucket),
+[WinGet](https://github.com/randlee/sc-lint/blob/main/docs/WINGET_SETUP.md),
+the [GitHub Action](https://github.com/randlee/sc-lint/blob/main/action.yml),
+and the Rust crates on [crates.io](https://crates.io/crates/sc-lint). The
+Python package supplies bindings and helpers; it is not the CLI installer.
+
+## Run checks
+
+With a configured `sc-lint.toml`, run the consumer CI lint profile for a
+consumer repository with:
+
+```bash
+sc-lint lint ci --consumer
+```
+
+Bare `sc-lint lint ci` runs sc-lint's own maintainer profile.
+
+Run an individual analyzer with:
+
+```bash
+sc-lint lint sc-boundary
+sc-lint lint sc-portability
+sc-lint lint sc-runtime
+```
+
+Use `sc-lint --json lint ci --consumer` for machine-readable output. The offline manual
+is available with `sc-lint docs`; start with its `installation`,
+`configuration`, `using-sc-lint`, and package guides.
+
+The analyzers can also be run directly when working on their Rust crates:
+
+```bash
 cargo run -p sc-lint-boundary -- analyze --root . --format text
 cargo run -p sc-lint-portability -- analyze --root . --format text
 cargo run -p sc-lint-runtime -- analyze --root . --format text
-cargo run -p sc-lint-boundary -- export-graph --root . --format turtle
 ```
 
-## Config
+## Analyzer rules
 
-The repo-local lint runner currently uses:
+The rule inventories below match the 0.8.5 analyzer crates. Full descriptions,
+configuration, and examples are in each linked crate guide.
 
-- `.just/lint-config.toml`
+### Boundary
 
-Current live config knobs include:
+[`sc-lint-boundary`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-boundary/README.md)
+checks graph cycles, source boundaries, dependency policy, features, and
+manifests. Its rules are:
 
-- portability override env configuration
-- `cargo-shear` downgrade tables for allowed empty/unlinked files
+- `SCB-CYCLE-001`–`SCB-CYCLE-003`
+- `SCB-BOUNDARY-001`–`SCB-BOUNDARY-004`
+- `SCB-CALLER-001`
+- `SCB-DEPENDENCY-001`–`SCB-DEPENDENCY-004`
+- `SCB-FEATURE-001`
+- `SCB-MANIFEST-001`–`SCB-MANIFEST-006`
 
-Startup prompt injection for `team-lead` is configured in:
+### Portability
 
-- `.atm.toml`
+[`sc-lint-portability`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-portability/README.md)
+checks cross-platform paths, environment access, Unix shell assumptions, and
+`cfg` parity:
 
-## Development
+- `PORT-001`–`PORT-010`
 
-For a repository change, the complete agent/developer contract is exactly:
+### Runtime
+
+[`sc-lint-runtime`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-runtime/README.md)
+checks blocking waits, sleep calls, `block_on`, and mutex guards held across
+`.await`:
+
+- `SCB-RUNTIME-001`–`SCB-RUNTIME-007`
+
+## Packages
+
+The workspace version is **0.8.5**. The `sc-lint` CLI composes the analyzer
+crates; the support crates are reusable building blocks.
+
+| Package | Role |
+|---|---|
+| [`sc-lint`](https://crates.io/crates/sc-lint) | CLI and product command surface |
+| [`sc-lint-boundary`](https://crates.io/crates/sc-lint-boundary) | Boundary analyzer |
+| [`sc-lint-portability`](https://crates.io/crates/sc-lint-portability) | Portability analyzer |
+| [`sc-lint-runtime`](https://crates.io/crates/sc-lint-runtime) | Runtime analyzer |
+| [`sc-lint-analyzer-support`](https://crates.io/crates/sc-lint-analyzer-support) | Shared analyzer implementation support |
+| [`sc-lint-attributes`](https://crates.io/crates/sc-lint-attributes) | `#[sc_lint(...)]` procedural attribute |
+| [`sc-lint-directives`](https://crates.io/crates/sc-lint-directives) | Shared directive parser and types |
+| [`sc-lint-schema`](https://crates.io/crates/sc-lint-schema) | Analyzer report and finding types |
+| [`sc-lint` on PyPI](https://pypi.org/project/sc-lint/) | Python bindings and repository helpers |
+
+## Project links
+
+- [Offline manual source](https://github.com/randlee/sc-lint/tree/main/docs-bundle)
+- [Architecture and requirements](https://github.com/randlee/sc-lint/tree/main/docs/sc-lint)
+- [Issue tracker](https://github.com/randlee/sc-lint/issues)
+- [Changelog](https://github.com/randlee/sc-lint/blob/main/CHANGELOG.md)
+- [MIT license](https://github.com/randlee/sc-lint/blob/main/LICENSE)
+
+## Contributing
+
+From a source checkout, run the complete repository gates:
 
 ```bash
 just lint
 just test
 ```
-
-`just lint` and `just test` are complete aggregate gates. `just setup` checks
-the root model's product compatibility before a manual setup/repair flow.
-GitHub Actions invokes these same commands on Linux, macOS, and Windows.
-
-## Docs
-
-The installed operator manual is available offline through `sc-lint docs` and
-is sourced from [`docs-bundle/`](docs-bundle/README.md). The canonical consumer
-setup is [`docs-bundle/just-setup.md`](docs-bundle/just-setup.md).
-
-For the managed repository adoption kit and its agent-run workflow, see
-[`docs/sc-lint/adoption.md`](docs/sc-lint/adoption.md).
-
-Detailed design and planning material lives under:
-
-- [`docs/sc-lint/README.md`](docs/sc-lint/README.md)
-- [`crates/sc-lint-boundary/README.md`](crates/sc-lint-boundary/README.md)
-- [`crates/sc-lint-portability/README.md`](crates/sc-lint-portability/README.md)
-- [`crates/sc-lint-runtime/README.md`](crates/sc-lint-runtime/README.md)
-- [`crates/sc-lint-schema/README.md`](crates/sc-lint-schema/README.md)
-- [`crates/sc-lint-directives/README.md`](crates/sc-lint-directives/README.md)
-- [`crates/sc-lint-attributes/README.md`](crates/sc-lint-attributes/README.md)
-- [`docs/sc-lint-boundary/requirements.md`](docs/sc-lint-boundary/requirements.md)
-- [`docs/sc-lint-boundary/graph-schema.md`](docs/sc-lint-boundary/graph-schema.md)
-- [`docs/sc-lint-boundary/boundary-enforcement-model.md`](docs/sc-lint-boundary/boundary-enforcement-model.md)
-- [`docs/sc-lint-boundary/boundary-toml-migration.md`](docs/sc-lint-boundary/boundary-toml-migration.md)

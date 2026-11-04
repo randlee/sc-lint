@@ -85,13 +85,14 @@ pub(crate) fn render_success_human(
             let step_count = data_len(data, consts::FIELD_STEPS);
             format!("{}: {status} ({step_count} steps)", context.command_id())
         }
+        CommandId::Init => render_init_summary(data),
         CommandId::Setup | CommandId::Upgrade => data_str(data, "summary").map_or_else(
             || format!("{}: ok", context.command_id()),
             ToString::to_string,
         ),
         CommandId::Docs => match (data_str(data, "path"), data_str(data, "content")) {
-            (Some(path), Some(content)) => format!("Documentation root: {path}\n\n{content}"),
-            (Some(path), None) => format!("Documentation root: {path}"),
+            (Some(path), Some(content)) => format!("{path}\n\n{content}"),
+            (Some(path), None) => path.to_string(),
             (None, Some(content)) => content.to_string(),
             (None, None) => format!("{}: ok", context.command_id()),
         },
@@ -104,6 +105,45 @@ pub(crate) fn render_success_human(
         ),
         _ => format!("{}: ok", context.command_id()),
     }
+}
+
+fn render_init_summary(data: Option<&Value>) -> String {
+    let Some(data) = data else {
+        return "init: ok".to_string();
+    };
+    let status = data
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("current");
+    let mut lines = vec![format!("init: {status}")];
+    let created_label = if matches!(status, "would_create" | "would_update") {
+        "Would create"
+    } else {
+        "Created"
+    };
+    let refreshed_label = if status == "would_update" {
+        "Would refresh"
+    } else {
+        "Refreshed"
+    };
+    for (key, label) in [
+        ("created_files", created_label),
+        ("refreshed_files", refreshed_label),
+        ("preserved_files", "Preserved"),
+        ("version_only_stale_files", "Version-only stale"),
+    ] {
+        let files = data
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>();
+        if !files.is_empty() {
+            lines.push(format!("{label}: {}", files.join(", ")));
+        }
+    }
+    lines.join("\n")
 }
 
 /// The string at `key` of a success envelope's `data`.
@@ -141,7 +181,20 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
         }
     }
     render_step_failures(&mut rendered, error);
-    if let Some(cause) = error.cause.as_deref() {
+    let cause_duplicates_output = error.cause.as_deref().is_some_and(|cause| {
+        let stdout = error
+            .details
+            .get("stdout")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let stderr = error
+            .details
+            .get("stderr")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        cause == format!("stdout:\n{stdout}\nstderr:\n{stderr}")
+    });
+    if let Some(cause) = error.cause.as_deref().filter(|_| !cause_duplicates_output) {
         rendered.push('\n');
         rendered.push_str("Cause: ");
         rendered.push_str(cause);

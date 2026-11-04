@@ -1,7 +1,16 @@
-# `sc-portability` User Guide
+# `sc-lint-portability`
 
-`sc-portability` is the shipped portability-analysis tool for cross-platform
-Rust source checks.
+`sc-lint-portability` is the Rust analyzer used by the
+[`sc-lint` product](https://crates.io/crates/sc-lint) for cross-platform Rust
+source checks. The `sc-portability` name is the analyzer target accepted by
+`sc-lint lint`.
+
+Current crate release: **0.8.5**. Install the product CLI with
+`brew install randlee/tap/sc-lint` or from
+[GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
+crate as a Rust library, run `cargo add sc-lint-portability@0.8`. See the
+[repository](https://github.com/randlee/sc-lint) and
+[API documentation](https://docs.rs/sc-lint-portability/0.8.5).
 
 ## Purpose
 
@@ -36,7 +45,7 @@ Use `sc-portability` to catch portability drift such as:
 
 ## Ownership And Scope
 
-Per [ADR-010](../../docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md),
+Per [ADR-010](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md),
 `sc-lint-portability` is the shared product owner for consumer-neutral:
 
 - Windows-path parity companion rules for the current Unix-only path checks
@@ -58,10 +67,10 @@ sc-lint lint sc-portability
 sc-lint --json lint sc-portability
 ```
 
-Repo-local convenience path:
+Repository lint gate:
 
 ```bash
-just lint sc-portability
+just lint
 ```
 
 Backend-local path:
@@ -82,12 +91,11 @@ use std::os::unix::fs::PermissionsExt;
 pub fn configure() {}
 ```
 
-Representative text result:
+Representative text result from the 0.8.5 binary on a one-crate workspace
+with no findings:
 
 ```text
-sc-lint-portability: PASS
-scanned crates: 1
-findings: 0
+sc-lint-portability 0.8.5 status=pass scanned_crates=1 findings=0
 ```
 
 ## Representative Fail
@@ -100,47 +108,27 @@ use std::os::unix::fs::PermissionsExt;
 pub fn configure() {}
 ```
 
-Representative finding:
+The text summary from the 0.8.5 binary for an ungated Unix import is:
 
 ```text
-PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary
+sc-lint-portability 0.8.5 status=fail scanned_crates=1 findings=1
 ```
 
-Production code with a hardcoded Unix-only runtime path is also flagged:
+Finding details are in JSON. The `message` from this example is:
 
 ```text
-PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction
+/private/tmp/sc-lint-docs-085-A-sample/src/lib.rs:1: PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary
 ```
 
-Production code with a hardcoded Windows runtime path is also flagged:
+The backend `sc-lint-portability analyze` returns exit code `0` after a
+completed analysis even when the report status is `fail`. The top-level
+`sc-lint lint sc-portability` command returns exit code `10` for a configured
+lint failure.
 
-```text
-PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\?\` verbatim or `\\.\` device namespace prefixes)
-```
-
-Production code with Unix-centric environment lookups is also flagged:
-
-```text
-PORT-008 direct std::env lookup of `HOME` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper
-```
-
-Production code with Unix-shell assumptions is also flagged:
-
-```text
-PORT-009 Unix shell invocation `Command::new("sh" | "bash")` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary
-```
-
-Production code with a Unix-only branch and no companion is also flagged:
-
-```text
-PORT-010 production #[cfg(unix)] item `runtime_socket_name` has no #[cfg(windows)] companion or explicit portable fallback in the same scope
-```
-
-Test-only path literals are also flagged:
-
-```text
-PORT-001 hardcoded Unix-only absolute path `/tmp/example` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source
-```
+The other rules in the inventory above cover production Unix and Windows path
+literals, home-directory environment lookups, Unix-shell assumptions, Unix
+items without a Windows companion, and Unix-only paths in test code. Finding
+messages are included in the JSON report with the source path and line.
 
 ## Configuration
 
@@ -148,6 +136,11 @@ PORT-001 hardcoded Unix-only absolute path `/tmp/example` in test code; prefer s
 `<root>/sc-lint.toml` by default. If that file is absent, the analyzer uses its
 built-in defaults. Pass `--config PATH` to read a different TOML file; an
 explicit path must exist and be readable.
+
+`sc-lint-portability analyze` exits `0` when analysis completes, including
+when its report status is `fail`; inspect `status` and `findings` in the
+report. The top-level `sc-lint lint sc-portability` command applies the
+configured lint policy. Invalid arguments or configuration return an error.
 
 The analyzer table accepts common settings and portability-specific settings:
 
@@ -237,5 +230,5 @@ Delegated/backend normalization records also appear:
 
 See:
 
-- [logging.md](../../docs/sc-lint/logging.md)
-- [cli-contract.md](../../docs/sc-lint/cli-contract.md)
+- [logging.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/logging.md)
+- [cli-contract.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/cli-contract.md)

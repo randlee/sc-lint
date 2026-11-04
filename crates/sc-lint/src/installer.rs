@@ -303,23 +303,29 @@ fn find_existing_installation(
 }
 
 fn managed_install_dir() -> Result<PathBuf, CliError> {
-    if let Some(path) = env::var_os(INSTALL_DIR_ENV) {
-        return Ok(PathBuf::from(path));
-    }
     // The platform strategy resolves XDG data directories on Unix and
     // LocalAppData on Windows without coupling this product boundary to
     // platform-specific environment keys.
-    if let Ok(strategy) = choose_base_strategy() {
-        return Ok(strategy.data_dir().join("sc-lint").join("bin"));
-    }
-    etcetera::home_dir()
+    let data_dir = choose_base_strategy()
         .ok()
-        .map(|home| {
-            home.join(".local")
-                .join("share")
-                .join("sc-lint")
-                .join("bin")
-        })
+        .map(|strategy| strategy.data_dir())
+        .or_else(|| {
+            etcetera::home_dir()
+                .ok()
+                .map(|home| home.join(".local").join("share"))
+        });
+    managed_install_dir_from(env::var_os(INSTALL_DIR_ENV).map(PathBuf::from), data_dir)
+}
+
+fn managed_install_dir_from(
+    override_dir: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
+) -> Result<PathBuf, CliError> {
+    if let Some(path) = override_dir {
+        return Ok(path);
+    }
+    data_dir
+        .map(|path| path.join("sc-lint").join("bin"))
         .ok_or_else(|| {
             install_error(
                 InstallerErrorCode::PermissionDenied,
@@ -970,6 +976,24 @@ mod tests {
     /// after the test kills them. It does not bound the probe under test.
     #[cfg(unix)]
     const PROBE_HOLDER_EXIT_CEILING: Duration = Duration::from_secs(30);
+
+    #[test]
+    fn managed_install_dir_defaults_to_the_platform_data_directory() {
+        // Issue #833: the bootstrap default must match this rule. Both inputs
+        // are controlled; no process environment is read or mutated.
+        let controlled = env::temp_dir().join("sc-lint-controlled-data");
+        assert_eq!(
+            managed_install_dir_from(None, Some(controlled.clone()))
+                .expect("managed install directory"),
+            controlled.join("sc-lint").join("bin")
+        );
+        let override_dir = env::temp_dir().join("sc-lint-controlled-override");
+        assert_eq!(
+            managed_install_dir_from(Some(override_dir.clone()), Some(controlled))
+                .expect("override install directory"),
+            override_dir
+        );
+    }
 
     #[test]
     fn release_target_matches_the_published_release_matrix() {

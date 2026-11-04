@@ -40,9 +40,8 @@ use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-use sc_lint_analyzer_support::relative_slash_path;
+use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
 use sc_lint_schema::AllowedFinding;
 
@@ -52,22 +51,13 @@ mod parity;
 use self::findings::PortabilityFinding;
 use self::findings::convert_findings;
 
+type FileAnalysis = (
+    Vec<PortabilityFinding>,
+    Vec<crate::site_allow::SiteAllowance>,
+);
+
 type AnalyzedFinding = (Finding, Option<RepoRelativePath>);
 type PortabilityAnalysis = (Vec<AnalyzedFinding>, Vec<AllowedFinding<RuleId>>);
-
-pub(super) fn repo_relative_source_path(
-    root: &Path,
-    source_path: &Path,
-) -> Result<RepoRelativePath> {
-    let relative = relative_slash_path(root, source_path);
-    RepoRelativePath::parse(&relative).with_context(|| {
-        format!(
-            "failed to build repository-relative source path for `{}` under `{}`",
-            source_path.display(),
-            root.display()
-        )
-    })
-}
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {
@@ -214,9 +204,8 @@ pub(crate) fn analyze_portability(
             ));
             Ok((findings, allowances))
         })
-        .collect::<Vec<Result<_>>>()
-        .into_iter()
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Vec<Result<_>>>();
+    let file_findings = combine_file_analyses(file_findings)?;
     let mut findings = Vec::new();
     let mut allowances = Vec::new();
     for (file_findings, file_allowances) in file_findings {
@@ -239,8 +228,25 @@ pub(crate) fn analyze_portability(
     Ok((convert_findings(root, findings)?, allowed))
 }
 
-pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
-    count_crates(workspace)
+fn combine_file_analyses(results: Vec<Result<FileAnalysis>>) -> Result<Vec<FileAnalysis>> {
+    let mut analyses = Vec::new();
+    let mut diagnostics = Vec::new();
+    for result in results {
+        match result {
+            Ok(analysis) => analyses.push(analysis),
+            Err(error) => match error.downcast::<crate::SiteAllowErrors>() {
+                Ok(errors) => diagnostics.extend(errors.diagnostics),
+                Err(error) => return Err(error),
+            },
+        }
+    }
+    if diagnostics.is_empty() {
+        return Ok(analyses);
+    }
+    // Indexed parallel collection preserves within-file order; stable sorting
+    // orders files while retaining the original order of ids on the same line.
+    diagnostics.sort_by(|left, right| left.path.cmp(&right.path).then(left.line.cmp(&right.line)));
+    Err(anyhow::Error::new(crate::SiteAllowErrors { diagnostics }))
 }
 
 struct PortabilityCollector<'a> {

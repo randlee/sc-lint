@@ -4,6 +4,261 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.5]
+
+This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
+#844.
+
+### Added
+
+- Runtime rules reject thread `sleep_until` in production Tokio packages,
+  Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
+  held across `.await` (`SCB-RUNTIME-004`–`007`, #640, #838). Test code is exempt;
+  function/method allows require a non-empty reason. `yield_now` stays legal.
+- `SCB-RUNTIME-003` supports reason-required function/method allowances through
+  the shared directive path. Intentional synchronous helpers can use
+  `#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "...")]`
+  without suppressing sibling or nested functions (#836).
+- Generated command-line references for `sc-lint`, `sc-lint-boundary`,
+  `sc-lint-portability` and `sc-lint-runtime`, in Markdown and HTML, ship in
+  the offline bundle; `sc-lint docs cli-reference` prints the index. Tests
+  regenerate them from the real clap definitions and fail on drift.
+- Every `sc-lint` command, option and target value has help text, and
+  `-V` is a short form of `--version`. The `sc-lint ci` help says that
+  in a source checkout it runs the source-maintainer profile, and that
+  `sc-lint lint ci --consumer` selects the consumer CI profile.
+- `sc-lint docs` accepts `README`, `README.md` and `overview` for the
+  overview and `setup` as an alias of `installation`, so the
+  `Docs: sc-lint docs setup` pointer in setup and compatibility errors
+  resolves.
+- The GitHub Action writes each failure as a `::error` annotation titled with
+  its stable code, with the recovery text in the message.
+- `python -m sc_lint.run_all`, `run_fmt` and `source_venv` answer `--help`;
+  `print_help` lists only recipes that exist in the `Justfile`. The adoption
+  installer's `--help` describes `--input`, `--dry-run`, the persisted input
+  and its exit codes.
+- Every crate on crates.io ships its `LICENSE` and a README that points to
+  the primary `sc-lint` crate and the repository; each crate has
+  crate-level rustdoc.
+- The version-sync check has an opt-in `[version_sync.release_docs]` table
+  (`enabled`, `files`, `patterns`) with findings `release_docs.version` and
+  `release_docs.files`. sc-lint enables it for its own repository, so a stale
+  version literal in the README, crate manifests or the offline docs bundle
+  fails the check (lint-085.50).
+
+### Changed
+
+- The Python helpers and consumer bootstrap support Python 3.9 and newer
+  (`requires-python = ">=3.9"`, matching the abi3-py39 wheels, GitHub #778).
+  They parse TOML with the workspace `toml` crate through
+  `sc_lint._native.toml_loads` instead of `tomllib`. A source checkout that
+  has not built the native extension yet (before `just setup`) falls back to
+  `tomllib`, which needs Python 3.11 or newer; with neither available, parsing
+  raises `ImportError` with a recovery message. Windows ARM64 wheels still
+  require Python 3.11.
+- Runtime guard tracking handles diverging branches, match scrutinee ownership,
+  rest/or patterns and nested reference bindings more accurately (#840).
+- Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
+  opt-outs (#840).
+- Runtime test exemption: a source file whose inner attributes mark it
+  test-only (`#![cfg(test)]` or `#![cfg(all(test, ...))]`) is test code for
+  every runtime rule, `SCB-RUNTIME-001` through `007`, exactly like a file
+  under `tests/`. An out-of-line `#[cfg(test)] mod checks;` therefore needs
+  `#![cfg(test)]` at the top of `checks.rs`; the earlier documented
+  limitation that such files were linted as production code is removed
+  (#840).
+- Every runtime rule, `SCB-RUNTIME-001` through `007`, uses one test-scope
+  classifier from `sc-lint-analyzer-support`, which recognizes `#[test]`,
+  qualified test attributes such as `#[tokio::test]`, `#[cfg(test)]` and
+  compound test cfgs such as `#[cfg(all(test, ...))]` (#840, lint-085.46).
+- `SCB-RUNTIME-003` recovery text now recommends event-driven
+  synchronization or `yield_now` instead of `tokio::time::sleep(..).await`,
+  which `SCB-RUNTIME-005` now reports (#838).
+- Runtime import aliases, including `self::`, `super::` and `crate::`
+  imports, resolve per module and function scope for `SCB-RUNTIME-003`
+  through `007`. A `use ...::sleep` in one module no longer leaks into a
+  sibling module, so results no longer depend on item order, and statics
+  imported through `crate::`, `super::` (including sibling modules such as
+  `use super::a::M`), `self::` or a glob stay tracked for `SCB-RUNTIME-007`.
+  `SCB-RUNTIME-003` also resolves renamed `self` imports such as
+  `use std::thread::{self as thread}` (lint-085.39, lint-085.46,
+  lint-085.52).
+- The bootstrap usage lists each operation's own flags: `setup` accepts only
+  `--dry-run`, and `--check` belongs to `upgrade`. `setup --check` is now a
+  bootstrap usage error instead of being forwarded to `sc-lint setup`.
+- Bootstrap `lint`, `test` and `exec` resolve the command's first word with
+  `shutil.which` against PATH before running it. On Windows the child
+  process otherwise searches the parent Python's directory first and can run
+  a host interpreter instead of the managed venv tool (#841).
+- `sc-lint init` requires `--just`.
+- Files generated by `sc-lint init --just` start with
+  `# Generated by sc-lint; user edits are preserved by future init runs.`,
+  and the generated `sc-lint.toml` notes that its lint and test steps are
+  user-owned.
+- `sc-lint init --just` compares managed files after normalizing line
+  endings, so a generated file checked out with CRLF (for example by Git on
+  Windows) is recognised as current or version-only stale instead of a
+  user-owned conflict. Content edits still make a file user-owned. The
+  generated `sc-lint.toml` and `Justfile` assets are pinned to LF in
+  `.gitattributes` (lint-085.55).
+- A config whose `lint` profile has no steps now loads; `sc-lint lint ci
+  --consumer` then fails with a recovery that asks for a
+  `[[tool.sc-lint.lint]]` row, instead of the whole config being rejected.
+- Command-line usage errors show the usage of the subcommand that failed and
+  suggest `sc-lint <subcommand> --help`.
+- Compatibility errors give specific recovery: a missing config suggests
+  `sc-lint init --just`, a malformed config asks to correct the reported
+  error. A `--root` path that does not exist is reported as such, with a
+  recovery.
+- An unknown `--rule-filter` selector error lists the valid selectors for
+  that analyzer.
+- **Behaviour-breaking:** portability site-allowance errors are reported
+  together. An unsupported portability rule id (any `PORT-*` id other than
+  `PORT-010`) is reported as `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` instead of
+  `PORTABILITY.UNKNOWN_RULE`. Every site-allowance diagnostic across all
+  scanned files is reported in one failure, sorted by path and line, as
+  `<path>:<line>: <DIRECTIVE.SITE_ALLOW code and message>`; the
+  `PORTABILITY.INVALID_SITE_ALLOW` prefix is gone. The exit code stays 3.
+  Tooling that matches `PORTABILITY.UNKNOWN_RULE` or
+  `PORTABILITY.INVALID_SITE_ALLOW` must match the `DIRECTIVE.SITE_ALLOW.*`
+  codes instead (lint-085.52, lint-085.57).
+- Site-allowance attributes that are not valid Rust attribute syntax report
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`; `UNKNOWN_ELEMENT` now means only an
+  unsupported element. `EMPTY_REASON`, `MALFORMED_RULE_ID` and `UNKNOWN_RULE`
+  use one recovery text each (lint-085.52).
+- **Behaviour-breaking:** a Python helper that fails to start (no stdout,
+  error on stderr) is reported as a backend failure (exit 5) that carries the
+  stderr and suggests `just setup`. It was a backend protocol error (exit 6).
+  Scripts that test for exit 6 from `sc-lint view findings` or another
+  Python-backed command must also accept 5.
+- `sc-lint init --just` human output reports `init: <status>` (`current`,
+  `created`, `updated`, `would_create` or `would_update`) followed by
+  `Created:` (`Would create:` under `--dry-run`), `Refreshed:` (`Would
+  refresh:`), `Preserved:` and `Version-only stale:` file lists, instead of
+  `init: ok`. JSON adds one `refreshed_files` array: the files refreshed on
+  a real run, or the files that would be refreshed under `--dry-run`, told
+  apart by `status` and `dry_run`. `version_only_stale_files` lists only
+  preserved config files that differ in version; a refreshed file is not
+  listed there. Every init path list uses the platform's native separators,
+  including on Windows (lint-085.61, lint-085.63, lint-085.64).
+- `sc-lint docs --path` prints the bare path without the
+  `Documentation root:` prefix, so the output can be used directly in
+  scripts; with a guide name, the bare path precedes the guide text.
+- The GitHub Action runs on Node 24. Its description and `operation` input
+  state that `setup` only installs and preflights the release, and list the
+  six supported runners.
+- The adoption kit keeps its `skills/` and `agents/` at the plugin root, where
+  Claude Code's plugin loader finds them, and still installs them under
+  `.claude/` in consumers. The `sc-lint-version-adoption` skill ships in its
+  plugin.
+- The adoption kit writes `.sc-lint/install.json` in declaration order
+  instead of sorting keys, and rejects `null` helper-policy values instead of
+  rendering invalid TOML (#841).
+- The adoption kit writes TOML strings, keys and names as Unicode scalar
+  text and escapes DEL, so characters outside the Basic Multilingual Plane
+  render as valid TOML instead of invalid surrogate-pair escapes
+  (lint-085.39).
+- Published wheels exclude `**/*.pyc` (#841).
+- An `#[sc_lint(allow(...), reason = "...")]` runtime allowance on an item
+  that is not a function or method is reported as an error instead of being
+  silently ignored. A runtime allowance that names several unknown
+  `SCB-RUNTIME-*` ids reports every one, not only the first (lint-085.46).
+
+### Public Rust API
+
+- New in `sc-lint-analyzer-support`: `AnalyzeOptions` (moved from the
+  analyzer crates), `repo_relative_source_path`,
+  `RepoRelativeSourcePathError`, `relative_path_under_root` and
+  `is_test_only`. `sc-lint-portability` and `sc-lint-runtime` re-export
+  `AnalyzeOptions`, so `sc_lint_portability::AnalyzeOptions` and
+  `sc_lint_runtime::AnalyzeOptions` keep their paths and fields;
+  `sc-lint-boundary` keeps its own `AnalyzeOptions` with the `rule` filter.
+- New in `sc-lint-directives`: `is_sc_lint_attribute`, `unknown_owned_rules`,
+  `unknown_rule`, the `#[non_exhaustive]` `DirectiveCode` (including
+  `SyntaxError`), `DirectiveError::typed`, `DirectiveError::typed_code`,
+  `DirectiveError::from_diagnostic` (maps a foreign `syn` error to
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`), and `AttributeInput::parse_tokens` and
+  `AttributeInput::parse_attribute`. Existing `DirectiveError` parse variants
+  and constructors remain (lint-085.46, lint-085.52).
+- `sc-lint-portability`: `PortabilityError::UnknownRule` and
+  `PortabilityError::InvalidSiteAllow` are removed. Every site-allowance
+  failure, one or many, is `PortabilityError::InvalidSiteAllows(SiteAllowErrors)`.
+  New exported types: `SiteAllowDiagnostic { path, line, error }` and
+  `SiteAllowErrors { diagnostics }` (lint-085.52, lint-085.57).
+- `sc-lint-analyzer-support`: `PackageDependency.name` is the validated
+  `PackageName` instead of `String` (`PackageTarget.name` is already
+  `TargetName`). `PackageName` and `TargetName` keep `new`, `as_str`,
+  `AsRef<str>` and `Display` but no longer implement `Deref`; `new` panics on
+  empty input in release builds as well as debug builds, as documented
+  (lint-085.46). The unused public
+  `count_scanned_crates(root)` is removed;
+  `count_scanned_crates_with_metadata` remains (lint-085.39).
+- Rust library consumers that build `AnalyzeOptions` by struct literal or
+  import it from an analyzer crate need no change. Consumers that read
+  `PackageDependency.name` as `String`, rely on `Deref` from `PackageName` or
+  `TargetName`, call `count_scanned_crates`, or match
+  `PortabilityError::UnknownRule` or `PortabilityError::InvalidSiteAllow`
+  must update; use `as_str()` and match `InvalidSiteAllows`. CLI and Python users need no configuration migration.
+
+### Fixed
+
+- Analyzer output draining is deterministic: a lingering grandchild process
+  can no longer cause a lint step to miss output (#839, #843).
+- Consumer adoption defects found in sc-compose (#841, #844):
+  - Published Python wheels exclude repository-only contract, lifecycle,
+    orchestration and release tests; release verification rejects leaked
+    tests.
+  - The reusable GitHub Action selects Linux and Windows ARM64 releases as
+    well as the existing x86_64 and macOS targets.
+  - Docs state that Python helper policies retain per-table fallback to
+    `.just/lint-config.toml`; the native CLI and analyzers use
+    `sc-lint.toml`.
+- The adoption kit renders consumer helper-policy tables, logging/artifact
+  settings and `default_lint_profile` from its managed input without drift
+  (#841, #834).
+- Bootstrap lint, test and exec commands put the managed venv scripts on
+  child PATH after the archive bin directory and ahead of host interpreters
+  (#841).
+- The Python bootstrap's default managed binary directory matches the native
+  installer on Windows: it follows `%APPDATA%` (Roaming), not `%LOCALAPPDATA%`,
+  so a fresh install without `SC_LINT_INSTALL_DIR` finds the released binary
+  (#833). The bootstrap reads the home directory only when neither
+  `SC_LINT_INSTALL_DIR` nor `APPDATA` (Windows) or `XDG_DATA_HOME` supplies
+  the directory, so a host with no home directory and an explicit override no
+  longer fails with "Could not determine home directory" (lint-085.50). When
+  no override, `APPDATA`, `XDG_DATA_HOME` or home directory is available, the
+  bootstrap prints one `CLI.SC_LINT_INSTALL_PERMISSION_DENIED` line that
+  suggests setting `SC_LINT_INSTALL_DIR` and exits 4, instead of a Python
+  traceback. This includes Python 3.9 on a host where the user has no passwd
+  entry, which used to raise a `KeyError` (lint-085.58, lint-085.65).
+- `sc_lint.lint_common.rust_file_test_scope` classifies compound test cfgs such
+  as `#[cfg(any(test, feature = "..."))]` and `#[cfg(all(test, ...))]` under
+  `src/` as test scope; `cfg(not(test))` stays production (#837).
+- Analyzer binaries no longer fail when stdout is closed early, for example
+  when piped into `head`.
+- `sc-lint init --just` classifies a `sc-lint.toml` generated by 0.8.4 and
+  otherwise unedited as version-only stale: it is preserved and reported, not
+  overwritten, instead of being reported as a user-owned conflict. A 0.8.4
+  config with edited steps still conflicts and stays user-owned. Either line
+  ending is accepted (lint-085.47, lint-085.51, lint-085.55).
+- `sc-lint init --just` upgrades an unedited 0.8.4 integration without a
+  conflict: a 0.8.4 `Justfile` with its old managed header is accepted as
+  current, and an unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed with
+  the current one and reported with status `updated` and a `Refreshed:` line
+  (`--check` reports it as outdated). The refresh writes a temporary file in
+  the same directory, fsyncs it, renames it over the old one and, on Unix, fsyncs the
+  directory, keeping the existing permissions, so a failed write leaves the
+  previous file intact. A managed file that is a symbolic link is refreshed
+  through its target and the link is kept; a dangling link is reported as a
+  conflict (lint-085.61, lint-085.64, lint-085.68). An edited `Justfile` or
+  `bootstrap.py` stays user-owned and is reported as a conflict. A
+  `sc-lint.toml` counts as version-only stale only when the version value is
+  a well-formed minimum version, so a key inserted after it makes the file a
+  user-owned conflict instead (lint-085.56).
+- The Python bindings guide now says bootstrap `setup --check` is a usage
+  error (exit 2), `setup --dry-run` is supported, and `upgrade --check` is the
+  non-mutating probe (lint-085.47).
+
 ## [0.8.4] — 2026-11-01
 
 ### Added
@@ -85,7 +340,7 @@ Phase M ships the atm-core P1 tool fixes (#786, #720, #136, #385, #198,
   public directive and error variants and an optional `FindingsReport.allowed`
   field. Downstream exhaustive enum matches and `FindingsReport` struct
   literals may require source changes; see the
-  [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances).
+  [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances-2026-10-31).
 
 ## [0.8.2] — 2026-10-29
 

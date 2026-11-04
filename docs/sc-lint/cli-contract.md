@@ -295,7 +295,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
-| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
+| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `default_lint_profile`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
@@ -336,8 +336,22 @@ renderer behavior and verify that each machine-significant human-output field
 is present in the JSON envelope. The rule reflects the existing
 `render_success_human` implementation; it does not request a renderer change.
 
-- `init`, `compatibility.check`, and `view.graph` render exactly
-  `{id}: ok`.
+- `compatibility.check` and `view.graph` render exactly `{id}: ok`.
+- `init` renders `init: <status>`, where status is `current`, `created`,
+  `updated`, `would_create` or `would_update`. Any refresh of a prior-release
+  file makes it `updated` (`would_update` under `--dry-run`), even when
+  missing files are also created. Then one line for each non-empty file list,
+  in order: `Created:` (`Would create:` under `--dry-run`), `Refreshed:`
+  (`Would refresh:` under `--dry-run`), `Preserved:` and `Version-only
+  stale:`, each followed by the comma-separated paths from `created_files`,
+  `refreshed_files`, `preserved_files` and `version_only_stale_files`.
+  `refreshed_files` is always an array of files that were or would be refreshed;
+  `dry_run` and `status` indicate whether the refresh occurred. Refreshed
+  prior-release files do not appear in `version_only_stale_files`; that list
+  reports preserved version-only config changes. The init data object also
+  includes `status`, `managed_files`, `preserved_files`, `created_files`,
+  `refreshed_files`, `version_only_stale_files`, `check`, `dry_run` and
+  `summary`.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
 
@@ -352,7 +366,10 @@ Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
 - `sc-lint init --just` writes the generated config, Justfile, and bootstrap
-  helper only when each path is missing or product-managed. Its CLI `--json`
+  helper only when each path is missing or product-managed. A managed path
+  that is a symbolic link is refreshed through its target (a temporary file
+  beside the target, fsynced and renamed over it) and the link is kept; a
+  dangling link is `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer.
@@ -388,8 +405,10 @@ Cargo manifest, or analyzer package:
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
-  "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
-  bool}]}`, sorted by name.
+  "platforms": [...], "cwd": <string|null>, "env_keys": [...],
+  "env_path_keys": [...], "after_all": bool}]}`, sorted by name. `env_keys`
+  and `env_path_keys` list the names of the selector's `env` and `env_paths`
+  entries, never their values.
 
 Human-readable `sc-lint test --list` output contains one selector per line,
 sorted by name, in this form:
@@ -449,9 +468,9 @@ backend binary (`sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`)
 and the `sc-lint-docs` bundle resolve from a supported installed layout,
 including the published archive's `bin/` and manifest-declared bundle paths;
 `false` for source builds under `target/`. The `full` and
-`ci` lint profiles re-enter the running executable for their `sc-boundary` and
-`sc-portability` steps, so a released archive runs every kit recipe with no
-source-tree helper (issue #84).
+`ci` lint profiles re-enter the running executable for their `sc-boundary`,
+`sc-portability`, and `sc-runtime` steps, so a released archive runs every kit
+recipe with no source-tree helper (issue #84).
 
 `sc-lint compatibility check` loads the requirement once and runs
 `sc-lint --json version` against the PATH installation (or `--binary <path>`).
@@ -471,7 +490,7 @@ The preflight failure codes are stable:
 | `CLI.SC_LINT_VERSION_TOO_OLD` | Run `just setup` to install or upgrade the required version. |
 
 Every one of these errors includes `cause`, `suggested_action`, and
-`docs: "sc-lint docs setup"`; its details include the required version and
+`docs: "sc-lint docs just-setup"`; its details include the required version and
 available observed version/path.
 
 Compatibility preflight uses `config` only for the repository requirement.
@@ -584,27 +603,33 @@ finding is reported in schema `0.2.0` as an `allowed` entry containing
 `rule_id`, `reason`, the crate-relative qualified `item`, `source_path`, and
 one-based `line`.
 
-Malformed directives return `PORTABILITY.INVALID_SITE_ALLOW` with the source
-path, line, stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
+Malformed directives fail the portability analyzer (exit 3). Every
+site-allowance diagnostic across all scanned files is reported in one
+failure, sorted by source path and line, each as `<path>:<line>:` followed by
+its stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
 Directive codes and recoveries are:
 
 | Code | Cause | Recovery |
 | --- | --- | --- |
 | `DIRECTIVE.SITE_ALLOW.EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
 | `DIRECTIVE.SITE_ALLOW.MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
-| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason string. |
 | `DIRECTIVE.SITE_ALLOW.QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
 | `DIRECTIVE.SITE_ALLOW.DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
 | `DIRECTIVE.SITE_ALLOW.REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
 | `DIRECTIVE.SITE_ALLOW.MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
 | `DIRECTIVE.SITE_ALLOW.DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
 | `DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
-| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Write an analyzer prefix and numeric suffix, for example `PORT-010`. |
 | `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
+| `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR` | The attribute is not valid Rust attribute syntax. | Correct the attribute syntax reported by the parser. |
+| `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` | A rule id has the analyzer's prefix but is not in its catalog, for example ``unknown rule `PORT-999`; valid rule ids: PORT-010``. | Use a rule id from the owning analyzer catalog. |
 
-`PORTABILITY.UNKNOWN_RULE` identifies an unsupported portability rule id and
-provides the source path, line, cause, and recovery. Site allowances currently
-support only `PORT-010`; use that id or remove the allowance.
+An unsupported portability rule id is one of those diagnostics, with code
+`DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`; every unknown id in every file is
+reported. Portability site allowances support only `PORT-010`. Runtime
+site allowances accept any `SCB-RUNTIME-*` id the runtime analyzer knows; an
+unknown runtime id is also `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
 
 ### Python adapter backend
 

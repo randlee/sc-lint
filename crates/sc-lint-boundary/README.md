@@ -1,11 +1,20 @@
-# `sc-boundary` User Guide
+# `sc-lint-boundary`
 
-`sc-boundary` is the shipped boundary-analysis tool for AST-sensitive Rust
-ownership, boundary, and manifest-policy checks.
+`sc-lint-boundary` is the Rust analyzer used by the
+[`sc-lint` product](https://crates.io/crates/sc-lint) for AST-sensitive
+ownership, boundary, and manifest-policy checks. The `sc-boundary` name is the
+analyzer target accepted by `sc-lint lint`.
+
+Current crate release: **0.8.5**. Install the product CLI with
+`brew install randlee/tap/sc-lint` or from
+[GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
+crate as a Rust library, run `cargo add sc-lint-boundary@0.8`. See the
+[repository](https://github.com/randlee/sc-lint) and
+[API documentation](https://docs.rs/sc-lint-boundary/0.8.5).
 
 ## Purpose
 
-Use `sc-boundary` to check:
+Use the `sc-boundary` analyzer target to check:
 
 - architectural cycles
 - source-level boundary declarations such as `boundary.internal_only`
@@ -53,10 +62,11 @@ sc-lint lint sc-boundary
 sc-lint --json lint sc-boundary
 ```
 
-Repo-local convenience path:
+In the sc-lint source repository, `just lint` runs the complete repository
+lint gate. For one consumer analyzer, use the top-level CLI:
 
 ```bash
-just lint sc-boundary
+sc-lint lint sc-boundary
 ```
 
 Backend-local path:
@@ -131,12 +141,11 @@ mod parser {
 }
 ```
 
-Representative text result:
+Representative text result from the 0.8.5 binary on a one-crate workspace
+with no findings:
 
 ```text
-sc-lint-boundary: PASS
-scanned crates: 1
-findings: 0
+sc-lint-boundary 0.8.5 status=pass scanned_crates=1 findings=0
 ```
 
 ## Representative Fail
@@ -157,18 +166,24 @@ mod adapters {
 }
 ```
 
-Representative finding:
+Representative text finding (this graph finding has no source line):
 
 ```text
-SCB-BOUNDARY-003 forbid_external_impls violation:
-trait crate::api::Encode implemented outside declaring module by crate::adapters::Json
+SCB-BOUNDARY-003 forbid_external_impls_violation: trait crate::docs-sample::docs_sample::module::crate::api::Encode forbids external impls but is implemented from module crate::adapters
 ```
+
+`sc-lint-boundary analyze` returns exit code `0` when analysis completes,
+including when the report status is `fail`; inspect the report's `status` and
+`findings`. The product command `sc-lint lint sc-boundary` applies the
+configured lint policy and returns exit code `10` when a configured rule
+failure occurs.
+When run against a Cargo package that lacks the required workspace metadata,
+the backend exits `1` and reports `workspace.package.version missing`.
 
 Manifest-policy failures also surface through the same tool:
 
 ```text
-SCB-MANIFEST-001:
-workspace.package.version missing from Cargo.toml
+SCB-MANIFEST-001 package_workspace_field_required: Cargo.toml: set [package].authors.workspace = true
 ```
 
 Named-caller policy uses boundary inventory, not source annotations. A
@@ -323,7 +338,7 @@ sc-lint --json lint sc-boundary
 ```
 
 That command returns the standard top-level envelope from
-[`cli-contract.md`](../../docs/sc-lint/cli-contract.md):
+[`cli-contract.md`](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/cli-contract.md):
 
 - success:
   - `ok: true`
@@ -362,5 +377,5 @@ For A.7 manifest-policy coverage, the same command path also carries:
 
 See:
 
-- [logging.md](../../docs/sc-lint/logging.md)
-- [ADR-006](../../docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- [logging.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/logging.md)
+- [ADR-006](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md)

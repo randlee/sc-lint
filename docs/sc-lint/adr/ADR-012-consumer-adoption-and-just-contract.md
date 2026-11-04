@@ -33,7 +33,7 @@ one test suite.
    `just` runs recipes with `cmd.exe /c`, which returns the child's exit code
    unchanged. When the interpreter is missing, the shell's command-not-found
    failure is reported before the bootstrap runs; an interpreter older than
-   3.11 makes the bootstrap stop with `CLI.SC_LINT_PYTHON_UNAVAILABLE`.
+   3.9 makes the bootstrap stop with `CLI.SC_LINT_PYTHON_UNAVAILABLE`.
 3. **Kit recipes.** The managed import block defines `setup`, `lint` and
    `upgrade`. sc-lint provides a recommended `test` recipe calling the
    bootstrap's `test` operation; the installer adds it outside the block only when the
@@ -60,8 +60,9 @@ one test suite.
 
 - One test suite run on Linux, macOS and Windows verifies the bootstrap on
   every platform.
-- Python 3.11 or newer is required on every platform; it already is, for
-  the managed wheel (ADR-016).
+- Python 3.9 or newer is required on every platform (amended 2026-11-04: Rand's
+  ruling that Python 3.9 is supported, with the wheel floor per GitHub #778,
+  `cp39-abi3`). Windows ARM64 still requires Python 3.11 or newer (ADR-016).
 - Missing or incompatible installations stop `lint` and `test` before work
   begins, with a structured recovery message.
 - `just lint` runs complete configured profiles, never an advisory subset.

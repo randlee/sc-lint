@@ -65,7 +65,7 @@ def classify_lines(lines: list[str]) -> tuple[int, int]:
     test_scope = classify_rust_test_scope(lines)
     production_lines = 0
     test_lines = 0
-    for line, in_test_scope in zip(lines, test_scope, strict=True):
+    for line, in_test_scope in zip(lines, test_scope):
         if not is_code_line(line):
             continue
         if in_test_scope:
