@@ -94,15 +94,6 @@ planned.
   `clippy`, `check`, `setup`, `upgrade`, `init` and `compatibility`
   commands, with `workflow.rs`, `consumer_integration.rs`, `installer.rs` and
   `python_adapter.rs` behind them.
-- ADR-012 assigns "complete test" to installed `sc-lint` (see
-  [Top-level CLI Role](#top-level-cli-role)), and the (d) kit justfile
-  routes `setup`, `lint`, `test` and `upgrade` through the bootstrap into (c).
-  The layering leaves `just test` to the consumer repository, with `sc-lint`
-  supplying patterns and general helper functions. The ADR-012 and ADR-016
-  amendments of 2026-10-10 (Accepted, #194) remove this departure: the kit
-  justfile routes only `setup`, `lint` and `upgrade`, and the installer adds
-  sc-lint's recommended `test` recipe outside the managed block only when the
-  consumer `Justfile` has none, after which the consumer owns it.
 - (c) embeds a copy of the (d) bootstrap assets
   (`crates/sc-lint/assets/bootstrap.py`, included by `installer.rs`),
   byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap.py` and
@@ -262,21 +253,6 @@ The top-level CLI should standardize on:
   - `fast`
   - `full`
   - `ci`
-
-For consumer repositories, ADR-012 additionally fixes command ownership (this
-departs from the layering; see
-[Where the current code departs from the layering](#where-the-current-code-departs-from-the-layering)):
-
-- installed `sc-lint` owns setup, compatibility, complete lint, complete test,
-  and upgrade behavior (amended 2026-10-10, Accepted, #194: "complete test" is
-  dropped; installed `sc-lint` provides `sc-lint test` and a recommended
-  `test` recipe, and the consumer owns `just test`)
-- `sc-lint init --just` writes only product-owned integration files and never
-  a consumer README
-- a generated `Justfile` is a thin interface with four public recipes and a
-  shared private compatibility preflight
-- this repository's root `Justfile` remains the explicit source-maintainer
-  path; no command guesses its mode from a directory or Cargo package
 
 The primary `lint` target surface should preserve backend-crate ownership
 explicitly. Planned primary mappings are:
@@ -689,8 +665,7 @@ Consumer-proven rule families already shipped in dedicated product crates:
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer
-policy, and consumer-declared setup data owned by the adoption kit/managed
-wheel. The top-level CLI remains the sole consumer lint executor; Python
+policy, and consumer-declared setup data. The top-level CLI remains a consumer lint executor; Python
 bindings do not decide lint rules. Final current-facing and offline user docs
 are reconciled by k-10 after implementation. See the
 [Phase K intent](./plans/phase-k/intent.md) and ADR-017 for the exact scope.
