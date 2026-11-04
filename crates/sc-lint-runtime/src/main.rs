@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use clap::CommandFactory;
 use clap::Parser;
 use clap::Subcommand;
 use sc_lint_analyzer_support::AnalyzerConfigError;
@@ -71,6 +72,10 @@ fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
 }
 
 fn main() -> Result<()> {
+    if std::env::args_os().len() == 1 {
+        Cli::command().print_help()?;
+        return Ok(());
+    }
     let cli = Cli::parse();
 
     match cli.command {
