@@ -194,7 +194,9 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
 )]
 fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, CliError> {
     match fs::read_to_string(&file.path) {
-        Ok(actual) if actual == file.contents => Ok(ManagedFileState::Current),
+        Ok(actual) if normalize_line_endings(&actual) == normalize_line_endings(&file.contents) => {
+            Ok(ManagedFileState::Current)
+        }
         Ok(actual)
             if file.kind == ManagedFileKind::Config && is_refreshable_generated_config(&actual) =>
         {
@@ -213,6 +215,7 @@ fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, Cli
 }
 
 fn is_refreshable_generated_config(actual: &str) -> bool {
+    let actual = normalize_line_endings(actual);
     let body = actual
         .strip_prefix(GENERATED_FILE_HEADER)
         .or_else(|| actual.strip_prefix(LEGACY_GENERATED_FILE_HEADER))
@@ -221,6 +224,10 @@ fn is_refreshable_generated_config(actual: &str) -> bool {
         || CANONICAL_CONSUMER_CONFIG_ASSET
             .strip_prefix(CURRENT_CONFIG_ADDED_COMMENTS)
             .is_some_and(|legacy_asset| has_version_only_difference(body, legacy_asset))
+}
+
+fn normalize_line_endings(contents: &str) -> String {
+    contents.replace("\r\n", "\n")
 }
 
 fn has_version_only_difference(actual: &str, template: &str) -> bool {
@@ -274,6 +281,50 @@ mod tests {
     }
 
     #[test]
+    fn generated_files_ignore_crlf_but_not_content_edits() {
+        let fixture = tempfile::TempDir::new().expect("fixture");
+        let files = consumer_integration_files(fixture.path());
+        for file in &files {
+            if let Some(parent) = file.path.parent() {
+                fs::create_dir_all(parent).expect("managed file parent");
+            }
+            fs::write(&file.path, to_crlf(&file.contents)).expect("CRLF generated file");
+            assert_eq!(
+                classify_file(file).expect("classify CRLF generated file"),
+                ManagedFileState::Current,
+                "{}",
+                file.path.display()
+            );
+        }
+
+        let config = &files[0];
+        let stale_config = config.contents.replace(env!("CARGO_PKG_VERSION"), "0.8.4");
+        fs::write(&config.path, to_crlf(&stale_config)).expect("CRLF stale config");
+        assert_eq!(
+            classify_file(config).expect("classify CRLF stale config"),
+            ManagedFileState::RefreshableGenerated
+        );
+
+        let edited_config =
+            stale_config.replace("\"fmt\", \"--all\", \"--check\"", "\"fmt\", \"--all\"");
+        fs::write(&config.path, to_crlf(&edited_config)).expect("edited CRLF config");
+        assert_eq!(
+            classify_file(config).expect("classify edited CRLF config"),
+            ManagedFileState::UserModified
+        );
+
+        let justfile = &files[1];
+        let edited_justfile = justfile
+            .contents
+            .replace("default: lint", "default: edited");
+        fs::write(&justfile.path, to_crlf(&edited_justfile)).expect("edited CRLF Justfile");
+        assert_eq!(
+            classify_file(justfile).expect("classify edited CRLF Justfile"),
+            ManagedFileState::UserModified
+        );
+    }
+
+    #[test]
     fn literal_0_8_4_generated_config_is_refreshable_but_edited_steps_are_not() {
         const LEGACY_0_8_4_GENERATED_CONFIG: &str = concat!(
             "# Managed by sc-lint; regenerate with `sc-lint init --just`.\n",
@@ -290,51 +341,90 @@ mod tests {
             "command = [\"cargo\", \"test\", \"--workspace\"]\n",
         );
 
-        let fixture = tempfile::TempDir::new().expect("fixture");
-        let config_path = fixture.path().join(CONFIG_FILENAME);
-        fs::write(&config_path, LEGACY_0_8_4_GENERATED_CONFIG).expect("legacy config");
-        fs::write(
-            fixture.path().join("Justfile"),
-            format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}"),
-        )
-        .expect("Justfile");
-        let bootstrap_dir = fixture.path().join(".sc-lint");
-        fs::create_dir(&bootstrap_dir).expect("bootstrap directory");
-        fs::write(bootstrap_dir.join("bootstrap.py"), CONSUMER_BOOTSTRAP_ASSET).expect("bootstrap");
+        for legacy_config in [
+            LEGACY_0_8_4_GENERATED_CONFIG.to_owned(),
+            LEGACY_0_8_4_GENERATED_CONFIG.replace('\n', "\r\n"),
+        ] {
+            let crlf = legacy_config.contains("\r\n");
+            let fixture = tempfile::TempDir::new().expect("fixture");
+            let config_path = fixture.path().join(CONFIG_FILENAME);
+            fs::write(&config_path, &legacy_config).expect("legacy config");
+            let justfile_path = fixture.path().join("Justfile");
+            let justfile = format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}");
+            fs::write(
+                &justfile_path,
+                if crlf {
+                    justfile.replace('\n', "\r\n")
+                } else {
+                    justfile.clone()
+                },
+            )
+            .expect("Justfile");
+            let bootstrap_dir = fixture.path().join(".sc-lint");
+            fs::create_dir(&bootstrap_dir).expect("bootstrap directory");
+            let bootstrap = if crlf {
+                CONSUMER_BOOTSTRAP_ASSET.replace('\n', "\r\n")
+            } else {
+                CONSUMER_BOOTSTRAP_ASSET.to_owned()
+            };
+            fs::write(bootstrap_dir.join("bootstrap.py"), bootstrap).expect("bootstrap");
 
-        let result = run_consumer_init_at(
-            fixture.path(),
-            ConsumerInitRequest {
-                just: true,
-                check: false,
-                dry_run: false,
-            },
-        )
-        .expect("legacy generated config should be recognized");
-        assert_eq!(result["status"], "current");
-        assert_eq!(
-            result["version_only_stale_files"],
-            json!([config_path.display().to_string()])
-        );
-        assert_eq!(
-            fs::read_to_string(&config_path).expect("config remains user-owned"),
-            LEGACY_0_8_4_GENERATED_CONFIG
-        );
+            let result = run_consumer_init_at(
+                fixture.path(),
+                ConsumerInitRequest {
+                    just: true,
+                    check: false,
+                    dry_run: false,
+                },
+            )
+            .expect("legacy generated config should be recognized");
+            assert_eq!(result["status"], "current");
+            assert_eq!(
+                result["version_only_stale_files"],
+                json!([config_path.display().to_string()])
+            );
+            assert_eq!(
+                fs::read_to_string(&config_path).expect("config remains user-owned"),
+                legacy_config
+            );
 
-        let edited_steps = LEGACY_0_8_4_GENERATED_CONFIG
-            .replace("\"fmt\", \"--all\", \"--check\"", "\"fmt\", \"--all\"");
-        assert!(!is_refreshable_generated_config(&edited_steps));
-        fs::write(&config_path, &edited_steps).expect("edited legacy config");
-        let error = run_consumer_init_at(
-            fixture.path(),
-            ConsumerInitRequest {
-                just: true,
-                check: false,
-                dry_run: false,
-            },
-        )
-        .expect_err("edited steps remain user-owned");
-        assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+            if crlf {
+                let edited_justfile = justfile.replace("default: lint", "default: edited");
+                fs::write(&justfile_path, edited_justfile.replace('\n', "\r\n"))
+                    .expect("edited CRLF Justfile");
+                let error = run_consumer_init_at(
+                    fixture.path(),
+                    ConsumerInitRequest {
+                        just: true,
+                        check: false,
+                        dry_run: false,
+                    },
+                )
+                .expect_err("edited CRLF Justfile remains user-owned");
+                assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+                fs::write(&justfile_path, justfile.replace('\n', "\r\n"))
+                    .expect("restore CRLF Justfile");
+            }
+
+            let edited_steps =
+                legacy_config.replace("\"fmt\", \"--all\", \"--check\"", "\"fmt\", \"--all\"");
+            assert!(!is_refreshable_generated_config(&edited_steps));
+            fs::write(&config_path, &edited_steps).expect("edited legacy config");
+            let error = run_consumer_init_at(
+                fixture.path(),
+                ConsumerInitRequest {
+                    just: true,
+                    check: false,
+                    dry_run: false,
+                },
+            )
+            .expect_err("edited steps remain user-owned");
+            assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+        }
+    }
+
+    fn to_crlf(contents: &str) -> String {
+        normalize_line_endings(contents).replace('\n', "\r\n")
     }
 
     #[test]
