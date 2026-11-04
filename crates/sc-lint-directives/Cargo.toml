@@ -9,12 +9,16 @@ description = "Shared directive parsing for sc-lint proc-macro and analyzer crat
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-directives/0.8.5"
+keywords = ["rust", "sc-lint", "directives", "parsing", "proc-macro"]
+categories = ["development-tools", "development-tools::procedural-macro-helpers", "parser-implementations"]
 
 [lib]
 name = "sc_lint_directives"
 path = "src/lib.rs"
 
 [dependencies]
+proc-macro2 = { workspace = true }
 syn = { version = "3.0.9", features = ["full", "parsing"] }
 
 [dev-dependencies]

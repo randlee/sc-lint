@@ -1,12 +1,16 @@
 # sc-lint adoption kit
 
-Install a generic, drift-checked `sc-lint` consumer contract with:
+From the installed Claude Code plugin, run its installer with:
 
-```text
-python3 plugins/sc-lint/install.py .
+```bash
+python3 "$CLAUDE_PLUGIN_ROOT/install.py" .
 ```
 
 Use `--dry-run` to report drift without writing.
+
+The marketplace plugin root is supplied by Claude Code. The repository path
+`plugins/sc-lint/install.py` is the consumer layout created by an install; it
+is not the marketplace entry point.
 
 The first install persists its validated input at `.sc-lint/install.json`.
 Use `--input <path>` to override it or bootstrap a new input document.

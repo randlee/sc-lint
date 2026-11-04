@@ -14,17 +14,19 @@ impl Scanner {
         match expr {
             syn::Expr::Paren(expr) => self.match_resource(&expr.expr),
             syn::Expr::MethodCall(call) if self.kind(&call.receiver) == ValueKind::Mutex => {
-                match call.method.to_string().as_str() {
-                    "lock" => Some(MatchResource::LockResult),
-                    "try_lock" => Some(MatchResource::TryLockResult),
-                    _ => None,
+                if call.method == "lock" {
+                    Some(MatchResource::LockResult)
+                } else if call.method == "try_lock" {
+                    Some(MatchResource::TryLockResult)
+                } else {
+                    None
                 }
             }
             syn::Expr::Call(call) => {
                 let syn::Expr::Path(path) = &*call.func else {
                     return None;
                 };
-                match lookup(&self.imports.resolve(&path.path).join("::")) {
+                match lookup(&self.imports.resolve(&path.path)) {
                     Some(Api::MutexLock) => Some(MatchResource::LockResult),
                     Some(Api::MutexTryLock) => Some(MatchResource::TryLockResult),
                     _ => None,

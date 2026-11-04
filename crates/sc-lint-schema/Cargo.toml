@@ -9,6 +9,9 @@ description = "Shared machine schema types for sc-lint analyzer outputs."
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-schema/0.8.5"
+keywords = ["rust", "sc-lint", "schema", "findings", "json"]
+categories = ["data-structures", "encoding", "parser-implementations"]
 
 [lib]
 name = "sc_lint_schema"

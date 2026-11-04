@@ -52,7 +52,7 @@ impl Entry {
 const PATHS: &[Entry] = &[
     Entry::direct("std", Api::Std),
     Entry::direct("std::thread", Api::Thread),
-    Entry::direct("std::thread::sleep", Api::ThreadSleep),
+    Entry::glob("std::thread::sleep", Api::ThreadSleep),
     Entry::glob("std::thread::sleep_until", Api::ThreadSleepUntil),
     Entry::glob("std::sync::Mutex", Api::Mutex),
     Entry::glob("std::sync::MutexGuard", Api::MutexGuard),
@@ -105,7 +105,20 @@ pub(crate) fn lookup(path: &str) -> Option<Api> {
         .map(|entry| entry.api)
 }
 
-pub(crate) fn known_glob_path(path: &[String]) -> bool {
-    let path = path.join("::");
+pub(crate) fn known_glob_path(path: &str) -> bool {
     PATHS.iter().any(|entry| entry.glob && entry.path == path)
+}
+
+pub(crate) fn canonical_path(path: &syn::Path) -> Option<&'static str> {
+    PATHS
+        .iter()
+        .find(|entry| {
+            entry.path.split("::").count() == path.segments.len()
+                && entry
+                    .path
+                    .split("::")
+                    .zip(&path.segments)
+                    .all(|(name, part)| part.ident == name)
+        })
+        .map(|entry| entry.path)
 }

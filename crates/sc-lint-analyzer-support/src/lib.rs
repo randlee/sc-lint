@@ -1,4 +1,9 @@
-//! Shared, rule-neutral support for `sc-lint` AST analyzer crates.
+//! Shared, rule-neutral support for `sc-lint` AST analyzer crates: analysis
+//! options, analyzer configuration, source discovery and relative paths.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
 
 mod analyze_options;
 mod analyzer_config;
@@ -32,9 +37,9 @@ pub use source_scan::TargetName;
 pub use source_scan::WorkspaceMetadata;
 pub use source_scan::WorkspacePackageInfo;
 pub use source_scan::attr_is_cfg_test;
-pub use source_scan::attr_is_test;
+#[cfg(test)]
+use source_scan::attr_is_test;
 pub use source_scan::classify_scope;
-pub use source_scan::count_scanned_crates;
 pub use source_scan::count_scanned_crates_with_metadata;
 pub use source_scan::discover_source_files;
 pub use source_scan::discover_source_files_with_metadata;

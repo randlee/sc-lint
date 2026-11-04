@@ -15,12 +15,30 @@ CI owners use the findings to keep Linux, macOS, and Windows lanes equivalent.
 
 ```sh
 sc-lint lint sc-portability
-sc-lint lint ci
+sc-lint lint ci --consumer
 ```
 
 The analyzer inspects the configured repository root and reports source path,
 rule, and portable remediation. It does not read consumer `sc-lint.toml`
 profiles directly; the top-level product orchestrates it.
+
+## Rules
+
+Every rule fails by default. Rule filters, `exclude_rules`, and `fail_rules`
+take these IDs.
+
+| Rule | Code | Reports |
+| --- | --- | --- |
+| `PORT-001` | test | A hardcoded Unix-only absolute path. |
+| `PORT-002` | test | A direct `dirs::home_dir()` call in a test helper without first checking the configured `config_home_env` variable. |
+| `PORT-003` | test | `std::env::set_var()`, which mutates global process state. |
+| `PORT-004` | production | An ungated `std::os::unix` import. |
+| `PORT-005` | production | `#[cfg_attr(not(unix), allow(dead_code))]` used as a portability suppressor. |
+| `PORT-006` | production | A hardcoded Unix-only absolute path literal. |
+| `PORT-007` | production | A hardcoded Windows absolute path literal (drive letter or UNC), outside a Windows-only `cfg`. |
+| `PORT-008` | production | A direct `std::env` lookup of `HOME`, `USER`, or `XDG_*`. |
+| `PORT-009` | production | A Unix shell invocation such as `Command::new("sh")` or `/bin/sh`. |
+| `PORT-010` | production | A `#[cfg(unix)]` item with no Windows or portable companion in the same scope. |
 
 For equivalent private platform implementations with different module paths,
 `platform_adapters` records an explicit Unix/Windows pair and a review reason
@@ -69,7 +87,7 @@ version-matched macro crate and admit it in each annotated crate's boundary:
 
 ```toml
 [dependencies]
-sc-lint-attributes = "0.8.4"
+sc-lint-attributes = "0.8.5"
 ```
 
 Add `sc-lint-attributes` to the `dependencies.allowed_dependencies` array in

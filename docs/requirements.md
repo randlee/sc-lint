@@ -195,6 +195,12 @@ The product should support both:
   ownership remain in their dedicated analyzer crates (ADR-013).
   (Amended 2026-10-10, Accepted, #201.)
 
+  Clarification (0.8.5, not an amendment): source discovery and scope
+  classification include the shared `AnalyzeOptions` input,
+  repository-relative source-path normalization, root-prefix stripping and
+  test-only attribute recognition. These are rule-neutral and fit ADR-013 as
+  written, so the Accepted text above is unchanged.
+
 - `REQ-PRODUCT-004E` — **Accepted** (0.8.5, #640)
   Approval receipt: Rand, 2026-11-03: "004E approved (as long as consumer can
   opt out w/ reason)".

@@ -3,8 +3,8 @@
 
 import sys
 
-if sys.version_info < (3, 11):
-    print("setup: Python 3.11 or newer is required (CLI.SC_LINT_PYTHON_UNAVAILABLE)", file=sys.stderr)
+if sys.version_info < (3, 9):
+    print("setup: Python 3.9 or newer is required (CLI.SC_LINT_PYTHON_UNAVAILABLE)", file=sys.stderr)
     sys.exit(1)
 
 import hashlib
@@ -15,7 +15,6 @@ import platform
 import re
 import shutil
 import subprocess
-import sysconfig
 import tarfile
 import tempfile
 import urllib.error
@@ -23,7 +22,8 @@ import urllib.request
 import venv
 import zipfile
 
-USAGE = ("usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]; "
+USAGE = ("usage: .sc-lint/bootstrap.py setup --config sc-lint.toml [--dry-run]; "
+         ".sc-lint/bootstrap.py upgrade --config sc-lint.toml [--check] [--dry-run]; "
          ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; "
          ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml; "
          ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml; "
@@ -62,7 +62,9 @@ def parse(argv):
             if config is not None or not rest or not rest[0]:
                 usage()
             config, rest = rest[0], rest[1:]
-        elif token in ("--check", "--dry-run") and operation in ("setup", "upgrade"):
+        elif token == "--dry-run" and operation == "setup" and token not in flags:
+            flags.append(token)
+        elif token in ("--check", "--dry-run") and operation == "upgrade" and token not in flags:
             flags.append(token)
         elif (token == "--fail-fast" and operation in ("lint", "test")
               or token == "--list" and operation == "test") and token not in flags:
@@ -90,14 +92,35 @@ def run(argv, **kwargs):
         return 127
 
 
-def managed_path():
-    if os.environ.get("SC_LINT_INSTALL_DIR"):
-        directory = Path(os.environ["SC_LINT_INSTALL_DIR"])
-    elif os.name == "nt":
-        directory = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "sc-lint" / "bin"
+def default_install_directory(environ, home_directory, windows):
+    # Mirrors the native installer: SC_LINT_INSTALL_DIR, else the platform data
+    # directory (%APPDATA% on Windows, XDG_DATA_HOME elsewhere) plus sc-lint/bin.
+    # home_directory is a callable so the home lookup runs only when no override
+    # supplies the directory; a host without a home still honours the override.
+    if environ.get("SC_LINT_INSTALL_DIR"):
+        return Path(environ["SC_LINT_INSTALL_DIR"])
+    if windows:
+        data_dir = Path(environ.get("APPDATA") or home_directory() / "AppData" / "Roaming")
     else:
-        directory = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "sc-lint" / "bin"
-    return directory / ("sc-lint.exe" if os.name == "nt" else "sc-lint")
+        data_dir = Path(environ.get("XDG_DATA_HOME") or home_directory() / ".local" / "share")
+    return data_dir / "sc-lint" / "bin"
+
+
+def managed_path():
+    windows = os.name == "nt"
+    try:
+        directory = default_install_directory(os.environ, Path.home, windows)
+    except (RuntimeError, KeyError):
+        # Path.home() raises RuntimeError when no home can be determined, and KeyError
+        # on Python 3.9 when the user has no passwd entry. The native installer
+        # reports the same condition with this code.
+        fail(
+            "sc-lint install directory is unavailable: neither SC_LINT_INSTALL_DIR, APPDATA, "
+            "XDG_DATA_HOME nor a home directory was available; set SC_LINT_INSTALL_DIR to a "
+            "writable directory and rerun (CLI.SC_LINT_INSTALL_PERMISSION_DENIED)",
+            4,
+        )
+    return directory / ("sc-lint.exe" if windows else "sc-lint")
 
 
 def resolve_binary(managed):
@@ -192,8 +215,7 @@ def venv_directory(config):
 
 
 def venv_scripts(config):
-    directory = venv_directory(config)
-    return Path(sysconfig.get_path("scripts", scheme="venv", vars={"base": str(directory), "platbase": str(directory)}))
+    return venv_directory(config) / ("Scripts" if os.name == "nt" else "bin")
 
 
 def activate(binary, config):

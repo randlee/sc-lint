@@ -16,7 +16,7 @@ concurrency model.
 
 ```sh
 sc-lint lint sc-runtime
-sc-lint lint ci
+sc-lint lint ci --consumer
 ```
 
 The analyzer reads Rust source under the configured root and emits normalized
@@ -43,12 +43,14 @@ Rules 005–007 do not require a declared Tokio dependency. `yield_now` is legal
 Test files/targets and inline `cfg(test)`, `#[test]` and framework test
 attributes are exempt. Prefer event-driven synchronization over sleeps.
 
-A function/method may declare a reasoned exception:
+A function/method may declare a reasoned exception. `SCB-RUNTIME-003` uses
+the same allowance path as rules 004–007; the allowance covers only that body,
+so sibling and nested functions still need their own reasoned exceptions:
 
 ```rust
-#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-005), reason = "Protocol timer boundary")]
-async fn timer() {
-    tokio::time::sleep(duration).await;
+#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "Bounded synchronous compatibility polling")]
+fn bounded_sync_poll(poll_interval: std::time::Duration) {
+    std::thread::sleep(poll_interval);
 }
 ```
 
@@ -79,12 +81,12 @@ calls do not contribute to an if/match guard join.
 They do not expand macros or perform Rust type/borrow checking. Known false
 negatives include indirect calls, reexports/crate renames, type aliases,
 external return types, unrecognized receivers, and guards moved through other
-bindings/containers/captures. File-flattened imports/type/static names and unproved
-control-flow exits can cause conservative false positives. In particular,
+bindings/containers/captures. Imports resolve by lexical module and function
+scope. File-flattened type/static names and unproved control-flow exits can
+cause conservative false positives. In particular,
 `consume(g); other().await` and `loop { drop(g); break; } other().await` may
 still report 007: interprocedural moves and loop/labeled-block exit guard transfer are not
-proved. Rule 003's legacy resolver does not recognize renamed `self` imports
-such as `use std::thread::{self as thread}`; use a direct module alias instead.
+proved.
 For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
 including `Ok(_)` and `Ok(..)` scrutinees. Explicit
 `Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined
@@ -108,9 +110,10 @@ fn checks_behavior() {
 }
 ```
 
-The file-level marker classifies the separate file as test code and exempts
-rules 004–007. The parent module's `cfg(test)` attribute alone does not
-propagate into it.
+The file-level marker makes the whole file test code for every runtime rule,
+`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`tests/`. The parent module's `cfg(test)` attribute alone does not propagate
+into it.
 
 ## Finding interpretation and CI
 

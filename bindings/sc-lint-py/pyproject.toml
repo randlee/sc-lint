@@ -4,19 +4,32 @@ build-backend = "maturin"
 
 [project]
 name = "sc-lint"
-version = "0.8.4"
-description = "sc-lint Python bindings and repository helper package."
+version = "0.8.5"
+description = "Python bindings and repository helpers for the sc-lint Rust linting tool."
 readme = "README.md"
 dependencies = ["codespell>=2.2"]
 
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.9"
+keywords = ["rust", "lint", "static-analysis", "code-quality", "repository-policy"]
 classifiers = [
+  "Development Status :: 4 - Beta",
   "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Developers",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Rust",
-  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +38,9 @@ test = ["pytest>=8,<9", "rdflib>=7,<8", "Jinja2>=3.1,<4", "PyYAML>=6,<7", "sc-co
 [project.urls]
 Homepage = "https://github.com/randlee/sc-lint"
 Repository = "https://github.com/randlee/sc-lint"
+Documentation = "https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md"
+Issues = "https://github.com/randlee/sc-lint/issues"
+Changelog = "https://github.com/randlee/sc-lint/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 python-source = "python"

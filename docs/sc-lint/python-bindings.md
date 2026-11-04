@@ -10,14 +10,18 @@ invoke in every consumer; no consumer copies helper scripts any more
 
 | Surface | Contents |
 | --- | --- |
-| `sc_lint._native` (pyo3, abi3-py39) | exactly two exports: `version_json() -> str` (the `sc-lint --json version` payload) and `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code). No lint logic lives here. |
+| `sc_lint._native` (pyo3, abi3-py39) | exactly three exports: `version_json() -> str` (the `sc-lint --json version` payload), `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code), and `toml_loads(text: str) -> str` (parses TOML with the workspace `toml` crate and returns a JSON object). No lint logic lives here. |
 | `sc_lint.__version__` | parsed from `version_json()`; always equals the workspace version. |
 | `sc_lint.binary_path()` | resolves the native `sc-lint` executable: `SC_LINT_BIN`, then the managed install dir (`SC_LINT_INSTALL_DIR`, `$XDG_DATA_HOME/sc-lint/bin`, `~/.local/share/sc-lint/bin`), then `PATH`. |
 | `sc_lint.<helper>` modules | the former `.just/*.py` helpers (`run_lint`, `run_pytests`, `lint_*`, `check_version_sync`, `view_findings`, …) run as `python -m sc_lint.<helper>`. |
 | `sc_lint.tests` | the tests shipped inside the wheel (`python -m sc_lint.run_pytests`); the runner discovers its bundled `sc_lint.tests` package and does not assume the consumer checkout has the sc-lint repository's test tree. |
 
 The pyo3 layer is a packaging bridge only: `run` accepts argv tokens, never
-shell text, and the package adds no plugin registry or selection policy. The
+shell text, and the package adds no plugin registry or selection policy.
+`toml_loads` is a parser, not policy. `sc_lint/_toml.py` wraps it as `loads`,
+`load` and `TOMLDecodeError`, so the helpers parse TOML the same way the CLI
+does on Python 3.9, where `tomllib` is unavailable. Datetime values come back as
+RFC 3339 text and non-finite floats as `null`. The
 boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 
 ## How consumers get it
@@ -26,9 +30,13 @@ boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 `.sc-lint/venv` next to the config file
 and installs `sc-lint==<minimum_version>` into it:
 
-- `setup --check` exits 4 (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is
-  missing or older than `minimum_version`; `--dry-run` prints what it would
-  install.
+- `upgrade --check` probes without changing anything: it exits 4
+  (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is missing or older than
+  `minimum_version`. `setup --dry-run` prints what it would install
+  (`setup: would install sc-lint==<version> into <venv>`) and exits 0.
+- `setup --check` is rejected by the bootstrap parser with its usage message
+  (exit 2); `setup` accepts `--dry-run` but not `--check`. Use
+  `upgrade --check` for a non-mutating compatibility probe.
 - `SC_LINT_WHEEL_DIR=<dir>` installs offline with
   `pip install --no-index --find-links <dir>`; the directory must also hold
   the wheel's dependencies (currently `codespell`).
@@ -90,6 +98,8 @@ The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
 | `winget.missing_field` | A configured Winget version or installer URL field is absent. |
 | `release_wiring.file_missing` | The configured release workflow does not exist. |
 | `release_wiring.fragment` | A configured release workflow fragment is absent. |
+| `release_docs.files` | The configured `release_docs` globs matched no files. |
+| `release_docs.version` | A release-version literal matched by a configured `release_docs` pattern differs from the workspace version; `expected` and `actual` carry the line number. |
 
 Configuration is resolved per `[version_sync]` table: `--config` first, then
 `sc-lint.toml`, then `.just/lint-config.toml`; a candidate without that table
@@ -114,6 +124,14 @@ accepts `enabled`, `file` (no default; required when enabled), and
 `required_fragments` (default `[]`); absent files and fragments produce
 `release_wiring.file_missing` and `release_wiring.fragment` findings. Paths
 and globs must be relative to the repository root and stay inside it.
+
+`[version_sync.release_docs]` is disabled by default with `enabled = false`.
+When enabled it requires `files` (a non-empty array of repo-relative globs)
+and `patterns` (a non-empty array of regular expressions). Each pattern must
+capture the release version in the named group `version`; every match in a
+listed file must equal the workspace version. Matching is per line, so a
+finding names the file and line. This is how the sc-lint repository keeps its
+README, crate manifests and docs-bundle at the release version.
 
 ## Release channel
 

@@ -29,12 +29,14 @@ complete unit before activation.
 The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 
 Starting with 0.8.3, release archives support x86_64 and ARM64 on Linux, macOS, and Windows.
-Python wheels cover the same six platforms and require Python 3.9 or newer;
-Windows ARM64 requires Python 3.11 or newer.
+Python wheels cover the same six platforms and declare Python 3.9 or newer
+(`requires-python = ">=3.9"`). On Windows ARM64, install the wheel into a
+native ARM64 Python (python.org provides those from 3.11), not an x64
+interpreter running under emulation.
 
 ```sh
-tar -xzf sc-lint_0.8.4_x86_64-unknown-linux-gnu.tar.gz
-cd sc-lint_0.8.4_x86_64-unknown-linux-gnu
+tar -xzf sc-lint_0.8.5_x86_64-unknown-linux-gnu.tar.gz
+cd sc-lint_0.8.5_x86_64-unknown-linux-gnu
 install -d /usr/local/bin /usr/local/share/sc-lint
 install -m 0755 bin/sc-lint bin/sc-lint-boundary bin/sc-lint-portability bin/sc-lint-runtime /usr/local/bin/
 cp -R share/sc-lint/sc-lint-docs /usr/local/share/sc-lint/

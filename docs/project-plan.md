@@ -395,6 +395,44 @@ authoritative sprint/dependency plan is in the `lint-phase-l` beads;
 `docs/plans/phase-l.jsonl` is the phase index. The #82 Tokio sleep rule
 ships in `sc-lint-runtime` in l-7 (REQ-PRODUCT-004C as amended).
 
+Release `0.8.5` (epic `lint-085`, #640) adds the runtime rules
+`SCB-RUNTIME-004` to `007`: thread `sleep_until` in production Tokio packages,
+Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
+held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
+#837, #843 and #844. Follow-ups in the same release:
+
+- #840: guard tracking across diverging branches and common Mutex shapes,
+  shared `AnalyzeOptions`, path helpers and test-scope recognition in
+  `sc-lint-analyzer-support`, reasoned `SCB-RUNTIME-*` site allowances through
+  `sc-lint-directives`, and the separate-file `#![cfg(test)]` marker
+- #839: deterministic draining of analyzer test output (closes #843)
+- #841: adoption fixes from the sc-compose adoption (wheel excludes
+  repository-only tests, Action ARM64 targets, kit helper-policy tables and
+  `default_lint_profile`, bootstrap PATH order; closes #834 and #844)
+- Python 3.9 support for the helpers and bootstrap (GitHub #778), and
+  generated CLI reference guides in the offline bundle
+- issues Rand pulled into 0.8.5: #833 (Windows bootstrap and installer agree
+  on the default binary directory, `lint-085.42`), #836 (item-level
+  `SCB-RUNTIME-003` allowances, `lint-085.43`) and #837 (compound test `cfg`
+  expressions classified in `rust_file_test_scope`, `lint-085.42`)
+- phase-end review and documentation fixes (`lint-085.35`, `lint-085.37`,
+  `lint-085.39`, `lint-085.40`, `lint-085.44`) and QA fixes:
+  round 1 (`lint-085.45` to `lint-085.48`), round 2 (`lint-085.50` to
+  `lint-085.53`, and `lint-085.55` for generated-file line endings),
+  round 3 (`lint-085.56` to `lint-085.59`), round 4 (`lint-085.60` to
+  `lint-085.63`: refreshed-files init output and Windows path separators) and
+  round 5 (`lint-085.64` to `lint-085.68`: symlink-safe, fsynced refresh
+  writes and the Python 3.9 bootstrap no-home error) and round 6 (QA
+  `lint-085.69`, fix `lint-085.70`, QA `lint-085.71`), merged through the
+  version-bump PR #842
+
+Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
+The REQ-CLI-022 prior-release refresh exception (2026-11-04) is Pending
+Rand.
+REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker
+ruling, which Rand accepted on 2026-11-03. Open issues #783, #832 and #835
+are not addressed by 0.8.5 and are deferred to 0.8.6.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.

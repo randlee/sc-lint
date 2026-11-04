@@ -16,6 +16,10 @@ customization mechanism.
 
 Installation is three commands, run from the consumer repository root:
 
+The `plugins/sc-publish/...` paths below refer to a kit already installed in a
+consumer repository. They are not entry points in the upstream sc-lint
+source checkout.
+
 ```bash
 # 1. Provision the exact pinned sc-compose 1.5.0 renderer wheel into a virtualenv.
 python plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py --venv <venv>
@@ -288,7 +292,7 @@ Publisher/admin bootstrap is a separate, authorized setup operation:
    mutable releases remain historical; use a new version when immutability is
    required. Never delete/recreate a release or move its tag to convert it.
 
-Read-only inventory supplied by the rollout lead on 2026-09-20 found
+Historical read-only inventory supplied by the rollout lead on 2026-09-20 found
 `enabled:false,enforced_by_owner:false` on all six repositories below. This is
 an observation, not evidence of enablement or a settings change:
 
@@ -298,7 +302,7 @@ an observation, not evidence of enablement or a settings change:
 | wyvern | Flat `release/sc-publish-pin.toml` at `25668ecc…` | Preserve flat pin layout; regenerate actual input |
 | sc-observability | Pin at `232c695…` | Reviewed full SHA advance and installer regeneration |
 | sc-compose | Vendors `plugins/sc-publish`; `release/sc-publish-install.json`, `README.sc-publish.md` | Follow vendored layout; absence of standard pin path is not absence of installation |
-| sc-lint | Installed manifest and preflight workflow; no standard pin path found | sc-lint team owns adoption; provide instructions only |
+| sc-lint | Installed manifest and preflight workflow; `release/sc-publish-pin.toml` | sc-lint team owns its pin and adoption |
 | sc-publish | Shared kit source | Qualify source and its own publication setup separately |
 
 Rollout checklist, per consumer (not performed by this change):

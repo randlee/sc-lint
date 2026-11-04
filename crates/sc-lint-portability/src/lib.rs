@@ -1,3 +1,10 @@
+//! Portability analyzer for `sc-lint`: reports OS and platform assumptions as
+//! rules `PORT-001` to `PORT-010`. Run it as `sc-lint lint sc-portability`.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -13,7 +20,6 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
-use sc_lint_directives::{DirectiveError, SiteRuleId};
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 
@@ -27,6 +33,7 @@ mod platform_adapters;
 mod portability;
 mod predicates;
 mod site_allow;
+pub use site_allow::{SiteAllowDiagnostic, SiteAllowErrors};
 #[cfg(test)]
 mod tests;
 
@@ -114,18 +121,8 @@ impl From<anyhow_crate::Error> for PortabilityErrorSource {
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
-    #[error("PORTABILITY.INVALID_SITE_ALLOW at {}:{line}: {error}", path.display())]
-    InvalidSiteAllow {
-        path: PathBuf,
-        line: usize,
-        error: DirectiveError,
-    },
-    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unsupported portability rule `{rule}`; recovery: use PORT-010 or remove the allowance", path.display())]
-    UnknownRule {
-        path: PathBuf,
-        line: usize,
-        rule: SiteRuleId,
-    },
+    #[error(transparent)]
+    InvalidSiteAllows(#[from] SiteAllowErrors),
     #[error("failed to analyze portability findings for root `{}`: {source:#}", root.display())]
     AnalyzeFindings {
         root: PathBuf,
@@ -212,7 +209,8 @@ fn analyze_workspace_configured_with_metadata_loader(
                 &module_cfg,
             )
             .map_err(|source| map_portability_analysis_error(source, &options.root))?;
-            let scanned_crates = portability::count_scanned_crates(workspace);
+            let scanned_crates =
+                sc_lint_analyzer_support::count_scanned_crates_with_metadata(workspace);
             (findings, allowed, scanned_crates)
         } else {
             (Vec::new(), Vec::new(), 0)
@@ -240,13 +238,8 @@ fn analyze_workspace_configured_with_metadata_loader(
 }
 
 fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
-    match source.downcast::<site_allow::SiteAllowError>() {
-        Ok(site_allow::SiteAllowError::InvalidDirective { path, line, error }) => {
-            PortabilityError::InvalidSiteAllow { path, line, error }
-        }
-        Ok(site_allow::SiteAllowError::UnknownRule { path, line, rule }) => {
-            PortabilityError::UnknownRule { path, line, rule }
-        }
+    match source.downcast::<SiteAllowErrors>() {
+        Ok(errors) => PortabilityError::InvalidSiteAllows(errors),
         Err(source) => PortabilityError::AnalyzeFindings {
             root: root.to_path_buf(),
             source: source.into(),

@@ -39,21 +39,11 @@ WINDOWS_SHELL_SETTING = 'set windows-shell := ["cmd.exe", "/c"]'
 WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/templates/Justfile.default",
     "Justfile")
 
-# The usage grammar of the POSIX `.sc-lint/bootstrap` at cc1d496, which printed:
-#   usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run];
-#   .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml;
-#   .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>
-# bootstrap.py must list the same operations and arguments under its own name (AC3), plus the
-# l-6 `--fail-fast` lint flag and the test selector grammar.
-CC1D496_USAGE_GRAMMAR = (
-    "usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]",
-    ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py exec [--config sc-lint.toml] -- <argv...>",
-)
-CC1D496_USAGE_TOKENS = ("setup", "lint", "test", "upgrade", "exec", "--config sc-lint.toml", "[--check]", "[--dry-run]",
-    "[selector]", "[host|all|linux|macos|windows]", "-- <argv...>")
+# Pinned rather than sys.stdlib_module_names, which is missing on Python 3.9.
+BOOTSTRAP_STDLIB_MODULES = frozenset({
+    "hashlib", "json", "os", "pathlib", "platform", "re", "shutil", "subprocess",
+    "sys", "tarfile", "tempfile", "urllib", "venv", "zipfile",
+})
 
 
 def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
@@ -70,7 +60,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
             modules.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.add(node.module.split(".")[0])
-    assert modules <= sys.stdlib_module_names
+    assert modules <= BOOTSTRAP_STDLIB_MODULES
     for relative in ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/.sc-lint/justfile",
                      "packages/sc-lint-adoption/templates/Justfile.default",
                      "packages/sc-lint-adoption/templates/test.just", "Justfile"):
@@ -83,7 +73,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
             assert shell_lines == [], relative
 
 
-@pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--config"],
+@pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--check", "--config", "sc-lint.toml"], ["setup", "--config"],
     ["setup", "extra", "--config", "a"], ["lint", "a", "b", "c", "--config", "a"],
     ["lint", "a", "", "--config", "a"], ["test", "--config", "a", "--list", "x"],
     ["exec"], ["exec", "--config", "a", "sc-lint"], ["exec", "--"]])
@@ -92,9 +82,7 @@ def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     assert result.returncode == 2
     usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
     assert len(usage_lines) == 1, result.stderr
-    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
-    for token in CC1D496_USAGE_TOKENS:
-        assert token in usage_lines[0], token
+    assert usage_lines[0] == load_bootstrap().USAGE
     assert ".sc-lint/bootstrap " not in usage_lines[0]
 
 
@@ -103,6 +91,42 @@ def load_bootstrap():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_default_install_directory_follows_the_native_installer_rule(tmp_path: Path) -> None:
+    # Issue #833: the bootstrap and the native installer must pick the same
+    # default. The inputs are passed in, so no real %APPDATA% or home is read.
+    bootstrap = load_bootstrap()
+    home = tmp_path / "home"
+    roaming = tmp_path / "Roaming"
+    default_windows = home / "AppData" / "Roaming" / "sc-lint" / "bin"
+    default_unix = home / ".local" / "share" / "sc-lint" / "bin"
+
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, lambda: home, windows=True) == roaming / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"APPDATA": ""}, lambda: home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({}, lambda: home, windows=True) == default_windows
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, lambda: home, windows=False) == default_unix
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, lambda: home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": ""}, lambda: home, windows=False) == default_unix
+    assert bootstrap.default_install_directory(
+        {"SC_LINT_INSTALL_DIR": str(tmp_path / "managed"), "APPDATA": str(roaming)}, lambda: home, windows=True
+    ) == tmp_path / "managed"
+
+
+def test_default_install_directory_reads_no_home_when_an_override_supplies_it(tmp_path: Path) -> None:
+    # Windows finding 1b: a host with no home directory must still resolve an
+    # explicit install dir or %APPDATA%; the home lookup must not run eagerly.
+    bootstrap = load_bootstrap()
+
+    def no_home() -> Path:
+        raise RuntimeError("Could not determine home directory")
+
+    roaming = tmp_path / "Roaming"
+    managed = tmp_path / "managed"
+    assert bootstrap.default_install_directory({"SC_LINT_INSTALL_DIR": str(managed)}, no_home, windows=True) == managed
+    assert bootstrap.default_install_directory({"SC_LINT_INSTALL_DIR": str(managed)}, no_home, windows=False) == managed
+    assert bootstrap.default_install_directory({"APPDATA": str(roaming)}, no_home, windows=True) == roaming / "sc-lint" / "bin"
+    assert bootstrap.default_install_directory({"XDG_DATA_HOME": str(tmp_path / "xdg")}, no_home, windows=False) == tmp_path / "xdg" / "sc-lint" / "bin"
 
 
 def test_bootstrap_test_forwards_selector_and_args() -> None:
@@ -139,10 +163,59 @@ def test_bootstrap_lint_accepts_fail_fast() -> None:
 
 
 def test_old_python_fails_before_importing_the_bootstrap() -> None:
-    probe = "import runpy,sys; sys.version_info=(3,10,0); runpy.run_path(sys.argv[1],run_name='__main__')"
+    probe = "import runpy,sys; sys.version_info=(3,8,0); runpy.run_path(sys.argv[1],run_name='__main__')"
     result = run_subprocess([sys.executable, "-c", probe, str(ASSET)], text=True, capture_output=True, check=False)
     assert result.returncode == 1
     assert "CLI.SC_LINT_PYTHON_UNAVAILABLE" in result.stderr
+
+
+# Finding 10 (lint-085.54): with no override, APPDATA, XDG_DATA_HOME or home, every
+# copy must fail with one coded line and no traceback. The home lookup is forced to
+# raise in a child process, so the test reads no real home directory.
+# Path.home() raises RuntimeError when no home can be determined and KeyError on
+# Python 3.9 when the user has no passwd entry (QA round 4, finding 8).
+NO_HOME_PROBE = (
+    "import pathlib,runpy,sys\n"
+    "def no_home(cls):\n"
+    "    raise {error}\n"
+    "pathlib.Path.home = classmethod(no_home)\n"
+    "sys.argv = sys.argv[1:]\n"
+    "runpy.run_path(sys.argv[0], run_name='__main__')\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("script", "error"),
+    [
+        (ASSET, "RuntimeError('Could not determine home directory.')"),
+        (ROOT / ".sc-lint/bootstrap.py", "RuntimeError('Could not determine home directory.')"),
+        (ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", "RuntimeError('Could not determine home directory.')"),
+        (ASSET, "KeyError('getpwuid(): uid not found')"),
+        (ROOT / ".sc-lint/bootstrap.py", "KeyError('getpwuid(): uid not found')"),
+        (ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", "KeyError('getpwuid(): uid not found')"),
+    ],
+    ids=["asset-runtime", "repo-copy-runtime", "adoption-copy-runtime", "asset-keyerror", "repo-copy-keyerror", "adoption-copy-keyerror"],
+)
+def test_no_home_without_override_fails_with_one_coded_line(script: Path, error: str) -> None:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"SC_LINT_INSTALL_DIR", "SC_LINT_BIN", "APPDATA", "XDG_DATA_HOME"}
+    }
+    result = run_subprocess(
+        [sys.executable, "-c", NO_HOME_PROBE.format(error=error), str(script), "exec", "--", "sc-lint", "version"],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 4, result.stderr
+    assert result.stdout == ""
+    assert "Traceback" not in result.stderr
+    lines = result.stderr.splitlines()
+    assert len(lines) == 1, result.stderr
+    assert "CLI.SC_LINT_INSTALL_PERMISSION_DENIED" in lines[0]
+    assert "SC_LINT_INSTALL_DIR" in lines[0]
 
 
 def build_fake_product(tmp_path: Path) -> Path:
@@ -196,7 +269,7 @@ def test_just_reports_bootstrap_usage_errors(arguments: list[str]) -> None:
     assert result.returncode == 2, result.stdout + result.stderr
     usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
     assert len(usage_lines) == 1, result.stderr
-    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
+    assert usage_lines[0] == load_bootstrap().USAGE
 
 
 @pytest.mark.integration

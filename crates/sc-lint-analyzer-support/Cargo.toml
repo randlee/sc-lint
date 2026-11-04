@@ -9,6 +9,9 @@ description = "Shared AST scanning, analyzer configuration parsing, and text ren
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-analyzer-support/0.8.5"
+keywords = ["rust", "sc-lint", "analyzer", "ast", "support"]
+categories = ["development-tools", "development-tools::procedural-macro-helpers", "parser-implementations"]
 
 [lib]
 name = "sc_lint_analyzer_support"

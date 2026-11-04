@@ -12,6 +12,8 @@ Phase L improves portability and boundary analysis across real workspaces. Porta
 
 The runtime analyzer adds `SCB-RUNTIME-003` for blocking `std::thread::sleep` in production targets of packages that declare Tokio. Replace those calls with `tokio::time::sleep(...).await`; test-only code is outside the rule's scope.
 
+> **Note (0.8.5):** this advice is superseded. 0.8.5 adds `SCB-RUNTIME-005`, which also reports `tokio::time::sleep` in non-test code; use event-driven synchronization or `yield_now` instead. See the [CHANGELOG](https://github.com/randlee/sc-lint/blob/main/CHANGELOG.md).
+
 Rust analyzer reports are checked against the bundled `analyzer-report-v1` JSON Schema. Python adapter responses are also checked against the stable `sc-lint-python-v1` contract, so malformed backend data fails with an actionable protocol error.
 
 ---

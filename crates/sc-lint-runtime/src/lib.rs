@@ -1,3 +1,11 @@
+//! Runtime analyzer for `sc-lint`: reports blocking waits, sleeps, executor
+//! entry and `Mutex` guards held across `.await` as rules `SCB-RUNTIME-001` to
+//! `SCB-RUNTIME-007`. Run it as `sc-lint lint sc-runtime`.
+//!
+//! The primary product is the [`sc-lint`](https://crates.io/crates/sc-lint) CLI;
+//! install it rather than this crate unless you are building on the library.
+//! Documentation and source: <https://github.com/randlee/sc-lint>.
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -24,6 +32,7 @@ use thiserror::Error;
 
 mod api;
 mod imports;
+mod position;
 mod practices;
 mod runtime;
 mod scope;
@@ -34,67 +43,45 @@ mod tests;
 const SC_LINT_RUNTIME_TOOL: &str = "sc-lint-runtime";
 const SC_LINT_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+macro_rules! runtime_rules {
+    ($($variant:ident => ($code:literal, $kind:literal)),+ $(,)?) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        #[non_exhaustive]
+        pub enum RuleId { $($variant),+ }
+        impl RuleId {
+            pub(crate) const ALL: &'static [Self] = &[$(Self::$variant),+];
+            pub const fn as_str(self) -> &'static str { match self { $(Self::$variant => $code),+ } }
+            pub(crate) const fn kind(self) -> &'static str { match self { $(Self::$variant => $kind),+ } }
+            pub(crate) fn from_known(value: &str) -> Option<Self> {
+                Self::ALL.iter().copied().find(|rule| rule.as_str() == value)
+            }
+        }
+        pub(crate) const KNOWN_RULES: &[&str] = &[$($code),+];
+        const CATALOG_RULES: &[CatalogRuleId] = &[$(CatalogRuleId::new($code)),+];
+    };
+}
+
+runtime_rules! {
+    ScbRuntime001 => ("SCB-RUNTIME-001", "condvar_wait_without_timeout"),
+    ScbRuntime002 => ("SCB-RUNTIME-002", "discarded_wait_timeout_result"),
+    ScbRuntime003 => ("SCB-RUNTIME-003", "blocking_thread_sleep_in_tokio_package"),
+    ScbRuntime004 => ("SCB-RUNTIME-004", "blocking_thread_sleep_until"),
+    ScbRuntime005 => ("SCB-RUNTIME-005", "tokio_timer_sleep"),
+    ScbRuntime006 => ("SCB-RUNTIME-006", "blocking_executor_entry"),
+    ScbRuntime007 => ("SCB-RUNTIME-007", "mutex_guard_across_await"),
+}
+
 pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
     analyzer: AnalyzerName::new("runtime"),
-    rules: &[
-        CatalogRuleId::new("SCB-RUNTIME-001"),
-        CatalogRuleId::new("SCB-RUNTIME-002"),
-        CatalogRuleId::new("SCB-RUNTIME-003"),
-        CatalogRuleId::new("SCB-RUNTIME-004"),
-        CatalogRuleId::new("SCB-RUNTIME-005"),
-        CatalogRuleId::new("SCB-RUNTIME-006"),
-        CatalogRuleId::new("SCB-RUNTIME-007"),
-    ],
-    path_addressable_rules: &[
-        CatalogRuleId::new("SCB-RUNTIME-001"),
-        CatalogRuleId::new("SCB-RUNTIME-002"),
-        CatalogRuleId::new("SCB-RUNTIME-003"),
-        CatalogRuleId::new("SCB-RUNTIME-004"),
-        CatalogRuleId::new("SCB-RUNTIME-005"),
-        CatalogRuleId::new("SCB-RUNTIME-006"),
-        CatalogRuleId::new("SCB-RUNTIME-007"),
-    ],
+    rules: CATALOG_RULES,
+    path_addressable_rules: CATALOG_RULES,
     families: &[],
-    default_fail: &[
-        CatalogRuleId::new("SCB-RUNTIME-001"),
-        CatalogRuleId::new("SCB-RUNTIME-002"),
-        CatalogRuleId::new("SCB-RUNTIME-003"),
-        CatalogRuleId::new("SCB-RUNTIME-004"),
-        CatalogRuleId::new("SCB-RUNTIME-005"),
-        CatalogRuleId::new("SCB-RUNTIME-006"),
-        CatalogRuleId::new("SCB-RUNTIME-007"),
-    ],
+    default_fail: CATALOG_RULES,
     own_keys: &[],
 };
 
 pub type FindingsReport = SchemaFindingsReport<RuleId>;
 pub type Finding = SchemaFinding<RuleId>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum RuleId {
-    ScbRuntime001,
-    ScbRuntime002,
-    ScbRuntime003,
-    ScbRuntime004,
-    ScbRuntime005,
-    ScbRuntime006,
-    ScbRuntime007,
-}
-
-impl RuleId {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::ScbRuntime001 => "SCB-RUNTIME-001",
-            Self::ScbRuntime002 => "SCB-RUNTIME-002",
-            Self::ScbRuntime003 => "SCB-RUNTIME-003",
-            Self::ScbRuntime004 => "SCB-RUNTIME-004",
-            Self::ScbRuntime005 => "SCB-RUNTIME-005",
-            Self::ScbRuntime006 => "SCB-RUNTIME-006",
-            Self::ScbRuntime007 => "SCB-RUNTIME-007",
-        }
-    }
-}
 
 impl Serialize for RuleId {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -159,10 +146,12 @@ fn analyze_workspace_configured_with_metadata_loader(
                 root: options.root.clone(),
                 source: source.into(),
             })?;
-        let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &settings)
-            .map_err(|source| RuntimeError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
+        let findings =
+            runtime::analyze_runtime_liveness(&options.root, &workspace).map_err(|source| {
+                RuntimeError::AnalyzeFindings {
+                    root: options.root.clone(),
+                    source: source.into(),
+                }
             })?;
         let scanned_crates =
             sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);

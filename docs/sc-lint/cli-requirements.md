@@ -322,7 +322,7 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-018`
   Compatibility failures must use stable error codes and include a cause,
-  `just setup`/installer recovery guidance, and the `sc-lint docs setup`
+  `just setup`/installer recovery guidance, and the `sc-lint docs just-setup`
   reference. When available, the JSON details and human message must identify
   the configured minimum version, observed version, binary path, and
   configuration path.
@@ -376,6 +376,16 @@ specialized backend tools and mixed Rust/Python implementations.
   A current integration is idempotent; `--check` and `--dry-run` do not mutate
   it. A differing existing managed-path file is a structured conflict, never
   an overwrite, and a consumer README is outside the command's write set.
+  Exception for prior-release files: comparison ignores line endings (CRLF
+  and LF), and a managed file that matches a known prior-release asset is
+  not a conflict. A matching prior-release `.sc-lint/bootstrap.py` is
+  refreshed with the current asset; a matching prior-release `Justfile` with
+  its old managed header is accepted as current; a generated `sc-lint.toml`
+  that differs only in its well-formed minimum version is preserved and
+  reported as version-only stale. Any other difference is a conflict.
+  `--check` reports a file that would be refreshed as
+  `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
+  lint-085.56 and lint-085.61; Pending Rand.)
   E.6 owns optional CI workflow generation because it depends on the reusable
   release-verified Action rather than a source-checkout fallback.
 

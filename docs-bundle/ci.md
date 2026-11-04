@@ -16,8 +16,12 @@ the consumer commands after the preflight.
 - uses: randlee/sc-lint@v1
   with:
     operation: lint
-    version: 0.8.4
+    version: 0.8.5
 ```
+
+The Action runs on Linux, macOS, and Windows runners on x86_64 or ARM64 (the
+six release targets). Any other runner fails with
+`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`.
 
 `version` is required. It is the exact released product SemVer, without a
 leading `v`, and it selects the verified artifact. Do not infer it from Cargo
@@ -30,7 +34,7 @@ commit SHA and keep `version` explicit:
 - uses: randlee/sc-lint@<full-commit-sha>
   with:
     operation: test
-    version: 0.8.4
+    version: 0.8.5
 ```
 
 The `v1` tag identifies the Action interface and is a movable tag, refreshed

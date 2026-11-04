@@ -428,8 +428,9 @@ def published_registry_url() -> str:
         yield f"http://{host}:{port}"
     finally:
         server.shutdown()
-        thread.join()
+        thread.join(timeout=10)
         server.server_close()
+        assert not thread.is_alive(), "published-version fixture server did not stop"
 
 
 def configure_fixture_crates_registry(manifest: Path, registry_url: str) -> None:

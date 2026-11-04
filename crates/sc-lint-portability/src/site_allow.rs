@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use sc_lint_directives::{
     AttributeInput, Directive, DirectiveError, SiteAllowReason, SiteRuleId, is_sc_lint_attribute,
-    unknown_owned_rule,
+    unknown_owned_rules, unknown_rule,
 };
 use sc_lint_schema::AllowedFinding;
 use syn::Attribute;
@@ -23,36 +23,50 @@ pub(super) struct SiteAllowance {
     pub(super) item: String,
 }
 
+/// One source-located site allowance diagnostic.
 #[derive(Debug, thiserror::Error)]
-pub(super) enum SiteAllowError {
-    #[error("{path}:{line}: {error}")]
-    InvalidDirective {
-        path: PathBuf,
-        line: usize,
-        error: DirectiveError,
-    },
-    #[error("{path}:{line}: unsupported portability rule `{rule}`")]
-    UnknownRule {
-        path: PathBuf,
-        line: usize,
-        rule: SiteRuleId,
-    },
+#[error("{path}:{line}: {error}")]
+pub struct SiteAllowDiagnostic {
+    pub path: PathBuf,
+    pub line: usize,
+    #[source]
+    pub error: DirectiveError,
 }
+/// Site allowance diagnostics, ordered by source path and then source location.
+#[derive(Debug)]
+pub struct SiteAllowErrors {
+    pub diagnostics: Vec<SiteAllowDiagnostic>,
+}
+impl std::fmt::Display for SiteAllowErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, diagnostic) in self.diagnostics.iter().enumerate() {
+            if index != 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{diagnostic}")?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for SiteAllowErrors {}
 
 pub(super) fn collect_site_allowances(
     file: &syn::File,
     source_path: &Path,
-) -> Result<Vec<SiteAllowance>, SiteAllowError> {
+) -> Result<Vec<SiteAllowance>, SiteAllowErrors> {
     let mut visitor = SiteAllowVisitor {
         path: source_path,
         module_path: source_file_module_path(source_path),
         allowances: Vec::new(),
-        error: None,
+        errors: Vec::new(),
     };
     visitor.visit_file(file);
-    match visitor.error {
-        Some(error) => Err(error),
-        None => Ok(visitor.allowances),
+    if visitor.errors.is_empty() {
+        Ok(visitor.allowances)
+    } else {
+        Err(SiteAllowErrors {
+            diagnostics: visitor.errors,
+        })
     }
 }
 
@@ -60,7 +74,7 @@ struct SiteAllowVisitor<'a> {
     path: &'a Path,
     module_path: Vec<String>,
     allowances: Vec<SiteAllowance>,
-    error: Option<SiteAllowError>,
+    errors: Vec<SiteAllowDiagnostic>,
 }
 
 impl SiteAllowVisitor<'_> {
@@ -70,7 +84,7 @@ impl SiteAllowVisitor<'_> {
                 continue;
             }
             let line = attr.span().start().line;
-            let parsed = match attr.parse_args::<AttributeInput>() {
+            let parsed = match AttributeInput::parse_attribute(attr) {
                 Ok(parsed) => parsed,
                 Err(error) => {
                     // Boundary directives retain their existing diagnostics; only site syntax
@@ -79,17 +93,20 @@ impl SiteAllowVisitor<'_> {
                     {
                         continue;
                     }
-                    self.fail(line, DirectiveError::from_diagnostic(&error.to_string()));
-                    return;
+                    self.fail(line, error);
+                    continue;
                 }
             };
             for directive in parsed.directives {
                 let Directive::SiteAllow { rules, reason } = directive else {
                     continue;
                 };
-                if let Some(rule) = unknown_owned_rule(&rules, "PORT-", &["PORT-010"]) {
-                    self.fail_unknown_rule(line, rule.clone());
-                    return;
+                let unknown = unknown_owned_rules(&rules, "PORT-", &["PORT-010"]);
+                for rule in &unknown {
+                    self.fail(line, unknown_rule(rule, &["PORT-010"]));
+                }
+                if !unknown.is_empty() {
+                    continue;
                 }
                 self.allowances.push(SiteAllowance {
                     path: self.path.to_path_buf(),
@@ -103,33 +120,16 @@ impl SiteAllowVisitor<'_> {
     }
 
     fn fail(&mut self, line: usize, error: DirectiveError) {
-        let error = SiteAllowError::InvalidDirective {
+        self.errors.push(SiteAllowDiagnostic {
             path: self.path.to_path_buf(),
             line,
             error,
-        };
-        // The visitor preserves the first source-order error.
-        if self.error.is_none() {
-            self.error = Some(error);
-        }
-    }
-
-    fn fail_unknown_rule(&mut self, line: usize, rule: SiteRuleId) {
-        if self.error.is_none() {
-            self.error = Some(SiteAllowError::UnknownRule {
-                path: self.path.to_path_buf(),
-                line,
-                rule,
-            });
-        }
+        });
     }
 }
 
 impl<'ast> Visit<'ast> for SiteAllowVisitor<'_> {
     fn visit_item(&mut self, item: &'ast Item) {
-        if self.error.is_some() {
-            return;
-        }
         match item {
             Item::Mod(module) => {
                 let item_path = qualified_item(&self.module_path, module.ident.to_string());
@@ -168,9 +168,6 @@ impl<'ast> Visit<'ast> for SiteAllowVisitor<'_> {
     }
 
     fn visit_impl_item(&mut self, item: &'ast ImplItem) {
-        if self.error.is_some() {
-            return;
-        }
         if let ImplItem::Fn(method) = item {
             self.visit_attrs(
                 &method.attrs,

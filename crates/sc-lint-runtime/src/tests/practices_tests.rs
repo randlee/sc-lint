@@ -168,7 +168,7 @@ fn missing_empty_and_unknown_allow_reasons_are_reported() {
     for (attribute, code) in [
         (
             "allow(SCB-RUNTIME-005)",
-            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+            sc_lint_directives::DirectiveCode::MissingReason.qualified(),
         ),
         (
             "allow(SCB-RUNTIME-005), reason=\"  \"",
@@ -176,7 +176,7 @@ fn missing_empty_and_unknown_allow_reasons_are_reported() {
         ),
         (
             "allow(SCB-RUNTIME-999), reason=\"unknown\"",
-            "DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE",
+            sc_lint_directives::DirectiveCode::UnknownRule.qualified(),
         ),
     ] {
         let fixture = tokio_fixture(
@@ -375,12 +375,16 @@ fn allowance_errors_are_all_located_source_ordered_and_not_duplicated() {
         .unwrap_err()
         .to_string();
     assert_eq!(
-        error.matches("DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE").count(),
+        error
+            .matches(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+            .count(),
         1,
         "{error}"
     );
     assert_eq!(
-        error.matches("DIRECTIVE.SITE_ALLOW.MISSING_REASON").count(),
+        error
+            .matches(sc_lint_directives::DirectiveCode::MissingReason.qualified())
+            .count(),
         1,
         "{error}"
     );
@@ -428,7 +432,9 @@ fn known_never_associated_and_self_methods_do_not_contribute_to_joins() {
         let source = format!(
             "struct S;impl S{{fn stop(&self)->!{{panic!()}}async fn f(&self,m:&std::sync::Mutex<()>){{let g=m.lock().unwrap();let v=if condition{{drop(g);1}}else{{{exit}}};other(v).await;}}}}"
         );
-        assert!(report(&source, false).findings.is_empty(), "{source}");
+        for source in [source.clone(), format!("mod nested {{{source}}}")] {
+            assert!(report(&source, false).findings.is_empty(), "{source}");
+        }
     }
 }
 
@@ -492,9 +498,7 @@ fn macro_break_inside_loop_preserves_reachable_guard_state() {
 }
 
 #[test]
-fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
-    // Known limitation: rule 003 does not resolve renamed `self` imports.
-    // See the README and offline guide's syntactic coverage and limits.
+fn shared_resolver_supports_sleep_import_forms_and_preserves_name_hint_policy() {
     for (imports, expected) in [
         (
             "use std::thread::{self};",
@@ -502,7 +506,7 @@ fn resolver_consolidation_preserves_legacy_sleep_policy_differences() {
         ),
         (
             "use std::thread::{self as thread};",
-            vec![RuleId::ScbRuntime004],
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime004],
         ),
         (
             "use std::*;",
@@ -744,4 +748,317 @@ fn or_patterns_preserve_named_and_borrowed_guard_ownership() {
             "{source}"
         );
     }
+}
+
+#[test]
+fn module_and_function_aliases_do_not_collide_in_either_declaration_order() {
+    let imports = "use std::thread::sleep_until as tick; use tokio::time::sleep as nap; use futures::executor::block_on as run; use std::sync::Mutex as Lock;";
+    let ordinary = "use custom::{tick, nap, run, Lock};";
+    let body = "tick(()); nap(()); run(async {}); let m=Lock::new(()); let guard=m.lock().unwrap(); future.await;";
+    for (checked, plain) in [
+        (
+            format!("mod a {{ {imports} async fn checked(){{{body}}} }}"),
+            format!("mod b {{ {ordinary} async fn plain(){{{body}}} }}"),
+        ),
+        (
+            format!("async fn checked(){{{imports}{body}}}"),
+            format!("async fn plain(){{{ordinary}{body}}}"),
+        ),
+    ] {
+        for source in [format!("{checked}{plain}"), format!("{plain}{checked}")] {
+            let found = report(&source, true);
+            assert_eq!(
+                rule_ids(&found),
+                vec![
+                    RuleId::ScbRuntime004,
+                    RuleId::ScbRuntime005,
+                    RuleId::ScbRuntime006,
+                    RuleId::ScbRuntime007
+                ],
+                "{source}"
+            );
+            assert!(
+                found.findings.iter().all(|finding| finding
+                    .node_ids
+                    .iter()
+                    .all(|id| id.as_str().ends_with("::checked"))),
+                "{source}"
+            );
+        }
+    }
+}
+
+#[test]
+fn file_test_marker_exempts_legacy_runtime_rules_too() {
+    let source = "fn f(cv: &Condvar) { cv.wait(guard); cv.wait_timeout(guard, duration); std::thread::sleep(duration); }";
+    assert_eq!(
+        rule_ids(&report(source, true)),
+        vec![
+            RuleId::ScbRuntime001,
+            RuleId::ScbRuntime002,
+            RuleId::ScbRuntime003
+        ]
+    );
+    assert!(
+        report(&format!("#![cfg(test)]\n{source}"), true)
+            .findings
+            .is_empty()
+    );
+}
+
+#[test]
+fn allowance_diagnostics_retain_typed_codes_and_source_positions() {
+    let source: syn::File = syn::parse_str("#[sc_lint(allow(SCB-RUNTIME-999), reason=\"test\")] fn f() {}\n#[sc_lint(allow(SCB-RUNTIME-005))] fn g() {}") .unwrap();
+    let errors = crate::practices::allowances::Allowances::collect(&source)
+        .err()
+        .unwrap();
+    assert_eq!(errors.diagnostics.len(), 2);
+    assert_eq!(errors.diagnostics[0].position.line, 1);
+    assert_eq!(
+        errors.diagnostics[0].directive.code(),
+        sc_lint_directives::DirectiveCode::UnknownRule.qualified()
+    );
+    assert_eq!(errors.diagnostics[1].position.line, 2);
+    assert_eq!(
+        errors.diagnostics[1].directive.code(),
+        sc_lint_directives::DirectiveCode::MissingReason.qualified()
+    );
+    assert!(
+        errors
+            .to_string()
+            .contains(sc_lint_directives::DirectiveCode::UnknownRule.recovery())
+    );
+}
+
+#[test]
+fn qualified_impls_resolve_fields_in_the_declaring_module_only() {
+    let declaration = "mod a { pub struct S { pub m: std::sync::Mutex<()> } }";
+    let ordinary = "mod b { pub struct S { pub m: Custom } } impl b::S { async fn ordinary(&self){let g=self.m.lock().unwrap();future.await;} }";
+    for owner in ["a::S", "crate::a::S"] {
+        for source in [
+            format!(
+                "{declaration}{ordinary} impl {owner} {{async fn checked(&self){{let g=self.m.lock().unwrap();future.await;}}}}"
+            ),
+            format!(
+                "{ordinary}{declaration} impl {owner} {{async fn checked(&self){{let g=self.m.lock().unwrap();future.await;}}}}"
+            ),
+        ] {
+            let found = report(&source, false);
+            assert_eq!(rule_ids(&found), vec![RuleId::ScbRuntime007], "{source}");
+            assert!(
+                found.findings[0].node_ids[0]
+                    .as_str()
+                    .ends_with("::checked")
+            );
+        }
+    }
+}
+
+#[test]
+fn explicit_parent_imports_keep_runtime_aliases_available_in_child_modules() {
+    let imports = "use std::thread::sleep_until as tick; use tokio::time::sleep as nap; use futures::executor::block_on as run; use std::sync::Mutex as Lock;";
+    let body = "tick(());nap(());run(async{});let m=Lock::new(());let guard=m.lock().unwrap();future.await;";
+    for inherited in [
+        "use super::*;",
+        "use super::{tick, nap, run, Lock};",
+        "use crate::{tick, nap, run, Lock};",
+    ] {
+        let source = format!("{imports} mod child {{{inherited} async fn checked(){{{body}}}}}");
+        assert_eq!(
+            rule_ids(&report(&source, true)),
+            vec![
+                RuleId::ScbRuntime004,
+                RuleId::ScbRuntime005,
+                RuleId::ScbRuntime006,
+                RuleId::ScbRuntime007
+            ],
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn parent_aliases_keep_their_definition_scope_across_nested_modules() {
+    let source = "use tokio::time::sleep as nap; mod a { use super::nap; mod b { use super::*; async fn f(){nap(()).await;} } }";
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime005]
+    );
+}
+
+#[test]
+fn qualified_003_allow_is_scoped_to_the_annotated_function() {
+    let source = r#"
+#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "Bounded synchronous compatibility polling")]
+fn allowed() {
+    std::thread::sleep(interval);
+    fn nested() { std::thread::sleep(interval); }
+}
+fn sibling() { std::thread::sleep(interval); }
+"#;
+    let found = report(source, true);
+    assert_eq!(
+        rule_ids(&found),
+        vec![RuleId::ScbRuntime003, RuleId::ScbRuntime003]
+    );
+    let labels = found
+        .findings
+        .iter()
+        .flat_map(|finding| &finding.node_ids)
+        .map(|node| node.as_str().rsplit("::").next().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        labels,
+        std::collections::BTreeSet::from(["nested", "sibling"])
+    );
+}
+
+#[test]
+fn qualified_003_allow_requires_a_reason() {
+    let fixture = tokio_fixture(
+        "#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003))] fn missing_reason() { std::thread::sleep(interval); }",
+        TOKIO,
+    );
+    let error = analyze_workspace(&analyze_options(&fixture))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(sc_lint_directives::DirectiveCode::MissingReason.qualified()),
+        "{error}"
+    );
+    assert!(error.contains("at line 1"), "{error}");
+    assert!(error.contains("recovery:"), "{error}");
+}
+
+#[test]
+fn imported_root_statics_preserve_mutex_identity() {
+    let source = r#"
+        static M: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        mod a { use crate::M; async fn f() { let guard = M.lock().unwrap(); work().await; } }
+        mod b { use super::M; async fn f() { let guard = M.lock().unwrap(); work().await; } }
+    "#;
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007; 2]
+    );
+}
+
+#[test]
+fn sleep_imports_do_not_leak_between_modules_or_functions() {
+    let blocking = "mod a { use std::thread::sleep; fn f(){ sleep(()); } }";
+    let timer = "mod b { use tokio::time::sleep; fn f(){ sleep(()); } }";
+    for source in [
+        format!("{blocking}{timer}"),
+        format!("{timer}{blocking}"),
+        "fn a(){use std::thread::sleep; sleep(());} fn b(){use tokio::time::sleep; sleep(());}"
+            .into(),
+    ] {
+        assert_eq!(
+            rule_ids(&report(&source, true)),
+            vec![RuleId::ScbRuntime003, RuleId::ScbRuntime005]
+        );
+    }
+}
+
+#[test]
+fn all_wait_rules_share_compound_and_framework_test_exemptions() {
+    let body = "fn f(c:&std::sync::Condvar,m:&std::sync::Mutex<()>){let g=m.lock().unwrap();c.wait(g);c.wait_timeout(g,d);}";
+    assert_eq!(
+        rule_ids(&report(body, false)),
+        vec![RuleId::ScbRuntime001, RuleId::ScbRuntime002]
+    );
+    for attr in [
+        "#[cfg(all(test,unix))]",
+        "#[tokio::test]",
+        "#[async_std::test]",
+    ] {
+        assert!(
+            report(&format!("{attr}{body}"), false).findings.is_empty(),
+            "{attr}"
+        );
+    }
+}
+
+#[test]
+fn runtime_allowances_reject_non_function_placement() {
+    for item in ["mod m {}", "struct S;", "impl S {}", "const C: () = ();"] {
+        let source = format!("#[sc_lint(allow(SCB-RUNTIME-003),reason=\"deliberate\")] {item}");
+        let fixture = tokio_fixture(&source, TOKIO);
+        let error = analyze_workspace(&analyze_options(&fixture)).unwrap_err();
+        assert!(error.to_string().contains("UNSUPPORTED_ITEM"), "{error}");
+    }
+}
+
+#[test]
+fn runtime_reports_every_unknown_owned_rule() {
+    let fixture = tokio_fixture(
+        "#[sc_lint(allow(SCB-RUNTIME-998,SCB-RUNTIME-999),reason=\"typos\")]fn f(){}",
+        TOKIO,
+    );
+    let error = analyze_workspace(&analyze_options(&fixture))
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        error
+            .matches(sc_lint_directives::DirectiveCode::UnknownRule.qualified())
+            .count(),
+        2,
+        "{error}"
+    );
+    assert!(error.contains("valid rule ids:"));
+}
+
+#[test]
+fn typed_runtime_inventory_matches_catalog() {
+    assert_eq!(
+        RuleId::ALL.iter().map(|id| id.as_str()).collect::<Vec<_>>(),
+        RUNTIME_CATALOG
+            .rules
+            .iter()
+            .map(|id| id.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn parent_and_current_module_imports_preserve_static_identity() {
+    let source = r#"
+        mod a { pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(()); }
+        static R: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        mod b { use super::a::M; async fn f(){let g=M.lock().unwrap();tick().await;} }
+        mod c { use crate::a::M; async fn f(){let g=M.lock().unwrap();tick().await;} }
+        mod d { use crate::R; async fn f(){let g=R.lock().unwrap();tick().await;} }
+        mod e { use super::R; async fn f(){let g=R.lock().unwrap();tick().await;} }
+    "#;
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007; 4]
+    );
+    for (declarations, imports) in [
+        ("", "use super::super::a::M;"),
+        (
+            "mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}",
+            "use self::a::M;",
+        ),
+        ("", "use super::super::a::*;"),
+        (
+            "mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}",
+            "use self::a::*;",
+        ),
+        ("", "use crate::a::*;"),
+    ] {
+        let source = format!(
+            "mod a {{pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());}} mod outer {{mod b {{{declarations} {imports} async fn f(){{let g=M.lock().unwrap();tick().await;}}}}}}"
+        );
+        assert_eq!(
+            rule_ids(&report(&source, false)),
+            vec![RuleId::ScbRuntime007],
+            "{imports}"
+        );
+    }
+    let source = "mod outer { mod a {pub static M: std::sync::Mutex<()> = std::sync::Mutex::new(());} mod b {use super::a::M;async fn f(){let g=M.lock().unwrap();tick().await;}}}";
+    assert_eq!(
+        rule_ids(&report(source, false)),
+        vec![RuleId::ScbRuntime007]
+    );
 }

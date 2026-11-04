@@ -16,8 +16,27 @@ The crate provides one canonical parse model for supported source directives.
   and portability ignores boundary-scoped directives. The literal reason must
   be non-empty, and the exception never cascades to child items. The only
   portability rule currently supported by this site allowance is `PORT-010`;
-  other `PORT-*` ids are well-formed syntax but return
-  `PORTABILITY.UNKNOWN_RULE` from the portability analyzer.
+  other `PORT-*` ids are well-formed syntax but the portability analyzer
+  rejects them with `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
+- `REQ-PRODUCT-004E` (Accepted, Rand 2026-11-03: "004E approved (as long as
+  consumer can opt out w/ reason)") applies the same site-allowance model to
+  the runtime analyzer: `#[sc_lint(allow(SCB-RUNTIME-00N), reason = "...")]`
+  on a function or method exempts that function from the named runtime
+  rules, without cascading into nested functions. Every known
+  `SCB-RUNTIME-*` id is accepted. A well-formed `SCB-RUNTIME-*` id the
+  runtime analyzer does not know fails with
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` and recovery "use a rule id from the
+  owning analyzer catalog". Ids owned by another analyzer are left to that analyzer. ADR-022
+  decision 4 names only `PORT-010`; this requirement is the decision record
+  for the runtime extension until the ADR-022 runtime site-allowance
+  amendment (Pending Rand) is decided.
+- Shared helpers for analyzers that consume site allowances:
+  `is_sc_lint_attribute` recognizes `#[sc_lint(...)]` and
+  `#[sc_lint_attributes::sc_lint(...)]`; `unknown_owned_rules` returns
+  every id that carries an analyzer's prefix but is missing from its catalog;
+  `DirectiveError::from_diagnostic` maps a foreign `syn` parse error to
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`, and `UNKNOWN_ELEMENT` is reserved for
+  unsupported elements.
 
 ## Scope Rules
 
@@ -39,7 +58,7 @@ The crate provides one canonical parse model for supported source directives.
 | --- | --- | --- |
 | `allow(PORT-010), reason="x"` | One site allowance. | — |
 | `reason="x", allow(PORT-010,),` | Same allowance; order is free and a trailing comma is accepted. | — |
-| `allow(PORT-010, PORT-011,), reason="x"` | Parses; unsupported portability ids fail later as `PORTABILITY.UNKNOWN_RULE`. | Use `PORT-010` or remove the unsupported allowance. |
+| `allow(PORT-010, PORT-011,), reason="x"` | Parses; unsupported portability ids fail later as `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`, one diagnostic per id. | Use a rule id from the owning analyzer catalog (`PORT-010`). |
 | `allow()` | `DIRECTIVE.SITE_ALLOW.EMPTY_RULES`. | Provide at least one unquoted rule id. |
 | `allow(PORT-010)` | `DIRECTIVE.SITE_ALLOW.MISSING_REASON`. | Add `reason = "..."` to the allowance. |
 | `allow(PORT-010), reason="  "` | `DIRECTIVE.SITE_ALLOW.EMPTY_REASON`. | Provide a non-empty reason string. |
@@ -51,7 +70,8 @@ The crate provides one canonical parse model for supported source directives.
 | `unknown_element` | `DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT`. | Remove unsupported elements from the attribute. |
 | `allow(PORT-), reason="x"` | `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID`. | Write an analyzer prefix and numeric suffix, for example `PORT-010`. |
 | `allow(PORT-010), reason=variable` | `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON`. | Use a string literal for the reason. |
-| `allow(PORT-001), reason="x"` | Parses, then returns `PORTABILITY.UNKNOWN_RULE`; only `PORT-010` is supported. | Use `PORT-010` or remove the unsupported allowance. |
+| Tokens the attribute parser cannot read | `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`. | Correct the attribute syntax reported by the parser. |
+| `allow(PORT-001), reason="x"` | Parses, then returns `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`; only `PORT-010` is supported. | Use a rule id from the owning analyzer catalog (`PORT-010`). |
 | `allow(SCB-MANIFEST-004), reason="x"` | Parses and is ignored by portability because another analyzer owns the id. | — |
 | `boundary.allow("B"), allow(PORT-010), reason="x"` | Both directives parse; boundary syntax and behavior stay unchanged. | — |
 

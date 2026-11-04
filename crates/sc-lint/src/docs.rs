@@ -157,6 +157,7 @@ mod tests {
         "upgrade.md",
         "troubleshooting.md",
         "best-practices.md",
+        "cli-reference/README.md",
     ];
 
     fn source_root() -> PathBuf {
@@ -404,10 +405,12 @@ mod tests {
 
     #[test]
     fn canonical_just_guide_contains_the_product_template_verbatim() {
-        let guide = fs::read_to_string(source_root().join("just-setup.md")).expect("just guide");
-        let template = include_str!("../assets/consumer-Justfile").trim();
+        let guide = fs::read_to_string(source_root().join("just-setup.md"))
+            .expect("just guide")
+            .replace("\r\n", "\n");
+        let template = include_str!("../assets/consumer-Justfile").replace("\r\n", "\n");
         assert!(
-            guide.contains(template),
+            guide.contains(template.trim()),
             "just-setup.md must embed the canonical generated consumer template"
         );
     }

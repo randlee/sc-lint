@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
-use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -24,75 +23,41 @@ pub fn relative_slash_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PackageName(String);
-
-impl PackageName {
-    pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-        debug_assert!(!value.is_empty(), "package names must not be empty");
-        Self(value)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+macro_rules! name_type {
+    ($name:ident, $description:literal) => {
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct $name(String);
+        impl $name {
+            /// Constructs a non-empty name.
+            ///
+            /// # Panics
+            /// Panics if `value` is empty.
+            pub fn new(value: impl Into<String>) -> Self {
+                let value = value.into();
+                assert!(
+                    !value.is_empty(),
+                    concat!($description, " names must not be empty")
+                );
+                Self(value)
+            }
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+    };
 }
-
-impl AsRef<str> for PackageName {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl Deref for PackageName {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl fmt::Display for PackageName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TargetName(String);
-
-impl TargetName {
-    pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-        debug_assert!(!value.is_empty(), "target names must not be empty");
-        Self(value)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for TargetName {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl Deref for TargetName {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl fmt::Display for TargetName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
+name_type!(PackageName, "package");
+name_type!(TargetName, "target");
 
 #[derive(Debug, Clone)]
 pub struct FileContext {
@@ -126,7 +91,7 @@ pub enum PackageDependencyKind {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageDependency {
-    pub name: String,
+    pub name: PackageName,
     pub rename: Option<String>,
     pub kind: PackageDependencyKind,
     pub target: Option<String>,
@@ -157,7 +122,7 @@ impl WorkspaceMetadata {
                     .dependencies
                     .iter()
                     .map(|dependency| PackageDependency {
-                        name: dependency.name.clone(),
+                        name: PackageName::new(dependency.name.clone()),
                         rename: dependency.rename.clone(),
                         kind: match dependency.kind {
                             cargo_metadata::DependencyKind::Normal => PackageDependencyKind::Normal,
@@ -230,12 +195,12 @@ pub fn discover_source_files_with_metadata(
     workspace: &WorkspaceMetadata,
 ) -> Result<Vec<FileContext>> {
     let metadata = &workspace.metadata;
-    let workspace_members = metadata.workspace_members.clone();
+    let workspace_members = &metadata.workspace_members;
     let mut files = Vec::new();
     let mut seen_paths = BTreeSet::new();
 
     for package in &metadata.packages {
-        if !workspace_members.iter().any(|id| id == &package.id) {
+        if !workspace_members.contains(&package.id) {
             continue;
         }
         for target in &package.targets {
@@ -273,18 +238,13 @@ pub fn discover_source_files_with_metadata(
     Ok(files)
 }
 
-pub fn count_scanned_crates(root: &Path) -> Result<usize> {
-    let metadata = load_workspace_metadata(root)?;
-    Ok(count_scanned_crates_with_metadata(&metadata))
-}
-
 pub fn count_scanned_crates_with_metadata(workspace: &WorkspaceMetadata) -> usize {
     let metadata = &workspace.metadata;
-    let workspace_members = metadata.workspace_members.clone();
+    let workspace_members = &metadata.workspace_members;
     metadata
         .packages
         .iter()
-        .filter(|package| workspace_members.iter().any(|id| id == &package.id))
+        .filter(|package| workspace_members.contains(&package.id))
         .count()
 }
 
@@ -296,7 +256,7 @@ pub fn attr_is_cfg_test(attr: &Attribute) -> bool {
     cfg_is_test(attr, false)
 }
 
-pub fn attr_is_test(attr: &Attribute) -> bool {
+pub(crate) fn attr_is_test(attr: &Attribute) -> bool {
     test_attribute(attr, false)
 }
 

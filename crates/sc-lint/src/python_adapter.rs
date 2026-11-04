@@ -92,7 +92,7 @@ pub(crate) fn run_python_tool(
                 .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
         })?;
 
-    adapter_outcome(tool, output.status.code(), &output.stdout)
+    adapter_process_outcome(tool, output.status.code(), &output.stdout, &output.stderr)
 }
 
 /// Items shown per list in a failure envelope; the full counts are always reported.
@@ -119,11 +119,39 @@ fn with_failure_report(mut error: CliError, data: &Value) -> CliError {
     clippy::result_large_err,
     reason = "Adapter verdicts must use the shared top-level CliError contract."
 )]
+#[cfg(test)]
 fn adapter_outcome(
     tool: PythonTool,
     exit_code: Option<i32>,
     stdout: &[u8],
 ) -> Result<CommandSuccess, CliError> {
+    adapter_process_outcome(tool, exit_code, stdout, &[])
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Adapter process failures use the shared top-level CliError contract."
+)]
+fn adapter_process_outcome(
+    tool: PythonTool,
+    exit_code: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> Result<CommandSuccess, CliError> {
+    if stdout.iter().all(u8::is_ascii_whitespace) && !stderr.is_empty() {
+        let stderr = String::from_utf8_lossy(stderr).trim().to_string();
+        return Err(CliError::backend_failure(format!(
+            "{} could not start the Python adapter",
+            tool.tool_name()
+        ))
+        .with_cause(stderr.clone())
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+        .with_detail("stderr", json!(stderr))
+        .with_detail(consts::FIELD_EXIT_CODE, json!(exit_code))
+        .with_suggested_action(
+            "Install or repair the sc-lint Python helper environment with `just setup`, then rerun the command.",
+        ));
+    }
     let parsed = parse_adapter_output(tool, stdout)?;
     if let Some(error) = parsed.error {
         return Err(error);
@@ -402,6 +430,33 @@ pub(crate) const fn adapter_kind() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_adapter_stdout_with_startup_stderr_is_a_recoverable_exec_error() {
+        let error = adapter_process_outcome(
+            PythonTool::ViewFindings,
+            Some(1),
+            b"",
+            b"ModuleNotFoundError: No module named sc_lint",
+        )
+        .expect_err("adapter startup failure should be surfaced");
+        assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+        assert!(error.message.contains("could not start the Python adapter"));
+        assert!(
+            error
+                .cause
+                .as_deref()
+                .unwrap()
+                .contains("ModuleNotFoundError")
+        );
+        assert!(
+            error
+                .suggested_action
+                .as_deref()
+                .unwrap()
+                .contains("just setup")
+        );
+    }
 
     #[test]
     fn adapter_success_payload_normalizes_data() {

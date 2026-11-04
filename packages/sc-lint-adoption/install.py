@@ -19,6 +19,9 @@ MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
 INSTALL_INPUT = Path(".sc-lint/install.json")
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
+# Plugin components sit at the package root so Claude Code's plugin loader finds
+# them; a consumer repository receives them under .claude/ as before.
+PLUGIN_COMPONENTS = frozenset({"skills", "agents"})
 WINDOWS_SHELL = 'set windows-shell := ["cmd.exe", "/c"]\n'
 PYTHON_BINDING = 'python := if os_family() == "windows" { "python" } else { "python3" }\n'
 RECIPE = r"^([A-Za-z_][\w-]*)[^:\n]*:(?!=)"
@@ -153,10 +156,10 @@ def values(path: Path) -> dict:
 
 def toml_value(value: object) -> str:
     if value is None: raise ValueError("TOML configuration cannot contain null")
-    if isinstance(value, dict): return "{ " + ", ".join(f"{json.dumps(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, dict): return "{ " + ", ".join(f"{toml_value(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
     if isinstance(value, list): return "[" + ", ".join(toml_value(item) for item in value) + "]"
     if isinstance(value, bool): return str(value).lower()
-    return json.dumps(value, allow_nan=False)
+    return json.dumps(value, ensure_ascii=False, allow_nan=False).replace("\x7f", "\\u007f")
 
 
 def substitute_template_variables(source: str, replacements: dict[str, str]) -> str:
@@ -166,19 +169,19 @@ def substitute_template_variables(source: str, replacements: dict[str, str]) -> 
 
 
 def toml_key(name: str) -> str:
-    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
+    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else toml_value(name)
 
 
 def lint_profiles_table(lint_profiles: dict) -> str:
     if not lint_profiles: return ""
-    rows = "\n".join(f"{toml_key(name)} = {json.dumps(members)}" for name, members in lint_profiles.items())
+    rows = "\n".join(f"{toml_key(name)} = {toml_value(members)}" for name, members in lint_profiles.items())
     return f"[tool.sc-lint.lint_profiles]\n{rows}"
 
 
 def lint_step(name: str, step: object) -> str:
     """Render one lint row; cross-target and command semantics belong to sc-lint."""
     command, tags = (step, {}) if isinstance(step, list) else (step["command"], step)
-    lines = [f"name = {json.dumps(tags.get('name', name))}", f"command = {toml_value(command)}"]
+    lines = [f"name = {toml_value(tags.get('name', name))}", f"command = {toml_value(command)}"]
     lines += [f"{key} = {toml_value(tags[key])}" for key in ("platform", "target", "host", "after_all", "env", "env_paths", "cwd") if key in tags]
     return "[[tool.sc-lint.lint]]\n" + "\n".join(lines)
 
@@ -186,7 +189,7 @@ def lint_step(name: str, step: object) -> str:
 def test_layer(name: str, step: object) -> str:
     """Renders one test row using the fields accepted by the Rust test-step model."""
     command, fields = (step, {}) if isinstance(step, list) else (step["command"], step)
-    lines = [f"name = {json.dumps(name)}", f"command = {toml_value(command)}"]
+    lines = [f"name = {toml_value(name)}", f"command = {toml_value(command)}"]
     if "after_all" in fields:
         lines.append(f"after_all = {toml_value(fields['after_all'])}")
     return "[[tool.sc-lint.test]]\n" + "\n".join(lines)
@@ -266,13 +269,19 @@ def package_files() -> dict[Path, bytes]:
     }
 
 
+def consumer_path(relative: Path) -> Path:
+    if relative.parts[0] in PLUGIN_COMPONENTS:
+        return Path(".claude", *relative.parts)
+    return RENAMED.get(relative, relative)
+
+
 def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     result = package_files()
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
     for source in ROOT.rglob("*"):
         if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc" or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
-        result[RENAMED.get(source.relative_to(ROOT), source.relative_to(ROOT))] = source.read_bytes()
+        result[consumer_path(source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.tmpl" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
@@ -305,7 +314,18 @@ def load_manifest(repo: Path) -> dict[str, str] | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--input", type=Path); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("repo", type=Path); args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Install or update the managed sc-lint consumer contract in REPO.",
+        epilog=(
+            "The first install persists its validated input at REPO/.sc-lint/install.json, "
+            "which later runs reuse when --input is omitted. Exit codes: 0 converged or applied; "
+            "1 --dry-run found drift (nothing written); 2 conflict or invalid input."
+        ),
+    )
+    parser.add_argument("--input", type=Path, help="install input JSON; defaults to REPO/.sc-lint/install.json")
+    parser.add_argument("--dry-run", action="store_true", help="print the diff and report drift without writing")
+    parser.add_argument("repo", type=Path, help="consumer repository root")
+    args = parser.parse_args()
     input_path = args.input or args.repo / ".sc-lint" / "install.json"
     try: data = values(input_path); targets = desired(data, args.repo, input_path); prior = load_manifest(args.repo)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error: print(f"conflict: {error}", file=sys.stderr); return 2

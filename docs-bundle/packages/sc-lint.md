@@ -16,7 +16,8 @@ aggregate Just recipes.
 
 Read `[tool.sc-lint].minimum_version` and the named `lint`/`test` argv arrays
 from `sc-lint.toml`. Global flags include `--config`, `--root`, `--json`, and
-logging controls. Consumer profiles require explicit `--config sc-lint.toml`.
+logging controls. Without `--config`, consumer commands read `sc-lint.toml` in
+the working directory.
 
 ## Command surface
 
@@ -37,8 +38,11 @@ declared; `sc-lint test` runs the default selector (every row of a
 Steps run in parallel (cargo steps serialized in declaration order) and fail
 slow, reporting every failed step; `--fail-fast` stops starting new cargo-lane
 and `after_all` steps after the first failure.
-Lint steps accept `env` and `cwd` just like test command selectors. `env`
-values reach the child verbatim and `cwd` is relative to the repository root.
+Lint steps accept `env`, `env_paths`, `cwd`, and `host`. `env` values reach
+the child verbatim, relative `env_paths` values are joined to the
+configuration file's directory, `cwd` is relative to the repository root, and `host`
+(`linux`, `macos`, or `windows`) limits a step to one host platform. See
+[configuration](../configuration.md) for the exact rules.
 When a log root is configured (`--log-root` or the configuration file's
 `logging.root`), every executed step writes stdout and stderr
 to `<log-root>/steps/<sanitized-step-name>.log`; sanitized-name collisions

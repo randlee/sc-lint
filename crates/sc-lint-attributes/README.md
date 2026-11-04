@@ -1,8 +1,13 @@
 # `sc-lint-attributes`
 
-`sc-lint-attributes` is the proc-macro crate that provides the
-`#[sc_lint(...)]` attribute namespace used by analyzer-owned source
-declarations.
+`sc-lint-attributes` is an internal building block of the
+[`sc-lint` product](https://crates.io/crates/sc-lint). This proc-macro crate
+provides the `#[sc_lint(...)]` attribute namespace used by analyzer-owned
+source declarations; it is not a standalone lint command. See the
+[sc-lint repository](https://github.com/randlee/sc-lint).
+
+Current crate release: **0.8.5**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-attributes/0.8.5).
 
 ## Purpose
 
@@ -22,7 +27,7 @@ This crate is a proc-macro surface rather than a deep domain model. Its role
 is to:
 
 - expose the `#[sc_lint(...)]` attribute entry point
-- delegate syntax understanding to [`sc-lint-directives`](../sc-lint-directives/README.md)
+- delegate syntax understanding to [`sc-lint-directives`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-directives/README.md)
 - preserve stable source-level attribute usage across analyzer evolution
 
 ## Usage
@@ -30,18 +35,21 @@ is to:
 In a consumer crate:
 
 ```toml
-sc-lint-attributes = { version = "0.1.0", path = "../sc-lint-attributes" }
+sc-lint-attributes = "0.8"
 ```
 
 Example source:
 
 ```rust
+use sc_lint_attributes::sc_lint;
+
 #[sc_lint(boundary.internal_only)]
 pub(crate) struct Token;
 ```
 
 ## Further Reading
 
-- [`sc-lint-directives`](../sc-lint-directives/README.md)
-- [Boundary enforcement model](../../docs/sc-lint/boundary-enforcement-model.md)
-- [Crate architecture](../../docs/sc-lint/crate-architecture.md)
+- [`sc-lint-directives`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-directives/README.md)
+- [Boundary enforcement model](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint-boundary/boundary-enforcement-model.md)
+- [Crate architecture](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/crate-architecture.md)
+- [MIT license](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-attributes/LICENSE)

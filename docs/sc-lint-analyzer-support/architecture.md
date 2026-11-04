@@ -11,6 +11,24 @@ This library provides rule-neutral AST source discovery, scope classification,
 text report rendering, and shared analyzer configuration parsing. It does not
 define lint rules, rule IDs, or an analyzer command surface.
 
+Private modules, whose items the crate root re-exports:
+
+- `analyze_options` — `AnalyzeOptions`, the shared root and output-format
+  input. `sc-lint-portability` and `sc-lint-runtime` re-export it;
+  `sc-lint-boundary` converts its own options (which add the rule filter) into
+  it.
+- `relative_path` — `repo_relative_source_path`, `RepoRelativeSourcePathError`
+  and `relative_path_under_root`: repository-relative, slash-separated path
+  normalization and root-prefix stripping used by discovery and findings.
+- `source_scan` — source discovery, `classify_scope`, and `is_test_only`
+  test-attribute recognition (`#[test]`, qualified test attributes,
+  `cfg(test)`, `cfg(all(test, ...))`).
+- `analyzer_config` — the shared `[tool.sc-lint.analyzers.<name>]` parser.
+- `render` — `render_findings_report`, the shared text report.
+
+The `analyze_options` and `relative_path` modules and `is_test_only` were added
+in 0.8.5. Their ADR-013 fit is recorded in [requirements.md](./requirements.md).
+
 ## Governing ADRs
 
 - [ADR-007 — Analyzer-crate partition](../sc-lint/adr/ADR-007-analyzer-crate-partition.md)

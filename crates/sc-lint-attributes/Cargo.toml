@@ -9,6 +9,9 @@ description = "Source-level declarative attributes for sc-lint analyzers."
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-attributes/0.8.5"
+keywords = ["rust", "sc-lint", "attributes", "proc-macro", "lint"]
+categories = ["development-tools", "development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
