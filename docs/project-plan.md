@@ -421,8 +421,10 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
   `lint-085.53`, and `lint-085.55` for generated-file line endings),
   round 3 (`lint-085.56` to `lint-085.59`), round 4 (`lint-085.60` to
   `lint-085.63`: refreshed-files init output and Windows path separators) and
-  round 5 (`lint-085.64` to `lint-085.67`: atomic refresh writes and the
-  Python 3.9 bootstrap no-home error), merged through the version-bump PR #842
+  round 5 (`lint-085.64` to `lint-085.68`: symlink-safe, fsynced refresh
+  writes and the Python 3.9 bootstrap no-home error) and round 6 (QA
+  `lint-085.69`, fix `lint-085.70`, QA `lint-085.71`), merged through the
+  version-bump PR #842
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 The REQ-CLI-022 prior-release refresh exception (2026-11-04) is Pending
