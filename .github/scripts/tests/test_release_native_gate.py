@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import release_native_common as common
 import release_native_gate as gate
-import release_native_verify as native
+import release_native_matrix as matrix
 
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = ROOT / common.MANIFEST_PATH
@@ -25,9 +25,12 @@ TAG = "prerelease/v1.2.3"
 VERIFIED = "a" * 40
 CANDIDATE = "c" * 40
 TITLE = common.verify_run_title(TAG, VERIFIED)
-TARGETS = [row["target"] for row in native.native_matrix(tomllib.loads(MANIFEST.read_text(encoding="utf-8")))["include"]]
+TARGETS = [row["target"] for row in matrix.native_matrix(tomllib.loads(MANIFEST.read_text(encoding="utf-8")))["include"]]
 PROVEN = {common.native_job(target): "success" for target in TARGETS} | {common.REPORT_JOB: "success"}
 DEFAULT_BRANCH = "main"
+PRERELEASE_KIND = common.PRERELEASE_KIND
+RELEASE_KIND = common.RELEASE_KIND
+KIND = PRERELEASE_KIND
 
 
 @pytest.fixture(autouse=True)
@@ -79,7 +82,7 @@ class FakeGitHub:
         if endpoint.startswith("actions/runs/"):
             conclusions = self.jobs.get(int(endpoint.split("/")[2]), PROVEN)
             return {"total_count": len(conclusions), "jobs": [{"name": name, "conclusion": value} for name, value in conclusions.items()]}
-        prefix = f"actions/workflows/{gate.VERIFY_WORKFLOW}/runs?"
+        prefix = f"actions/workflows/{common.VERIFY_WORKFLOW_FILE}/runs?"
         assert endpoint.startswith(prefix), endpoint
         query = parse_qs(urlsplit(endpoint).query)
         assert query["status"] == ["success"]
@@ -104,20 +107,20 @@ def test_newest_successful_run_with_matching_title_is_selected():
         run(7, TITLE),
         run(5, TITLE),
     )})
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
 
 
 def test_run_for_another_tag_is_ignored():
     client = FakeGitHub({1: page(run(12, common.verify_run_title("prerelease/v1.2.4", VERIFIED)))})
     with pytest.raises(gate.GateError, match="no successful Release Native Verify run exists for prerelease/v1.2.3 at aaaa"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_run_for_a_moved_tag_does_not_satisfy_the_gate():
     older_build = common.verify_run_title(TAG, "b" * 40)
     client = FakeGitHub({1: page(run(12, older_build))})
     with pytest.raises(gate.GateError, match="no successful Release Native Verify run exists"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_failed_or_unfinished_matching_runs_fail_closed():
@@ -126,12 +129,12 @@ def test_failed_or_unfinished_matching_runs_fail_closed():
         run(2, TITLE, status="in_progress", conclusion=None),
     )})
     with pytest.raises(gate.GateError, match="no successful"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_no_verify_runs_fails_closed():
     with pytest.raises(gate.GateError, match=f"dispatch Release Native Verify with tag {TAG} and commit {VERIFIED}"):
-        gate.find_verified_run(FakeGitHub(), TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(FakeGitHub(), TAG, VERIFIED, TARGETS, KIND)
 
 
 @pytest.mark.parametrize("override", [
@@ -142,12 +145,12 @@ def test_no_verify_runs_fails_closed():
 def test_only_the_verify_workflow_on_a_trusted_event_can_prove_a_publish(override):
     client = FakeGitHub({1: page(run(7, TITLE, **override))})
     with pytest.raises(gate.GateError, match="no successful"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_a_dispatch_from_the_default_branch_proves_a_publish():
     client = FakeGitHub({1: page(run(7, TITLE, event="workflow_dispatch", head_branch=DEFAULT_BRANCH))})
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
 
 
 def test_a_success_run_whose_native_jobs_were_skipped_proves_nothing():
@@ -155,7 +158,7 @@ def test_a_success_run_whose_native_jobs_were_skipped_proves_nothing():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: skipped})
 
     with pytest.raises(gate.GateError, match="rejected: run 7: jobs did not all succeed"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_a_failed_native_job_in_a_success_run_is_named():
@@ -163,7 +166,7 @@ def test_a_failed_native_job_in_a_success_run_is_named():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: failed})
 
     with pytest.raises(gate.GateError, match=rf"{common.native_job(TARGETS[0])} \(failure\)"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_a_run_without_the_report_job_is_not_proof():
@@ -171,34 +174,34 @@ def test_a_run_without_the_report_job_is_not_proof():
     client = FakeGitHub({1: page(run(7, TITLE))}, jobs={7: without_report})
 
     with pytest.raises(gate.GateError, match=rf"{common.REPORT_JOB} \(absent\)"):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
 
 
 def test_an_older_proven_run_is_used_when_the_newest_is_unproven():
     skipped = {name: "skipped" for name in PROVEN}
     client = FakeGitHub({1: page(run(9, TITLE), run(7, TITLE))}, jobs={9: skipped})
 
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
 
 
 def test_pagination_finds_matching_run_on_second_page():
-    other_runs = [run(1000 + index, common.verify_run_title("prerelease/v1.2.4", VERIFIED)) for index in range(gate.PAGE_SIZE)]
+    other_runs = [run(1000 + index, common.verify_run_title("prerelease/v1.2.4", VERIFIED)) for index in range(common.PAGE_SIZE)]
     client = FakeGitHub({
-        1: page(*other_runs, total=gate.PAGE_SIZE + 1),
-        2: page(run(7, TITLE), total=gate.PAGE_SIZE + 1),
+        1: page(*other_runs, total=common.PAGE_SIZE + 1),
+        2: page(run(7, TITLE), total=common.PAGE_SIZE + 1),
     })
-    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS) == 7
+    assert gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND) == 7
     assert [parse_qs(urlsplit(call).query)["page"][0] for call in client.calls if "/runs?" in call] == ["1", "2"]
 
 
 def test_search_stops_at_the_page_limit():
-    full_pages = {number: page(*[run(number * 1000 + index, "other") for index in range(gate.PAGE_SIZE)],
+    full_pages = {number: page(*[run(number * 1000 + index, "other") for index in range(common.PAGE_SIZE)],
                                total=10_000)
-                  for number in range(1, gate.MAX_PAGES + 2)}
+                  for number in range(1, common.MAX_PAGES + 2)}
     client = FakeGitHub(full_pages)
     with pytest.raises(gate.GateError):
-        gate.find_verified_run(client, TAG, VERIFIED, TARGETS)
-    assert len([call for call in client.calls if "/runs?" in call]) == gate.MAX_PAGES
+        gate.find_verified_run(client, TAG, VERIFIED, TARGETS, KIND)
+    assert len([call for call in client.calls if "/runs?" in call]) == common.MAX_PAGES
 
 
 def test_unpublished_prerelease_fails():
@@ -279,7 +282,7 @@ def test_classification_splits_artifact_inputs_from_the_rest():
 def test_artifact_inputs_cover_every_manifest_declared_build_path():
     manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
     declared = [crate["cargo_toml"] for crate in manifest["crates"]]
-    declared += [manifest["python_packages"][0]["manifest"]]
+    declared += [package["manifest"] for package in manifest["python_packages"]]
     declared += [distribution["source"] for distribution in manifest["python_distributions"]]
     declared += [path["source"] for binary in manifest["release_binaries"] for path in binary.get("bundled_paths", [])]
     declared += ["Cargo.toml", "Cargo.lock", manifest["project"]["workspace_toml"], "rust-toolchain.toml"]
@@ -478,6 +481,7 @@ def test_main_writes_run_id_and_verified_commit_on_success(monkeypatch, tmp_path
 
     assert status == 0
     assert output.read_text(encoding="utf-8") == f"existing=1\nnative_verify_run_id=7\nnative_verified_commit={VERIFIED}\n"
+    assert f"manifest:{VERIFIED}" in client.calls
     out = capsys.readouterr().out
     assert "Release Native Verify run 7 on commit " + VERIFIED in out
     assert "Artifact inputs changed since the verified commit: none" in out
@@ -565,6 +569,8 @@ def test_preflight_takes_the_prerelease_prefix_from_the_manifest():
     assert 'prerelease_tag="prerelease/' not in text
     gate_step = text.split("id: native_matrix_gate", 1)[1].split("\n      - ", 1)[0]
     assert "python3 -c" not in gate_step
+    assert 'rev-parse --verify --quiet "refs/tags/${prerelease_tag}^{commit}"' in gate_step
+    assert 'rev-parse --verify --quiet "refs/tags/${candidate_tag}^{commit}"' in gate_step
 
 
 def test_verify_workflow_titles_each_run_with_its_tag_and_commit():
@@ -581,3 +587,25 @@ def test_verify_workflow_names_its_jobs_as_the_gate_expects():
     text = (ROOT / ".github/workflows/release-native-verify.yml").read_text(encoding="utf-8")
     assert f"name: {common.native_job('${{ matrix.target }}')}" in text
     assert f"name: {common.REPORT_JOB}" in text
+
+
+@pytest.mark.parametrize("event, branch, kind, trusted", [
+    ("workflow_run", TAG, PRERELEASE_KIND, True),
+    ("workflow_run", DEFAULT_BRANCH, PRERELEASE_KIND, False),
+    ("workflow_run", "v1.2.3", RELEASE_KIND, True),
+    ("workflow_run", DEFAULT_BRANCH, RELEASE_KIND, True),
+    ("workflow_run", "feature/x", RELEASE_KIND, False),
+    ("workflow_dispatch", DEFAULT_BRANCH, RELEASE_KIND, True),
+    ("workflow_dispatch", "feature/x", RELEASE_KIND, False),
+])
+def test_a_run_proves_a_tag_only_from_a_branch_its_tag_kind_allows(event, branch, kind, trusted):
+    tag = TAG if kind == PRERELEASE_KIND else "v1.2.3"
+    candidate = {"path": VERIFY_PATH, "event": event, "head_branch": branch}
+    assert gate.trusted_verify_run(candidate, tag, kind, DEFAULT_BRANCH) is trusted
+
+
+def test_gate_takes_the_matrix_from_the_policy_module_not_the_verifier():
+    tree = ast.parse(Path(gate.__file__).read_text(encoding="utf-8"))
+    imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    assert "release_native_matrix" in imported
+    assert "release_native_verify" not in imported

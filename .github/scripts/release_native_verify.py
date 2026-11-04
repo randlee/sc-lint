@@ -19,10 +19,11 @@ from pathlib import Path, PurePosixPath
 from verify_release_arch import EXPECTED, machine, verify as verify_wheel_arch
 from release_manifest import release_archive_name, release_archive_pattern
 from release_native_common import (
-    BUILD_WORKFLOW_FILES, MANIFEST_PATH, PRERELEASE_WORKFLOW, RELEASE_WORKFLOW, RESULT_SCHEMA_VERSION,
-    WIN_ARM64_TARGET, GitHub, GitHubError, is_full_sha, native_host, native_matrix, quote_tag, release_version,
-    wheel_specs,
+    BUILD_WORKFLOWS, MANIFEST_PATH, PRERELEASE_KIND, PRERELEASE_WORKFLOW, RELEASE_WORKFLOW, RESULT_SCHEMA_VERSION,
+    GitHub, GitHubError, build_workflow_for, is_full_sha, paged, prerelease_prefix, quote_tag, release_version,
+    tag_commit, tag_kind,
 )
+from release_native_matrix import WIN_ARM64_TARGET, native_host, native_matrix, wheel_specs
 from release_python import wheel_asset_pattern
 
 
@@ -49,7 +50,7 @@ def tag_from_run(client: GitHub, manifest: dict, run_id: str, *, prerelease: boo
         versions = [match[1] for name in archive.namelist() if (match := pattern.fullmatch(PurePosixPath(name).name))]
     if len(versions) != 1:
         raise ValueError(f"Release run {run_id}: archive artifact must identify exactly one release version")
-    prefix = manifest["prerelease"]["tag_prefix"] if prerelease else "v"
+    prefix = prerelease_prefix(manifest) if prerelease else "v"
     return prefix + versions[0]
 
 
@@ -79,27 +80,18 @@ def run_release_conclusion(client: GitHub, run_id: str, workflow: str) -> str | 
     return conclusion
 
 
-def resolve_tag_commit(client: GitHub, tag: str, expected_commit: str) -> str:
-    """Return the commit the tag names; a non-empty expected commit must be that same commit."""
-    commit = client.json(f"commits/{quote_tag(tag)}")["sha"]
-    if expected_commit and expected_commit != commit:
-        raise ValueError(f"{tag} names commit {commit}, not the commit {expected_commit} the run was given")
-    return commit
-
-
-def require_built_commit(client: GitHub, commit: str) -> None:
-    """Fail unless a successful build run at commit published its release.
+def require_built_commit(client: GitHub, commit: str, workflow: str) -> None:
+    """Fail unless a successful run of the workflow that builds the tag's kind published a release at commit.
 
     A tag re-cut to a commit whose build failed, or was never run, names assets that no
     successful build at that commit produced, so a dispatched verification must not bind to it.
     """
-    for workflow_file in BUILD_WORKFLOW_FILES:
-        data = client.json(f"actions/workflows/{workflow_file}/runs?head_sha={commit}&status=success&per_page=100")
-        for run in data.get("workflow_runs", []):
-            if run_release_conclusion(client, str(run["id"]), workflow_file) == "success":
-                return
+    runs = paged(client, f"actions/workflows/{BUILD_WORKFLOWS[workflow]}/runs?head_sha={commit}&status=success", "workflow_runs")
+    for run in runs:
+        if run_release_conclusion(client, str(run["id"]), workflow) == "success":
+            return
     raise ValueError(
-        f"{commit} has no successful Prerelease Archive or Release run that published its release; "
+        f"{commit} has no successful {workflow} run that published its release; "
         f"the tag must name a commit whose build succeeded"
     )
 
@@ -111,31 +103,37 @@ def require_source_branch(client: GitHub, run_id: str, tag: str) -> None:
         raise ValueError(f"prerelease run {run_id} was triggered from {head_branch!r}, not its tag {tag}")
 
 
-def plan_commit(client: GitHub, tag: str, supplied: str, *, dispatch: bool, workflow: str) -> str:
+def plan_commit(client: GitHub, tag: str, supplied: str, *, dispatch: bool, manifest: dict) -> str:
     """Return the commit a verification is bound to.
 
-    A dispatched or prerelease verification must bind to the commit the tag names, and a
-    dispatched one must also have a successful build there. A Release run keeps its tag's
-    commit even when it differs from the run's commit: release.yml reuses an existing,
-    verified tag when it retries a release.
+    A prerelease and any dispatched verification bind to the commit the tag names, which must be
+    the commit the run was given, and a dispatched one also needs a successful build of the
+    tag's kind at that commit. A Release run keeps its tag's commit even when it differs from the
+    run's commit: release.yml reuses an existing, verified tag when it retries a release from main.
     """
-    binding = dispatch or workflow == PRERELEASE_WORKFLOW
-    commit = resolve_tag_commit(client, tag, supplied if binding else "")
+    commit = tag_commit(client, tag)
+    if dispatch or tag_kind(tag, manifest) == PRERELEASE_KIND:
+        if supplied != commit:
+            raise ValueError(f"{tag} names commit {commit}, not the commit {supplied} the run was given")
     if dispatch:
-        require_built_commit(client, commit)
+        require_built_commit(client, commit, build_workflow_for(tag, manifest))
     return commit
 
 
 def plan_release(client: GitHub, manifest: dict, tag: str, run_id: str, *, workflow: str = RELEASE_WORKFLOW) -> tuple[str, dict] | None:
     """Select the published release, or prerelease, whose native matrix must run.
 
-    A prerelease run (workflow "Prerelease Archive") gates a publish: its tag is
-    prerelease/vX.Y.Z and its archives and wheels are verified like a release's.
+    The tag's shape picks its build workflow: a prerelease (prerelease/vX.Y.Z) is built by
+    Prerelease Archive and a release (vX.Y.Z) by Release, so a dispatch never takes the workflow
+    from its caller. A prerelease run gates a publish: its archives and wheels are verified like a release's.
     """
-    conclusion = "success" if tag else run_release_conclusion(client, run_id, workflow)
-    if conclusion is None:
-        return None
-    if not tag:
+    if tag:
+        workflow = build_workflow_for(tag, manifest)
+        conclusion = "success"
+    else:
+        conclusion = run_release_conclusion(client, run_id, workflow)
+        if conclusion is None:
+            return None
         tag = tag_from_run(client, manifest, run_id, prerelease=workflow == PRERELEASE_WORKFLOW)
         if workflow == PRERELEASE_WORKFLOW:
             require_source_branch(client, run_id, tag)
@@ -313,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "prerelease-prefix":
-            print(tomllib.loads(args.manifest.read_text(encoding="utf-8"))["prerelease"]["tag_prefix"], end="")
+            print(prerelease_prefix(tomllib.loads(args.manifest.read_text(encoding="utf-8"))), end="")
             return 0
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         if args.command == "plan":
@@ -325,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("plan requires --commit: the full 40-character commit SHA the tag names")
             plan = plan_release(client, local_manifest, args.tag, args.run_id, workflow=workflow)
             tag, matrix = plan if plan is not None else ("", {"include": []})
-            commit = plan_commit(client, tag, args.commit, dispatch=bool(args.tag), workflow=workflow) if plan is not None else ""
+            commit = plan_commit(client, tag, args.commit, dispatch=bool(args.tag), manifest=local_manifest) if plan is not None else ""
             enabled = "true" if plan is not None else "false"
             targets = ",".join(row["target"] for row in matrix["include"])
             output = (

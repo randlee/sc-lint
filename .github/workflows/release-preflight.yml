@@ -296,9 +296,10 @@ jobs:
           prerelease_prefix="$(python3 .github/scripts/release_native_verify.py prerelease-prefix --manifest release/publish-artifacts.toml)"
           prerelease_tag="${prerelease_prefix}${RELEASE_VERSION}"
           candidate_tag="release-candidate-${RELEASE_TAG}"
-          prerelease_commit="$(git rev-parse --verify --quiet "${prerelease_tag}^{commit}")" \
+          # Resolve refs/tags explicitly so a branch that shares a tag's name cannot stand in for it.
+          prerelease_commit="$(git rev-parse --verify --quiet "refs/tags/${prerelease_tag}^{commit}")" \
             || { echo "${prerelease_tag} is not present; build and verify a prerelease from an ancestor of the candidate first." >&2; exit 1; }
-          candidate_commit="$(git rev-parse --verify --quiet "${candidate_tag}^{commit}")" \
+          candidate_commit="$(git rev-parse --verify --quiet "refs/tags/${candidate_tag}^{commit}")" \
             || { echo "${candidate_tag} is not present; the release candidate must be cut first." >&2; exit 1; }
           python3 .github/scripts/release_native_gate.py --tag "${prerelease_tag}" \
             --prerelease-commit "${prerelease_commit}" --candidate-commit "${candidate_commit}" \

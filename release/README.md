@@ -32,13 +32,25 @@ Before `publisher` publishes `vX.Y.Z`, a prerelease must pass the native matrix:
    rejected. A run for an earlier commit of a re-cut tag does not match.
 4. The prerelease commit `V` must be an ancestor of the release-candidate commit
    `C`, and no artifact input may differ between `V` and `C`. Renames are checked
-   on both their old and new paths. The artifact inputs and the manifest sections
-   that count are defined in `.github/scripts/release_native_gate.py`
-   (`ARTIFACT_INPUT_DIRS`, `ARTIFACT_INPUT_PREFIXES`, `ARTIFACT_INPUT_FILES`,
-   `BUILD_MANIFEST_SECTIONS`); the gate's tests fail if a script the archive build
-   runs is not covered. Changes outside them, such as docs, `site/`, the CHANGELOG,
-   publish and channel workflows, the native verifier and its tests, and the
-   manifest's channel and prerelease sections, never require a rerun.
+   on both their old and new paths. The artifact inputs, the manifest sections
+   that build them and the trusted-run rules are the constants in
+   `.github/scripts/release_native_gate.py`; the gate's tests fail if a script the
+   archive build runs is not covered. Every other path, such as docs, `site/`, the
+   CHANGELOG and the publish workflows, never requires a rerun.
+
+The gate enforces two rules, and its tests pin both:
+
+- **Trusted runs only.** Only a `release-native-verify.yml` run can prove a tag.
+  A `workflow_run` is trusted when its branch is the tag (a prerelease, or a
+  release from its tag push) or, for a release tag only, the default branch (a
+  retried release that `release.yml` builds from `main`). A `workflow_dispatch`
+  is trusted only from the default branch. Other runs are ignored.
+- **Verified commit binds the publish.** A tag resolves through `refs/tags`, with
+  annotated tags peeled, so a branch of the same name cannot stand in. A
+  prerelease run must be for the commit its tag names. A release retry binds to
+  the commit its tag names, which `release.yml` may reuse from an earlier build. A
+  dispatch must name that same commit and a successful build of the tag's kind
+  must exist there. The manifest is read at `V`, not at the mutable tag.
 
 `release-preflight.yml` enforces steps 3 and 4. On success it prints `V`, the
 verify run id, the artifact-input list (`none` when nothing changed), and how many

@@ -65,17 +65,18 @@ gate is satisfied only by a verify run whose title names the prerelease tag and
 its commit `V`, whose native jobs and report job all concluded `success`. A run
 that concludes `success` with skipped native jobs does not count.
 
-Preflight does not demand a rerun for every commit. It passes when the verified
-prerelease commit `V` is an ancestor of the candidate `C` and the `V..C` diff
-touches no artifact input. The artifact inputs are the list in
-`.github/scripts/release_native_gate.py`: the crates, bindings and docs-bundle
-trees, the actions the archive build uses, the root Cargo files, the build and
-release scripts it runs with their local imports, `prerelease-archive.yml`, and
-the manifest's build sections. Changes to docs, `site/`, the CHANGELOG, publish or
-channel workflows, the native verifier and its tests, and the manifest's channel
-and prerelease sections never force a rerun. A change to an artifact input, or a
-`V` that is not an ancestor of `C`, fails the gate and names the offending paths;
-cut a new prerelease and rerun the native matrix.
+Preflight does not demand a rerun for every commit. It enforces two rules, both
+defined in `.github/scripts/release_native_gate.py`, and `release/README.md`
+documents them:
+
+- Only a `release-native-verify.yml` run from a trusted trigger can prove a tag:
+  a run from its tag push or, for a release tag, from the default branch.
+- The verified commit `V` must be an ancestor of the candidate `C`, and the
+  `V..C` diff may touch no artifact input. The artifact inputs and the manifest
+  build sections are the gate's constants. Other paths never force a rerun.
+
+A violation fails the gate and names the offending paths; cut a new prerelease
+and rerun the native matrix.
 
 `publisher` preflight prints the verify run id, the verified commit `V`, the
 artifact-input list, and the count of paths that need no rerun. A failure names

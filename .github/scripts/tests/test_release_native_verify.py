@@ -15,6 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import release_native_common as common
+import release_native_matrix as matrix
 import release_native_verify as native
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -22,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_matrix_uses_manifest_targets_and_native_hosts():
     manifest = tomllib.loads((ROOT / native.MANIFEST_PATH).read_text())
-    rows = native.native_matrix(manifest)["include"]
+    rows = matrix.native_matrix(manifest)["include"]
     assert [row["target"] for row in rows] == [entry["target"] for entry in manifest["release_targets"]]
     hosts = {row["target"]: row for row in rows}
     assert hosts["aarch64-unknown-linux-gnu"]["runner"] == "ubuntu-24.04-arm"
@@ -32,14 +33,14 @@ def test_matrix_uses_manifest_targets_and_native_hosts():
     }
     assert hosts["x86_64-apple-darwin"]["runner"] == "macos-15-intel"
     manifest["release_targets"] = manifest["release_targets"][-1:]
-    assert native.native_matrix(manifest)["include"] == [hosts["aarch64-pc-windows-msvc"]]
+    assert matrix.native_matrix(manifest)["include"] == [hosts["aarch64-pc-windows-msvc"]]
 
 
 def test_missing_native_runner_is_a_failure():
     with pytest.raises(ValueError, match="no supported native GitHub-hosted runner"):
-        native.native_matrix({"release_targets": [{"target": "riscv64gc-unknown-linux-gnu"}]})
+        matrix.native_matrix({"release_targets": [{"target": "riscv64gc-unknown-linux-gnu"}]})
     with pytest.raises(ValueError, match="no release targets"):
-        native.native_matrix({})
+        matrix.native_matrix({})
 
 
 def executable(target):
@@ -65,7 +66,7 @@ class Assets:
         self.target = target
         self.tag = tag
         self.version = "1.2.3"
-        windows = native.native_host(target)[0] == "Windows"
+        windows = matrix.native_host(target)[0] == "Windows"
         extension = "zip" if windows else "tar.gz"
         platform = {"x86_64-unknown-linux-gnu": "manylinux_2_28_x86_64", "aarch64-unknown-linux-gnu": "manylinux_2_28_aarch64",
                     "x86_64-apple-darwin": "macosx_11_0_x86_64", "aarch64-apple-darwin": "macosx_11_0_arm64",
@@ -119,7 +120,7 @@ class Assets:
 
 
 def host(monkeypatch, target):
-    system, arch = native.native_host(target)
+    system, arch = matrix.native_host(target)
     monkeypatch.setattr(native.platform, "system", lambda: system)
     monkeypatch.setattr(native.platform, "machine", lambda: "ARM64" if arch == "aarch64" else "AMD64")
 
@@ -362,9 +363,9 @@ def test_actions_artifact_and_release_asset_downloads_use_their_required_media_t
 
 def test_known_target_without_native_host_mapping_fails(monkeypatch):
     target = "x86_64-unknown-linux-gnu"
-    monkeypatch.delitem(common.NATIVE_RUNNERS, native.native_host(target))
+    monkeypatch.delitem(matrix.NATIVE_RUNNERS, matrix.native_host(target))
     with pytest.raises(ValueError, match="no native GitHub-hosted runner"):
-        native.native_matrix(Assets(target).manifest_data)
+        matrix.native_matrix(Assets(target).manifest_data)
 
 
 def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
@@ -393,7 +394,7 @@ class ReleaseRun(RunArtifact):
         self.tag = tag
         self.tag_endpoint = f"releases/tags/{urllib.parse.quote(tag, safe='')}"
         self.commit = "d" * 40
-        self.commit_endpoint = f"commits/{urllib.parse.quote(tag, safe='')}"
+        self.ref_endpoint = f"git/ref/tags/{common.quote_ref(tag)}"
         self.manifest_data = Assets("x86_64-unknown-linux-gnu").manifest_data
 
     def json(self, endpoint):
@@ -405,9 +406,9 @@ class ReleaseRun(RunArtifact):
             if not self.published:
                 raise native.GitHubError(endpoint, 404)
             return {"assets": []}
-        if endpoint == self.commit_endpoint:
+        if endpoint == self.ref_endpoint:
             self.calls.append(endpoint)
-            return {"sha": self.commit}
+            return {"object": {"type": "commit", "sha": self.commit}}
         if endpoint.startswith("actions/workflows/"):
             self.calls.append(endpoint)
             return {"workflow_runs": [{"id": 9}] if self.built else []}
@@ -662,7 +663,7 @@ def test_dispatch_binds_only_to_a_commit_with_a_successful_build(monkeypatch, tm
     client = ReleaseRun(built=False)
     status, output = _plan(monkeypatch, client, tmp_path, "--tag", "v1.2.3", "--commit", "d" * 40)
     assert status == 1 and not output.exists()
-    assert "has no successful Prerelease Archive or Release run" in capsys.readouterr().err
+    assert "has no successful Release run that published its release" in capsys.readouterr().err
 
 
 def test_dispatch_with_a_successful_build_plans_the_release(monkeypatch, tmp_path):
@@ -670,7 +671,7 @@ def test_dispatch_with_a_successful_build_plans_the_release(monkeypatch, tmp_pat
     status, output = _plan(monkeypatch, client, tmp_path, "--tag", "v1.2.3", "--commit", "d" * 40)
     assert status == 0
     assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
-    assert f"actions/workflows/prerelease-archive.yml/runs?head_sha={'d' * 40}&status=success&per_page=100" in client.calls
+    assert f"actions/workflows/release.yml/runs?head_sha={'d' * 40}&status=success&per_page=100&page=1" in client.calls
 
 
 def test_dispatch_rejects_a_tag_recut_to_another_commit(monkeypatch, tmp_path, capsys):
@@ -741,3 +742,93 @@ def test_verify_writes_a_failing_result_with_the_checks_it_passed(monkeypatch, t
     assert (payload["tag"], payload["target"], payload["checks"]) == ("v1.2.3", target, [])
     assert "native runner required" in payload["error"]
     assert "native runner required" in capsys.readouterr().err
+
+
+class FakeOpener:
+    """Stands in for the HTTP opener: records each request URL and answers with one JSON body."""
+
+    def __init__(self, body: bytes):
+        self.body = body
+        self.urls = []
+
+    def open(self, request, timeout):
+        self.urls.append(request.full_url)
+        return io.BytesIO(self.body)
+
+
+def test_default_branch_is_read_from_the_repository_url_without_a_trailing_slash():
+    client = common.GitHub("owner/repo", "token")
+    client.opener = FakeOpener(b'{"default_branch": "main"}')
+    assert client.default_branch() == "main"
+    assert client.opener.urls == ["https://api.github.com/repos/owner/repo"]
+
+
+def test_release_version_needs_no_prerelease_section_for_release_tags():
+    assert common.release_version("v1.2.3", {}) == "1.2.3"
+    with pytest.raises(ValueError, match="invalid release tag 'prerelease/v1.2.3'"):
+        common.release_version("prerelease/v1.2.3", {})
+
+
+@pytest.mark.parametrize("prefix", ["prerelease/1", "bad prefix/v", "prerelease/", "v", "rc/v;x"])
+def test_manifest_prerelease_prefix_must_be_a_safe_name_ending_in_v(prefix):
+    with pytest.raises(ValueError, match="must match"):
+        common.prerelease_prefix({"prerelease": {"tag_prefix": prefix}})
+
+
+def test_prerelease_prefix_command_prints_exactly_the_manifest_prefix(tmp_path, capsys):
+    manifest = tmp_path / "publish-artifacts.toml"
+    manifest.write_text('[prerelease]\ntag_prefix="prerelease/v"\n', encoding="utf-8")
+    assert native.main(["prerelease-prefix", "--manifest", str(manifest)]) == 0
+    assert capsys.readouterr().out == "prerelease/v"
+
+
+class RefFake:
+    """Answers the git-ref endpoints for one tag. A branch lookup through commits/ is an error: a branch can share the name."""
+
+    def __init__(self, ref):
+        self.ref = ref
+        self.calls = []
+
+    def json(self, endpoint):
+        self.calls.append(endpoint)
+        if endpoint == "git/ref/tags/prerelease/v1.2.3":
+            return {"object": self.ref}
+        if endpoint == "git/tags/" + "t" * 40:
+            return {"object": {"type": "commit", "sha": "c" * 40}}
+        raise AssertionError(f"unexpected lookup {endpoint}")
+
+
+def test_tag_commit_reads_refs_tags_so_a_same_named_branch_cannot_answer():
+    fake = RefFake({"type": "commit", "sha": "a" * 40})
+    assert common.tag_commit(fake, "prerelease/v1.2.3") == "a" * 40
+    assert fake.calls == ["git/ref/tags/prerelease/v1.2.3"]
+
+
+def test_annotated_tag_is_peeled_to_its_commit():
+    fake = RefFake({"type": "tag", "sha": "t" * 40})
+    assert common.tag_commit(fake, "prerelease/v1.2.3") == "c" * 40
+    assert fake.calls == ["git/ref/tags/prerelease/v1.2.3", "git/tags/" + "t" * 40]
+
+
+def test_tag_naming_a_tree_is_rejected():
+    with pytest.raises(ValueError, match="does not name a commit; it names a tree"):
+        common.tag_commit(RefFake({"type": "tree", "sha": "e" * 40}), "prerelease/v1.2.3")
+
+
+def test_build_lookup_pages_through_every_run_at_the_commit(monkeypatch, tmp_path):
+    client = ReleaseRun()
+    original = client.json
+
+    def second_page_holds_the_build(endpoint):
+        if endpoint.startswith("actions/workflows/release.yml/runs?"):
+            client.calls.append(endpoint)
+            if "page=2" in endpoint:
+                return {"total_count": 101, "workflow_runs": [{"id": 9}]}
+            return {"total_count": 101, "workflow_runs": []}
+        return original(endpoint)
+
+    client.json = second_page_holds_the_build
+    status, output = _plan(monkeypatch, client, tmp_path, "--tag", "v1.2.3", "--commit", "d" * 40)
+    assert status == 0
+    assert output.read_text().startswith(f"verify=true\ntag=v1.2.3\ncommit={'d' * 40}\n")
+    assert any("page=2" in call for call in client.calls)

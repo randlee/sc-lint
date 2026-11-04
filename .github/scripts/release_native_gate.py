@@ -1,11 +1,11 @@
 """Gate a publish on a native matrix run that proved a verified prerelease.
 
 A Release Native Verify run gates the publish only when it ran for the prerelease tag at
-its commit V: its title names both, every native job and the report job concluded success.
-V must be an ancestor of the release candidate commit C, and no artifact input may differ
-between V and C. Changes outside the artifact inputs (docs, site, CHANGELOG, publish and
-channel workflows, verifier scripts and tests, and the manifest's publish-only sections)
-never require a rerun. Fail closed otherwise and name the offending paths.
+its commit V: its title names both, every native job and the report job concluded success,
+and it was triggered from a branch its tag allows. V must be an ancestor of the release
+candidate commit C, and no artifact input may differ between V and C. The artifact inputs,
+the manifest sections that build them and the trusted-run rules are the constants below.
+Fail closed otherwise and name the offending paths.
 """
 from __future__ import annotations
 
@@ -18,14 +18,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from release_native_common import (
-    MANIFEST_PATH, REPORT_JOB, GitHub, GitHubError, is_full_sha, native_job, native_matrix, quote_tag,
-    verify_run_title,
+    BUILD_WORKFLOWS, MANIFEST_PATH, PRERELEASE_KIND, PRERELEASE_WORKFLOW, REPORT_JOB, VERIFY_WORKFLOW_FILE,
+    VERIFY_WORKFLOW_NAME, VERIFY_WORKFLOW_PATH, GitHub, GitHubError, is_full_sha, native_job, paged, quote_tag,
+    tag_kind, verify_run_title,
 )
-
-VERIFY_WORKFLOW = "release-native-verify.yml"
-VERIFY_WORKFLOW_PATH = f".github/workflows/{VERIFY_WORKFLOW}"
-PAGE_SIZE = 100
-MAX_PAGES = 10
+from release_native_matrix import native_matrix
 
 # Paths whose content changes the released archives or wheels, or how they are built. The
 # gate's tests derive the manifest's declared sources and the scripts and actions that
@@ -48,10 +45,10 @@ ARTIFACT_INPUT_FILES = frozenset({
     ".github/scripts/verify_release_arch.py",
     ".github/scripts/worker_result.py",
     ".github/scripts/wheel_contents.py",
-    ".github/workflows/prerelease-archive.yml",
+    f".github/workflows/{BUILD_WORKFLOWS[PRERELEASE_WORKFLOW]}",
 })
-# The manifest sections that describe the archives and wheels. Channel, prerelease and
-# python-package settings only drive publication, so editing them never forces a rerun.
+# The manifest sections that describe the archives and wheels; python_packages are built into
+# wheels. Channel and prerelease settings only drive publication, so editing them never forces a rerun.
 BUILD_MANIFEST_SECTIONS = (
     "schema_version", "project", "release_targets", "crates", "release_binaries", "python_packages",
     "python_distributions",
@@ -94,28 +91,13 @@ def manifest_build_view(text: str | None) -> dict:
     return {key: data.get(key) for key in BUILD_MANIFEST_SECTIONS}
 
 
-def _verify_runs(client: GitHub):
-    page = 1
-    while page <= MAX_PAGES:
-        data = client.json(f"actions/workflows/{VERIFY_WORKFLOW}/runs?status=success&per_page={PAGE_SIZE}&page={page}")
-        yield from data.get("workflow_runs", [])
-        if page * PAGE_SIZE >= data.get("total_count", 0):
-            return
-        page += 1
-
-
 def _jobs_by_name(client: GitHub, run_id: int) -> dict[str, str | None]:
     jobs: dict[str, str | None] = {}
-    page = 1
-    while True:
-        data = client.json(f"actions/runs/{run_id}/jobs?filter=latest&per_page={PAGE_SIZE}&page={page}")
-        for job in data.get("jobs", []):
-            if job["name"] in jobs:
-                raise GateError(f"run {run_id}: duplicate job name {job['name']!r}")
-            jobs[job["name"]] = job.get("conclusion")
-        if page * PAGE_SIZE >= data.get("total_count", 0):
-            return jobs
-        page += 1
+    for job in paged(client, f"actions/runs/{run_id}/jobs?filter=latest", "jobs"):
+        if job["name"] in jobs:
+            raise GateError(f"run {run_id}: duplicate job name {job['name']!r}")
+        jobs[job["name"]] = job.get("conclusion")
+    return jobs
 
 
 def unproven_reason(jobs: dict[str, str | None], targets: list[str]) -> str | None:
@@ -125,16 +107,23 @@ def unproven_reason(jobs: dict[str, str | None], targets: list[str]) -> str | No
     return f"jobs did not all succeed: {', '.join(failing)}" if failing else None
 
 
-def trusted_verify_run(run: dict, default_branch: str) -> bool:
-    """Only the verify workflow file can prove a publish: run by a workflow_run, or dispatched from the default branch."""
+def trusted_verify_run(run: dict, tag: str, kind: str, default_branch: str) -> bool:
+    """Only the verify workflow file can prove a publish, from a trusted trigger.
+
+    A workflow_run inherits the branch of the build run that triggered it. A prerelease run
+    is triggered by its tag push, so its branch is the tag. A release run is triggered by its
+    tag push or, when release.yml retries an existing tag, from the default branch. A dispatch
+    counts only from the default branch.
+    """
     if run.get("path") != VERIFY_WORKFLOW_PATH:
         return False
     if run.get("event") == "workflow_run":
-        return True
+        allowed = {tag} if kind == PRERELEASE_KIND else {tag, default_branch}
+        return run.get("head_branch") in allowed
     return run.get("event") == "workflow_dispatch" and run.get("head_branch") == default_branch
 
 
-def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str]) -> int:
+def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str], kind: str) -> int:
     """Return the id of the newest successful verify run that proved the native matrix for tag at commit.
 
     The title binds the run to the tag and commit, so a run for an earlier build of a re-cut
@@ -144,8 +133,8 @@ def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str])
     title = verify_run_title(tag, commit)
     default_branch = client.default_branch()
     rejected = []
-    for run in _verify_runs(client):
-        if not trusted_verify_run(run, default_branch):
+    for run in paged(client, f"actions/workflows/{VERIFY_WORKFLOW_FILE}/runs?status=success", "workflow_runs"):
+        if not trusted_verify_run(run, tag, kind, default_branch):
             continue
         if run.get("display_title") != title or run.get("status") != "completed" or run.get("conclusion") != "success":
             continue
@@ -155,8 +144,8 @@ def find_verified_run(client: GitHub, tag: str, commit: str, targets: list[str])
         rejected.append(f"run {run['id']}: {reason}")
     detail = f" (rejected: {'; '.join(rejected)})" if rejected else ""
     raise GateError(
-        f"no successful Release Native Verify run exists for {tag} at {commit}; "
-        f"dispatch Release Native Verify with tag {tag} and commit {commit}{detail}"
+        f"no successful {VERIFY_WORKFLOW_NAME} run exists for {tag} at {commit}; "
+        f"dispatch {VERIFY_WORKFLOW_NAME} with tag {tag} and commit {commit}{detail}"
     )
 
 
@@ -185,7 +174,7 @@ def evaluate(tag: str, verified_commit: str, candidate_commit: str, *, is_ancest
         raise GateError(
             f"artifact inputs changed between verified commit {verified_commit[:12]} and candidate "
             f"{candidate_commit[:12]}: {', '.join(diff.artifact_inputs)}; "
-            f"cut a new prerelease and rerun Release Native Verify"
+            f"cut a new prerelease and rerun {VERIFY_WORKFLOW_NAME}"
         )
 
 
@@ -236,8 +225,10 @@ def main(argv: list[str] | None = None) -> int:
         require_full_shas(args.tag, args.prerelease_commit, args.candidate_commit)
         client = GitHub(os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GH_TOKEN", ""))
         check_prerelease_release(client, args.tag)
-        targets = [row["target"] for row in native_matrix(client.manifest(args.tag))["include"]]
-        run_id = find_verified_run(client, args.tag, args.prerelease_commit, targets)
+        # The manifest is read at the verified commit V, not the tag: the tag is mutable, V is not.
+        manifest = client.manifest(args.prerelease_commit)
+        targets = [row["target"] for row in native_matrix(manifest)["include"]]
+        run_id = find_verified_run(client, args.tag, args.prerelease_commit, targets, tag_kind(args.tag, manifest))
         is_ancestor = git_is_ancestor(args.prerelease_commit, args.candidate_commit)
         paths = git_changed_paths(args.prerelease_commit, args.candidate_commit) if is_ancestor else []
         diff = classify(paths, manifest_build_changed=MANIFEST_PATH in paths and manifest_build_changed(
@@ -247,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     except (GateError, GitHubError, ValueError) as error:
         print(f"release-native-gate: {error}", file=sys.stderr)
         return 1
-    print(f"Native matrix verified for {args.tag}: Release Native Verify run {run_id} on commit {args.prerelease_commit}")
+    print(f"Native matrix verified for {args.tag}: {VERIFY_WORKFLOW_NAME} run {run_id} on commit {args.prerelease_commit}")
     print(f"Artifact inputs changed since the verified commit: {', '.join(diff.artifact_inputs) or 'none'}")
     print(f"Paths changed since the verified commit that need no rerun: {len(diff.other)}")
     if args.output:

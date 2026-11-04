@@ -452,6 +452,20 @@ PR #850):
   finding has a deterministic test or a documented resolution, and the artifact
   input list is covered by a test against the scripts and actions that
   `prerelease-archive.yml` runs.
+- `lint-085.81`: QA round 2 of #847 (lint-085.78 findings fixed). Acceptance:
+  18 findings filed against PR #847 at `31ecfe30`.
+- `lint-085.87`: #847 QA round 2: Release retry, tag binding, run provenance,
+  manifest sections and minors. Acceptance: each finding has a deterministic
+  test or a documented resolution; pushed to `ci/085-native-verify-prerelease`
+  at `a8989ac6` with no pull request, to merge into PR #842.
+- `lint-085.88`: QA round 3 of #847 (lint-085.81 findings fixed). Acceptance:
+  13 findings filed against `a8989ac6`.
+- `lint-085.93`: #847 QA round 3: default_branch 404 and 12 minors. Acceptance:
+  the default-branch request reaches the repository URL; release tags need no
+  `[prerelease]` section; tags resolve through `refs/tags` with annotated tags
+  peeled; the gate reads the manifest at `V`; the trusted-run rule follows the tag
+  kind; the prerelease prefix is validated; the native matrix policy sits in its
+  own module; each finding has a deterministic test or a documented resolution.
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
 The REQ-CLI-022 prior-release refresh exception and the ADR-022 runtime
