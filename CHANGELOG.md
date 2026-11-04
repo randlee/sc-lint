@@ -45,6 +45,15 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   `release_docs.files`. sc-lint enables it for its own repository, so a stale
   version literal in the README, crate manifests or the offline docs bundle
   fails the check (lint-085.50).
+- Release native verification runs on pre-release builds as well as published
+  releases. `Release Native Verify` verifies each `prerelease/vX.Y.Z` archive
+  and cp39-abi3 wheel on its native target before publication. Release
+  preflight requires a successful native verify on a pre-release whose commit
+  is an ancestor of the release candidate, and no artifact input may have
+  changed since. Documentation, CHANGELOG, publish-workflow and verifier
+  changes never force a rerun (#847). Each target writes a JSON result, and
+  the results are tiled into one HTML report under
+  `site/reports/release-native-verify/` (lint-085.75).
 
 ### Changed
 
