@@ -115,15 +115,17 @@ SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; insp
 The runtime analyzer supports the shared `enabled`, `exclude_rules`,
 `fail_rules`, `exclude_paths_by_rule`, and `--rule-filter` configuration.
 Every rule fails by default. A function or method can allow listed rules only
-with a non-empty reason, using the existing shared directive syntax:
+with a non-empty reason, using the existing shared directive syntax.
+`SCB-RUNTIME-003` uses the same allowance path as rules 004–007, so a bounded
+synchronous helper can declare a narrow exception without excluding its file:
 
 ```rust
 #[sc_lint_attributes::sc_lint(
-    allow(SCB-RUNTIME-005),
-    reason = "Compatibility protocol requires this timer boundary"
+    allow(SCB-RUNTIME-003),
+    reason = "Bounded synchronous compatibility polling"
 )]
-async fn protocol_timer() {
-    tokio::time::sleep(duration).await;
+fn bounded_sync_poll(poll_interval: std::time::Duration) {
+    std::thread::sleep(poll_interval);
 }
 ```
 
@@ -211,9 +213,6 @@ fn checks_behavior() {
 
 The file-level marker exempts rules 004–007. A parent module's `cfg(test)`
 attribute alone does not propagate into the separate file.
-
-If a future exception model is added, it must be backend-owned and documented
-explicitly before users rely on it.
 
 ## Output And Logging
 

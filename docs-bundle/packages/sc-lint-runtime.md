@@ -43,12 +43,14 @@ Rules 005–007 do not require a declared Tokio dependency. `yield_now` is legal
 Test files/targets and inline `cfg(test)`, `#[test]` and framework test
 attributes are exempt. Prefer event-driven synchronization over sleeps.
 
-A function/method may declare a reasoned exception:
+A function/method may declare a reasoned exception. `SCB-RUNTIME-003` uses
+the same allowance path as rules 004–007; the allowance covers only that body,
+so sibling and nested functions still need their own reasoned exceptions:
 
 ```rust
-#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-005), reason = "Protocol timer boundary")]
-async fn timer() {
-    tokio::time::sleep(duration).await;
+#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "Bounded synchronous compatibility polling")]
+fn bounded_sync_poll(poll_interval: std::time::Duration) {
+    std::thread::sleep(poll_interval);
 }
 ```
 

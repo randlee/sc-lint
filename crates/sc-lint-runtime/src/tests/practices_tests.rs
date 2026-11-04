@@ -883,3 +883,47 @@ fn parent_aliases_keep_their_definition_scope_across_nested_modules() {
         vec![RuleId::ScbRuntime005]
     );
 }
+
+#[test]
+fn qualified_003_allow_is_scoped_to_the_annotated_function() {
+    let source = r#"
+#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "Bounded synchronous compatibility polling")]
+fn allowed() {
+    std::thread::sleep(interval);
+    fn nested() { std::thread::sleep(interval); }
+}
+fn sibling() { std::thread::sleep(interval); }
+"#;
+    let found = report(source, true);
+    assert_eq!(
+        rule_ids(&found),
+        vec![RuleId::ScbRuntime003, RuleId::ScbRuntime003]
+    );
+    let labels = found
+        .findings
+        .iter()
+        .flat_map(|finding| &finding.node_ids)
+        .map(|node| node.as_str().rsplit("::").next().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        labels,
+        std::collections::BTreeSet::from(["nested", "sibling"])
+    );
+}
+
+#[test]
+fn qualified_003_allow_requires_a_reason() {
+    let fixture = tokio_fixture(
+        "#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003))] fn missing_reason() { std::thread::sleep(interval); }",
+        TOKIO,
+    );
+    let error = analyze_workspace(&analyze_options(&fixture))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"),
+        "{error}"
+    );
+    assert!(error.contains("at line 1"), "{error}");
+    assert!(error.contains("recovery:"), "{error}");
+}

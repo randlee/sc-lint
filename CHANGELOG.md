@@ -8,6 +8,11 @@ All notable changes to sc-lint are documented here.
 
 ### Added
 
+- `SCB-RUNTIME-003` supports reason-required function/method allowances through
+  the shared directive path. Intentional synchronous helpers can use
+  `#[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-003), reason = "...")]`
+  without suppressing sibling or nested functions (#836).
+
 - Runtime rules reject thread `sleep_until` in production Tokio packages,
   Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
   held across `.await` (`SCB-RUNTIME-004`–`007`, #640, #838). Test code is exempt;
