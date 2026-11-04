@@ -19,6 +19,9 @@ All notable changes to sc-lint are documented here.
   rest/or patterns and nested reference bindings more accurately (#840).
 - Analyzer crates share common analysis options and repository-relative
   source-path helpers, preserving existing public options shapes (#840).
+- The Python package requires Python 3.11 or newer (`requires-python`), matching
+  the helper modules' `tomllib` import and the consumer bootstrap; the abi3-py39
+  wheel tag is unchanged.
 - Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
   opt-outs. Separate test-module files can put `#![cfg(test)]` at the top to
   mark the whole file as test code (#840).

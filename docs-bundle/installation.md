@@ -31,7 +31,8 @@ The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 Starting with 0.8.3, release archives support x86_64 and ARM64 on Linux, macOS, and Windows.
 Python wheels cover the same six platforms and declare Python 3.9 or newer
 (`requires-python = ">=3.9"`). On Windows ARM64, install the wheel into a
-native ARM64 Python, not an x64 interpreter running under emulation.
+native ARM64 Python (python.org provides those from 3.11), not an x64
+interpreter running under emulation.
 
 ```sh
 tar -xzf sc-lint_0.8.5_x86_64-unknown-linux-gnu.tar.gz

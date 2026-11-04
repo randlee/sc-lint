@@ -6,7 +6,16 @@ import subprocess
 import sys
 
 
+USAGE = (
+    "usage: python -m sc_lint.run_all COMMAND [COMMAND ...]\n"
+    "Run each shell COMMAND in order, even after one fails, and report every failure."
+)
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(USAGE)
+        return 0 if len(argv) >= 2 else 2
     failed: list[str] = []
     for command in argv[1:]:
         print(f"run_all: {command}", flush=True)

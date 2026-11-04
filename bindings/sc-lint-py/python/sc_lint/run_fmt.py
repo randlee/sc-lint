@@ -19,9 +19,15 @@ def resolve_command(mode: str) -> list[str] | None:
     return FMT_STEPS.get(mode)
 
 
+USAGE = "usage: python -m sc_lint.run_fmt [check|write|apply]  (default: check)"
+
+
 def main(argv: list[str]) -> int:
-    repo_root = discover_repo_root()
     mode = argv[1] if len(argv) > 1 else "check"
+    if mode in ("-h", "--help"):
+        print(USAGE)
+        return 0
+    repo_root = discover_repo_root()
 
     command = resolve_command(mode)
     if command is None:

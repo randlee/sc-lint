@@ -8,7 +8,7 @@ const path = require("node:path");
 const test = require("node:test");
 const zlib = require("node:zlib");
 
-const { ERROR, releaseTarget, runAction } = require("../index.js");
+const { ActionError, ERROR, errorAnnotation, releaseTarget, runAction } = require("../index.js");
 
 function temporaryDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "sc-lint-action-test-"));
@@ -239,7 +239,7 @@ test("metadata declares the stable interface and required output contract", () =
   for (const name of ["operation:", "version:", "config-path:", "artifact-url:", "checksums-url:", "binary-path:", "docs-path:"]) {
     assert.match(metadata, new RegExp(`^  ${name}`, "m"));
   }
-  assert.match(metadata, /using: node20/);
+  assert.match(metadata, /using: node24/);
   assert.match(metadata, /main: action\/index\.js/);
 });
 
@@ -252,4 +252,9 @@ test("all six published release target triples and archive extensions are exact"
     ["win32", "x64", "x86_64-pc-windows-msvc", "zip"],
     ["win32", "arm64", "aarch64-pc-windows-msvc", "zip"],
   ]) assert.deepEqual(releaseTarget(platform, architecture), { triple, extension });
+});
+
+test("failures are also emitted as GitHub error annotations with escaped newlines", () => {
+  const failure = new ActionError(ERROR.command, "line one\nline 100%", "Fix it.");
+  assert.equal(errorAnnotation(failure), "::error title=ACTION.SC_LINT_COMMAND_FAILED::line one%0Aline 100%25 Recovery: Fix it.");
 });

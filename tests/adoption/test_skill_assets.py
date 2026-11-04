@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "packages" / "sc-lint-adoption"
-SKILL = PACKAGE / ".claude" / "skills" / "sc-lint-adoption" / "SKILL.md"
+SKILL = PACKAGE / "skills" / "sc-lint-adoption" / "SKILL.md"
 GUIDE = ROOT / "docs" / "sc-lint" / "adoption.md"
 ASSIGNMENT_TEMPLATE = SKILL.parent / "adopt.xml.j2"
 TEMPLATE_EXPRESSION = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.S)
@@ -69,7 +69,7 @@ def test_skill_has_the_seven_agent_run_steps() -> None:
 
 
 def test_package_assets_and_guide_stay_consumer_generic() -> None:
-    for path in [*PACKAGE.joinpath(".claude").rglob("*"), GUIDE]:
+    for path in [*PACKAGE.joinpath("skills").rglob("*"), *PACKAGE.joinpath("agents").rglob("*"), GUIDE]:
         if path.is_file():
             content = path.read_text()
             assert "sc-compose" not in content
