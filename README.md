@@ -39,12 +39,14 @@ Python package supplies bindings and helpers; it is not the CLI installer.
 
 ## Run checks
 
-With a configured `sc-lint.toml`, run the complete CI lint profile for a
+With a configured `sc-lint.toml`, run the consumer CI lint profile for a
 consumer repository with:
 
 ```bash
-sc-lint lint ci
+sc-lint lint ci --consumer
 ```
+
+Bare `sc-lint lint ci` runs sc-lint's own maintainer profile.
 
 Run an individual analyzer with:
 
@@ -54,7 +56,7 @@ sc-lint lint sc-portability
 sc-lint lint sc-runtime
 ```
 
-Use `sc-lint --json lint ci` for machine-readable output. The offline manual
+Use `sc-lint --json lint ci --consumer` for machine-readable output. The offline manual
 is available with `sc-lint docs`; start with its `installation`,
 `configuration`, `using-sc-lint`, and package guides.
 

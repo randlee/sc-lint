@@ -12,9 +12,23 @@ sc-lint init --just --dry-run # validate without writing; --json lists paths
 sc-lint init --just           # create or update managed files
 ```
 
-Human output for `--dry-run` is a one-line status (`init: ok`). Use
-`sc-lint --json init --just --dry-run` to see `created_files`,
-`managed_files`, and `preserved_files`.
+Human output starts with `init: <status>`: `current` when nothing needs
+writing, `would_create` for a `--dry-run` that would write files, and
+`created` after writing. Non-empty file lists follow, one line each:
+`Created:` (or `Would create:` for `--dry-run`), `Preserved:` and
+`Version-only stale:` (generated files that differ only in the sc-lint
+version; they are kept, not rewritten). For example:
+
+```text
+init: created
+Created: /work/repo/Justfile, /work/repo/.sc-lint/bootstrap.py
+Preserved: /work/repo/sc-lint.toml
+```
+
+Paths are printed as the repository root joined with each file name.
+
+`sc-lint --json init --just` reports the same lists as `created_files`,
+`preserved_files` and `version_only_stale_files`, plus `managed_files`.
 
 The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an

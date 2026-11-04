@@ -23,12 +23,14 @@ analyzers.
   analyzer honors known `SCB-RUNTIME-*` ids on functions and methods. Each
   analyzer ignores ids owned by another analyzer.
 - Unknown-id checks are analyzer-owned: an analyzer passes its prefix and
-  known ids to `unknown_owned_rule`. The runtime analyzer reports a miss as
-  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`; portability reports
-  `PORTABILITY.UNKNOWN_RULE`.
+  known ids to `unknown_owned_rules`, which returns every miss. The runtime
+  and portability analyzers both report each miss as
+  `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
 - `is_sc_lint_attribute` is the one place that decides which attribute paths
-  are `sc_lint` directives; `DirectiveError::from_diagnostic` maps a site-allowance parse
-  diagnostic message to its typed `DIRECTIVE.SITE_ALLOW.*` code and recovery.
+  are `sc_lint` directives; typed parsing keeps each
+  `DIRECTIVE.SITE_ALLOW.*` code without decoding message text, and
+  `DirectiveError::from_diagnostic` maps a foreign `syn` error to
+  `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR`.
 - The crate must not depend on the CLI or analyzer implementations.
 
 ## Related Docs

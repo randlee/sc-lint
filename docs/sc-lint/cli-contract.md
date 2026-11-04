@@ -336,8 +336,12 @@ renderer behavior and verify that each machine-significant human-output field
 is present in the JSON envelope. The rule reflects the existing
 `render_success_human` implementation; it does not request a renderer change.
 
-- `init`, `compatibility.check`, and `view.graph` render exactly
-  `{id}: ok`.
+- `compatibility.check` and `view.graph` render exactly `{id}: ok`.
+- `init` renders `init: <status>` (`current`, `would_create` or `created`),
+  then one line for each non-empty file list: `Created:` (`Would create:`
+  under `--dry-run`), `Preserved:` and `Version-only stale:`, each followed by
+  the comma-separated paths from `created_files`, `preserved_files` and
+  `version_only_stale_files`.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
 
@@ -594,22 +598,24 @@ Directive codes and recoveries are:
 | --- | --- | --- |
 | `DIRECTIVE.SITE_ALLOW.EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
 | `DIRECTIVE.SITE_ALLOW.MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
-| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
+| `DIRECTIVE.SITE_ALLOW.EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason string. |
 | `DIRECTIVE.SITE_ALLOW.QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
 | `DIRECTIVE.SITE_ALLOW.DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
 | `DIRECTIVE.SITE_ALLOW.REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
 | `DIRECTIVE.SITE_ALLOW.MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
 | `DIRECTIVE.SITE_ALLOW.DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
 | `DIRECTIVE.SITE_ALLOW.UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
-| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
+| `DIRECTIVE.SITE_ALLOW.MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Write an analyzer prefix and numeric suffix, for example `PORT-010`. |
 | `DIRECTIVE.SITE_ALLOW.NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
+| `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR` | The attribute is not valid Rust attribute syntax. | Correct the attribute syntax reported by the parser. |
+| `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` | A rule id has the analyzer's prefix but is not in its catalog, for example ``unknown rule `PORT-999`; valid rule ids: PORT-010``. | Use a rule id from the owning analyzer catalog. |
 
-`PORTABILITY.UNKNOWN_RULE` identifies an unsupported portability rule id and
-provides the source path, line, cause, and recovery. Portability site
-allowances support only `PORT-010`; use that id or remove the allowance.
-Runtime site allowances accept any `SCB-RUNTIME-*` id the runtime analyzer
-knows; an unknown runtime id is `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`, recovered
-by using a known runtime rule id.
+An unsupported portability rule id is also reported as
+`PORTABILITY.INVALID_SITE_ALLOW` with code `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`
+(exit 3); every unknown id is reported, one diagnostic each with its source
+path and line. Portability site allowances support only `PORT-010`. Runtime
+site allowances accept any `SCB-RUNTIME-*` id the runtime analyzer knows; an
+unknown runtime id is also `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
 
 ### Python adapter backend
 
