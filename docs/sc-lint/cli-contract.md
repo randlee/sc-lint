@@ -590,8 +590,10 @@ finding is reported in schema `0.2.0` as an `allowed` entry containing
 `rule_id`, `reason`, the crate-relative qualified `item`, `source_path`, and
 one-based `line`.
 
-Malformed directives return `PORTABILITY.INVALID_SITE_ALLOW` with the source
-path, line, stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
+Malformed directives fail the portability analyzer (exit 3). Every
+site-allowance diagnostic across all scanned files is reported in one
+failure, sorted by source path and line, each as `<path>:<line>:` followed by
+its stable `DIRECTIVE.SITE_ALLOW.<X>` code, cause, and recovery.
 Directive codes and recoveries are:
 
 | Code | Cause | Recovery |
@@ -610,10 +612,9 @@ Directive codes and recoveries are:
 | `DIRECTIVE.SITE_ALLOW.SYNTAX_ERROR` | The attribute is not valid Rust attribute syntax. | Correct the attribute syntax reported by the parser. |
 | `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` | A rule id has the analyzer's prefix but is not in its catalog, for example ``unknown rule `PORT-999`; valid rule ids: PORT-010``. | Use a rule id from the owning analyzer catalog. |
 
-An unsupported portability rule id is also reported as
-`PORTABILITY.INVALID_SITE_ALLOW` with code `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`
-(exit 3); every unknown id is reported, one diagnostic each with its source
-path and line. Portability site allowances support only `PORT-010`. Runtime
+An unsupported portability rule id is one of those diagnostics, with code
+`DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`; every unknown id in every file is
+reported. Portability site allowances support only `PORT-010`. Runtime
 site allowances accept any `SCB-RUNTIME-*` id the runtime analyzer knows; an
 unknown runtime id is also `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
 

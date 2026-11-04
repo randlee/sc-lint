@@ -22,7 +22,7 @@ platform and OS portability rules.
 - `PORT-010` is the only portability rule supported by site allowances. A
   well-formed `PORT-001` through `PORT-009` or another unsupported `PORT-*` id
   is rejected with `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE` (exit 3) instead of
-  silently doing nothing; every unknown id in a file is reported.
+  silently doing nothing; every unknown id in every scanned file is reported in one failure.
 - the allowance does not cover sibling items, methods in an annotated impl,
   module contents, or a file; reports with suppressed findings use schema
   version `0.2.0` and include `allowed`, while empty reports remain schema

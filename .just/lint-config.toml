@@ -8,7 +8,7 @@ config_home_env = "SC_LINT_CONFIG_HOME"
 [version_sync.python]
 cargo_lock = true
 
-# Finding 7 (lint-085.49): release-version literals in the README, crate
+# QA round-2 finding 7 (lint-085.50): release-version literals in the README, crate
 # manifests and docs-bundle must track the workspace version. Each pattern
 # captures the version in group `version`; a stale literal is `release_docs.version`.
 [version_sync.release_docs]

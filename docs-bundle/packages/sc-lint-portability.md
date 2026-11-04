@@ -15,7 +15,7 @@ CI owners use the findings to keep Linux, macOS, and Windows lanes equivalent.
 
 ```sh
 sc-lint lint sc-portability
-sc-lint lint ci
+sc-lint lint ci --consumer
 ```
 
 The analyzer inspects the configured repository root and reports source path,
