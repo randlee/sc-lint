@@ -123,7 +123,7 @@ Contents:
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
   the planned top-level `sc-lint` CLI
-- [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
+- [`cli-contract.md`](./cli-contract.md) — implemented top-level success/error
   envelope and backend-to-CLI normalization contract
 - [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
   — installed-product consumer commands and generated Just integration
@@ -199,9 +199,6 @@ Intended crate split:
     - structural `cfg(unix)` / `cfg(windows)` parity checks
 - `sc-lint-runtime`
   - analyzer crate for shared std runtime/concurrency rules
-- `sc-lint-tokio`
-  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
-  - represented now as a reserved future boundary surface only
 - `sc-lint-version`
   - planned future workspace crate for stable interface version checks and
     canonical interface artifacts
@@ -220,18 +217,18 @@ Scaffold status:
 
 - `sc-lint-directives`
   - exists now
-  - currently shares the workspace `0.1.0` version line
+  - currently shares the workspace `0.8.5` version line
   - currently provides shared parsing for `#[sc_lint(...)]` directives
 - `sc-lint-attributes`
   - exists now
-  - currently shares the workspace `0.1.0` version line
+  - currently shares the workspace `0.8.5` version line
   - currently provides compile-valid, no-op `#[sc_lint(...)]` support for:
     - `boundary.allow("cycle.type_method_self_loop")`
     - `boundary.allow("cycle.recursive_value_container")`
     - `boundary.internal_only`
 - `sc-lint-boundary`
   - exists now
-  - currently shares the workspace `0.1.0` version line
+  - currently shares the workspace `0.8.5` version line
   - currently provides:
     - workspace discovery through `cargo_metadata`
     - module-driven source traversal through `syn`
@@ -255,10 +252,10 @@ Scaffold status:
       - built-in default trait-self-loop policy from:
         - `crates/sc-lint-boundary/config/defaults.toml`
   - A.3 extraction surfaces now include:
-    - `.just/lint_line_counts.py`
-    - `.just/lint_identity_literals.py`
-    - `.just/view_findings.py`
-    - `.just/python_adapter.py`
+    - `bindings/sc-lint-py/python/sc_lint/lint_line_counts.py`
+    - `bindings/sc-lint-py/python/sc_lint/lint_identity_literals.py`
+    - `bindings/sc-lint-py/python/sc_lint/view_findings.py`
+    - `bindings/sc-lint-py/python/sc_lint/python_adapter.py`
     - boundary enforcement with:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
@@ -269,13 +266,18 @@ Scaffold status:
       - Turtle
 - `sc-lint-portability`
   - exists now
-  - currently shares the workspace `0.1.0` version line
+  - currently shares the workspace `0.8.5` version line
   - currently provides:
     - `PORT-001` hardcoded Unix-only absolute paths in test code
     - `PORT-002` direct `dirs::home_dir()` without configured override check
     - `PORT-003` `std::env::set_var()` in test code
     - `PORT-004` ungated `std::os::unix` imports in production code
     - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+    - `PORT-006` hardcoded Unix-only absolute paths in production code
+    - `PORT-007` hardcoded Windows absolute paths in production code
+    - `PORT-008` direct production lookup of home/config environment variables
+    - `PORT-009` production invocation of Unix-only shells
+    - `PORT-010` Unix-only production items without a Windows companion/fallback
     - stable text/JSON findings output
 - `sc-lint`
   - exists now
@@ -299,9 +301,8 @@ Implemented code moves for the completed extraction partition (historical):
   executor entry and Mutex guards across await; see the
   [current runtime guide](../../crates/sc-lint-runtime/README.md) and
   [Pending runtime requirement](../sc-lint-runtime/requirements.md).
-- keep the portability wrapper surface pointed at `sc-lint-portability`:
-  - `.just/lint_sc_portability.py`
-  - `.just/run_lint.py`
+- keep the portability wrapper surface pointed at `sc-lint-portability` through
+  the Python helpers under `bindings/sc-lint-py/python/sc_lint/`.
 
 Planned primary lint-target mapping for the top-level CLI:
 
@@ -323,12 +324,10 @@ Kept local to consumer repos for now:
 
 Repo integration status:
 
-- `just lint sc-boundary`
-  - exists now as a named target
-  - is part of default `just lint` for this repo
-- `just lint sc-portability`
-  - exists now as a named target
-  - is part of default `just lint` for this repo
+- The repository's `just lint` recipe runs the configured source-maintenance
+  gate; it does not define per-analyzer recipes such as `just lint sc-boundary`.
+- Use `sc-lint lint sc-boundary`, `sc-lint lint sc-portability`, or
+  `sc-lint lint sc-runtime` to select one analyzer through the product CLI.
 
 Implemented profile policy:
 
@@ -344,18 +343,16 @@ Implemented profile policy:
 - top-level `ci`
   - lint plus tests
 
-Wrapper mapping:
+Current wrapper and CLI mapping:
 
-- `just lint`
-  - defaults to `sc-lint lint full`
-- `just lint fast`
-  - maps to `sc-lint lint fast`
-- `just lint full`
-  - maps to `sc-lint lint full`
-- `just lint ci`
-  - maps to `sc-lint lint ci`
-- `just ci`
-  - maps to `sc-lint ci`
+- In this repository, `just lint` and `just test` run the complete source
+  maintenance gates.
+- `just lint ci` invokes the configured `ci` lint target where the repository
+  consumer configuration provides it.
+- `sc-lint lint fast`, `sc-lint lint full`, and `sc-lint lint ci` are supported
+  CLI targets; they are not corresponding `just lint <profile>` recipes here.
+- `sc-lint ci` is the top-level lint-and-test command; this repository's
+  source-maintenance contract uses `just lint` followed by `just test`.
 
 Rule-disable policy:
 
@@ -434,8 +431,6 @@ Related architecture decisions:
 - [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
   — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
 
-Planned A.8 user-guide convention:
-
-- per-tool guides will live under `docs/sc-lint/tools/`
-- each file will be named after the tool it documents
-- the repository-root `README.md` will link every guide directly
+Current user guides are the per-crate `README.md` files and the installed
+offline guides under `docs-bundle/`. Design and planning documentation remains
+under `docs/`.

@@ -1,7 +1,16 @@
-# `sc-runtime` User Guide
+# `sc-lint-runtime`
 
-`sc-runtime` is the shipped runtime-analysis tool for std
-concurrency/liveness checks.
+`sc-lint-runtime` is the Rust analyzer used by the
+[`sc-lint` product](https://crates.io/crates/sc-lint) for runtime and
+concurrency checks. The `sc-runtime` name is the analyzer target accepted by
+`sc-lint lint`.
+
+Current crate release: **0.8.5**. Install the product CLI with
+`brew install randlee/tap/sc-lint` or from
+[GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
+crate as a Rust library, run `cargo add sc-lint-runtime@0.8`. See the
+[repository](https://github.com/randlee/sc-lint) and
+[API documentation](https://docs.rs/sc-lint-runtime/0.8.5).
 
 ## Purpose
 
@@ -33,10 +42,11 @@ Rules 005–007 do not require a declared Tokio dependency. `yield_now` remains
 legal. Prefer event-driven synchronization; a timer is not a replacement for
 another forbidden sleep. The checks inspect syntax, not a running service.
 
-Sample `SCB-RUNTIME-003` finding:
+Rule details appear in the JSON `findings` array. For example, this is the
+message produced for `SCB-RUNTIME-003` by the 0.8.5 binary:
 
 ```text
-SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use event-driven synchronization or `yield_now` instead
+/private/tmp/sc-lint-docs-085-A-sample/src/lib.rs:2: SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `docs-sample`; use event-driven synchronization or `yield_now` instead
 ```
 
 ## Invocation
@@ -48,8 +58,8 @@ sc-lint lint sc-runtime
 sc-lint --json lint sc-runtime
 ```
 
-There is no dedicated repo-local `just lint sc-runtime` wrapper in the current
-release line. Use the top-level CLI or the backend-local command directly.
+There is no dedicated repo-local `just lint sc-runtime` wrapper. In the
+sc-lint source repository, `just lint` runs the complete repository lint gate.
 
 Backend-local path:
 
@@ -77,12 +87,11 @@ pub fn wait_until_ready(condvar: &Condvar, state: &Mutex<bool>) {
 }
 ```
 
-Representative text result:
+Representative text result from the 0.8.5 binary on a one-crate workspace
+with no findings:
 
 ```text
-sc-lint-runtime: PASS
-scanned crates: 1
-findings: 0
+sc-lint-runtime 0.8.5 status=pass scanned_crates=1 findings=0
 ```
 
 ## Representative Fail
@@ -101,14 +110,16 @@ pub fn block(condvar: &Condvar, state: &Mutex<bool>) {
 Representative finding:
 
 ```text
-SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult
+/private/tmp/sc-lint-docs-085-A-sample/src/lib.rs:5: SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult
 ```
 
-Discarded timeout result:
+Discarding the timeout result is reported as `SCB-RUNTIME-002`; the JSON
+finding message includes the source path and line.
 
-```text
-SCB-RUNTIME-002 wait_timeout* result discarded in non-test production code; inspect the returned WaitTimeoutResult before proceeding
-```
+The backend `sc-lint-runtime analyze` returns exit code `0` after a completed
+analysis even when the report status is `fail`. The top-level
+`sc-lint lint sc-runtime` command returns exit code `10` for a configured lint
+failure.
 
 ## Configuration and local allows
 
@@ -257,5 +268,5 @@ Delegated/backend normalization records also appear:
 
 See:
 
-- [logging.md](../../docs/sc-lint/logging.md)
-- [cli-contract.md](../../docs/sc-lint/cli-contract.md)
+- [logging.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/logging.md)
+- [cli-contract.md](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/cli-contract.md)

@@ -9,6 +9,9 @@ description = "AST-sensitive Rust runtime analyzer."
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+documentation = "https://docs.rs/sc-lint-runtime/0.8.5"
+keywords = ["rust", "sc-lint", "lint", "runtime", "concurrency"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "sc-lint-runtime"
