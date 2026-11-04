@@ -997,15 +997,16 @@ class PosixBootstrapToolTests(HelperFixture):
         return self.log.read_text(encoding="utf-8").splitlines() if self.log.exists() else []
 
     def test_issue_197_declared_missing_tool_reproduces_then_setup_provisions(self) -> None:
-        # The consumer is installed once by the adoption kit with a declared
-        # cross-target tool, persisting `.sc-lint/install.json`.
+        # The consumer declares its cross-target tool in its own input file.
         consumer = self.tmp / "issue-197-consumer"
         consumer.mkdir()
         data = install_input(XWIN_TOOLS)
         data["minimum_version"] = self.version
         data["profiles"] = {"clippy-windows": WINDOWS_CHECK}
-        input_path = self.tmp / "install-input.json"
+        input_path = consumer / ".sc-lint" / "install.json"
+        input_path.parent.mkdir()
         input_path.write_text(json.dumps(data), encoding="utf-8")
+        persisted_before = input_path.read_bytes()
         install = subprocess.run(
             [sys.executable, str(ADOPTION_INSTALLER), "--input", str(input_path), str(consumer)],
             text=True,
@@ -1016,8 +1017,8 @@ class PosixBootstrapToolTests(HelperFixture):
         self.assertEqual(install.returncode, 0, install.stderr)
         persisted = consumer / ".sc-lint" / "install.json"
         self.assertEqual(json.loads(persisted.read_text(encoding="utf-8"))["tools"], XWIN_TOOLS)
-        persisted_before = persisted.read_bytes()
-        manifest_before = (consumer / ".sc-lint" / "installed.json").read_bytes()
+        self.assertEqual(persisted.read_bytes(), persisted_before)
+        self.assertFalse((consumer / ".sc-lint" / "installed.json").exists())
         self.seed_venv(consumer)
         check_environment = dict(self.environment)
         check_environment["PATH"] = f"{self.cargo_home / 'bin'}:{self.fake.bin}:/usr/bin:/bin"
@@ -1035,7 +1036,7 @@ class PosixBootstrapToolTests(HelperFixture):
         self.assertNotIn("cargo-xwin", FakeToolchain.installs(self.cargo_home))
         self.assertNotIn(WINDOWS_TARGET, self.fake.targets())
 
-        # Green: ordinary setup from the same persisted input provisions and
+        # Green: ordinary setup from the same consumer input provisions and
         # verifies both declarations without rerunning install.py.
         setup = self.bootstrap("setup", "--config", "sc-lint.toml", consumer=consumer)
         self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
@@ -1053,7 +1054,7 @@ class PosixBootstrapToolTests(HelperFixture):
         self.assertEqual(green.returncode, 0, green.stderr)
         self.assertIn("Finished", green.stderr)
         self.assertEqual(persisted.read_bytes(), persisted_before)
-        self.assertEqual((consumer / ".sc-lint" / "installed.json").read_bytes(), manifest_before)
+        self.assertFalse((consumer / ".sc-lint" / "installed.json").exists())
 
         rerun = self.bootstrap("setup", "--config", "sc-lint.toml", consumer=consumer)
         self.assertEqual(rerun.returncode, 0, rerun.stderr)
