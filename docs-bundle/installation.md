@@ -29,7 +29,7 @@ complete unit before activation.
 The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 
 Starting with 0.8.3, release archives support x86_64 and ARM64 on Linux, macOS, and Windows.
-Python wheels cover the same six platforms and require Python 3.9 or newer;
+Python wheels cover the same six platforms and require Python 3.11 or newer;
 Windows ARM64 requires Python 3.11 or newer.
 
 ```sh
