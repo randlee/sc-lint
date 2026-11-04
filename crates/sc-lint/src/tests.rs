@@ -465,6 +465,8 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
 
     let current = crate::config::run_consumer_init_at(root, request).expect("idempotent");
     assert_eq!(current["status"], "current");
+    assert_eq!(current["refreshed_files"], json!([]));
+    assert_eq!(current["would_refresh_files"], json!([]));
     let checked = crate::config::run_consumer_init_at(
         root,
         ConsumerInitRequest {
@@ -2929,8 +2931,10 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
         &CommandEnvelope::success(
             "init",
             json!({
-                "status": "would_create",
+                "status": "would_update",
                 "created_files": ["sc-lint.toml"],
+                "refreshed_files": [],
+                "would_refresh_files": [".sc-lint/bootstrap.py"],
                 "preserved_files": ["README.md"],
                 "version_only_stale_files": [],
             }),
@@ -2938,7 +2942,26 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
     );
     assert_eq!(
         init_output,
-        "init: would_create\nWould create: sc-lint.toml\nPreserved: README.md"
+        "init: would_update\nWould create: sc-lint.toml\nWould refresh: .sc-lint/bootstrap.py\nPreserved: README.md"
+    );
+
+    let refreshed_output = crate::render::render_success_human(
+        &init_context,
+        &CommandEnvelope::success(
+            "init",
+            json!({
+                "status": "updated",
+                "created_files": [],
+                "refreshed_files": [".sc-lint/bootstrap.py"],
+                "would_refresh_files": [],
+                "preserved_files": [],
+                "version_only_stale_files": [],
+            }),
+        ),
+    );
+    assert_eq!(
+        refreshed_output,
+        "init: updated\nRefreshed: .sc-lint/bootstrap.py"
     );
 
     let docs_cli = Cli::parse_from(["sc-lint", "docs", "--path"]);

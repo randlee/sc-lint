@@ -116,13 +116,15 @@ fn render_init_summary(data: Option<&Value>) -> String {
         .and_then(Value::as_str)
         .unwrap_or("current");
     let mut lines = vec![format!("init: {status}")];
-    let created_label = if status == "would_create" {
+    let created_label = if matches!(status, "would_create" | "would_update") {
         "Would create"
     } else {
         "Created"
     };
     for (key, label) in [
         ("created_files", created_label),
+        ("refreshed_files", "Refreshed"),
+        ("would_refresh_files", "Would refresh"),
         ("preserved_files", "Preserved"),
         ("version_only_stale_files", "Version-only stale"),
     ] {
