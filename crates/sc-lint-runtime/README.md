@@ -193,8 +193,6 @@ control-flow exits are not proved; consumed guards or branch/loop exits may
 produce conservative findings. In particular, `consume(g); other().await`
 and `loop { drop(g); break; } other().await` may still report rule 007;
 interprocedural ownership and loop/labeled-block exit guard transfer are not proved.
-Rule 003's legacy resolver does not recognize renamed `self` imports such as
-`use std::thread::{self as thread}`; use a direct module alias instead.
 For raw `try_lock()` result-variant arms, `Ok` patterns retain the guard,
 including `Ok(_)` and `Ok(..)` scrutinees. Explicit
 `Err(TryLockError::Poisoned(p))` bindings are also tracked. Ownership in unrefined

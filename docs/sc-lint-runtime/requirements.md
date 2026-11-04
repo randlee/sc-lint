@@ -30,8 +30,6 @@ runtime/concurrency-correctness rules.
   ```
 
 - known limitations of the sleep pass:
-  - `use` imports are flattened across the whole file, including imports inside
-    function bodies
   - calls are matched by name, not by scope: a local item or binding that reuses
     an imported name, such as a local `sleep`, is not shadow-checked
   - macros are not expanded, so a sleep call produced by macro expansion is not

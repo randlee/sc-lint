@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-022 |
-| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Accepted — 2026-11-01. Receipts: Rand 2026-11-01: "I approve conditionally on atm-core acceptance."; team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core." |
+| Status | Base ADR accepted — Rand, 2026-10-31 ("3 - accept"); #822/#784 amendment Accepted — 2026-11-01. Receipts: Rand 2026-11-01: "I approve conditionally on atm-core acceptance."; team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core." Runtime site-allowance amendment (2026-11-04, #640): Pending Rand. |
 | Deciders | Rand |
-| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Accepted — 2026-11-01); REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784 |
+| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-CLI-028 (Accepted — 2026-11-01); REQ-PRODUCT-004E, REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786, #822, #784, #640 |
 
 ## Context
 
@@ -163,3 +163,34 @@ Alternatives considered:
 - Per-step `default = false`: rejected because it adds a second inclusion
   rule to each row and complicates the meaning of explicit `all`; the
   consumer-level named profile default keeps inclusion in profile membership.
+
+## Proposed Amendment — 2026-11-04 (runtime site allowances, #640)
+
+Status: Pending Rand. This amendment records an edge that 0.8.5 ships under
+REQ-PRODUCT-004E (Accepted, Rand 2026-11-03: "004E approved (as long as
+consumer can opt out w/ reason)"). Decision 4 above names only `PORT-010`, so
+the ADR does not yet show that `sc-lint-runtime` consumes the directive model.
+
+1. **Decision: decision 4 extends to known `SCB-RUNTIME-*` ids.**
+   `#[sc_lint(allow(SCB-RUNTIME-00N), reason = "...")]` on a function or
+   method exempts that function's body from the named runtime rules. It is a
+   single-site exception with a required, non-blank reason, as for
+   `PORT-010`. There is still no repository-wide switch.
+2. **Decision: `sc-lint-runtime` depends on `sc-lint-directives`.** The
+   runtime analyzer parses allowances through the shared directive model and
+   its site-allowance helpers, as `sc-lint-portability` does. This is the
+   only new crate edge.
+3. **Scope rules.**
+   - The allowance does not cascade into nested functions; each needs its own.
+   - An allowance on a module, impl or other non-function item does not
+     authorize its members and produces an explicit diagnostic.
+   - A well-formed `SCB-RUNTIME-*` id the runtime analyzer does not know
+     fails with `DIRECTIVE.SITE_ALLOW.UNKNOWN_RULE`.
+   - Ids owned by another analyzer are ignored by the runtime analyzer and
+     left to their owner.
+4. **Difference from `PORT-010`.** The runtime analyzer omits suppressed
+   sites from its findings; the reason stays in source. It does not list
+   honoured allowances in its report as decision 4 describes for `PORT-010`.
+
+If Rand rejects this amendment, REQ-PRODUCT-004E stays the decision record
+for the runtime extension and this section is removed.

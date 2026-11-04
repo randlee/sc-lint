@@ -22,7 +22,7 @@ semantics.
 - Common config and rule-filter behavior is driven by each analyzer's supplied
   rule IDs, families, defaults, and analyzer-specific keys.
 - The crate has no CLI, rule IDs, or analyzer-specific policy.
-- The crate owns the shared `AnalyzeOptions` analysis input (root and output
+- Since 0.8.5, the crate owns the shared `AnalyzeOptions` analysis input (root and output
   format). Analyzer crates re-export it; an analyzer that needs extra inputs,
   such as the boundary rule filter, keeps its own options type and converts.
 - The crate owns repository-relative source-path normalization and
@@ -32,15 +32,10 @@ semantics.
   attributes, `cfg(test)` and `cfg(all(test, ...))`); each analyzer decides
   which rules the result exempts.
 
-Since 0.8.5 these responsibilities include the shared `AnalyzeOptions` input
-(workspace root and output format) that the analyzers re-export,
-repository-relative source-path normalization (`repo_relative_source_path`,
-`RepoRelativeSourcePathError`), root-prefix stripping
-(`relative_path_under_root`) and test-only attribute recognition
-(`is_test_only`). These fit ADR-013 as written: path normalization belongs to
-source discovery, `is_test_only` to scope classification, and
-`AnalyzeOptions` carries no rule ids or analyzer policy, so no ADR amendment
-is needed.
+The three 0.8.5 responsibilities above fit ADR-013 as written: path
+normalization belongs to source discovery, test-only attribute recognition to
+scope classification, and `AnalyzeOptions` carries no rule ids or analyzer
+policy. They need no ADR amendment.
 
 ## Related Docs
 
