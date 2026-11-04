@@ -4,6 +4,20 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- `sc-lint init --just` treats `sc-lint.toml` and `Justfile` as consumer-owned
+  templates. They are seeded only when missing; an existing file is never read
+  for drift, rewritten, or reported as a conflict. Only `.sc-lint/bootstrap.py`
+  is product-owned: a differing bootstrap still exits 3 with
+  `CLI.SC_LINT_INTEGRATION_CONFLICT`. (#849)
+
+### Removed
+
+- `sc-lint init --just` no longer reports a version-only `sc-lint.toml` as
+  `Version-only stale:`. The `version_only_stale_files` JSON field added in 0.8.5
+  and its human output line are removed. (#849)
+
 ## [0.8.5]
 
 This release closes GitHub issues #640, #833, #834, #836, #837, #843 and

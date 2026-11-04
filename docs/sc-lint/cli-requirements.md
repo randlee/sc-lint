@@ -371,18 +371,21 @@ specialized backend tools and mixed Rust/Python implementations.
   [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-022`
-  `sc-lint init --just [--check|--dry-run]` must materialize only the
-  product-owned `sc-lint.toml`, `Justfile` and `.sc-lint/bootstrap.py` files.
-  A current integration is idempotent; `--check` and `--dry-run` do not mutate
-  it. A differing existing managed-path file is a structured conflict, never
-  an overwrite, and a consumer README is outside the command's write set.
-  Exception for prior-release files: comparison ignores line endings (CRLF
-  and LF), and a managed file that matches a known prior-release asset is
-  not a conflict. A matching prior-release `.sc-lint/bootstrap.py` is
-  refreshed with the current asset; a matching prior-release `Justfile` with
-  its old managed header is accepted as current; a generated `sc-lint.toml`
-  that differs only in its well-formed minimum version is preserved and
-  reported as version-only stale. Any other difference is a conflict.
+  `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
+  `sc-lint.toml` and `Justfile` only when they are missing, and materializes
+  the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
+  consumer-owned: an existing file is left exactly as it is, is never a
+  conflict, and is never written. Only `.sc-lint/bootstrap.py` is
+  product-owned: a differing existing bootstrap is a structured conflict
+  (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3), never an overwrite. Exception
+  for the prior-release bootstrap: comparison ignores line endings (CRLF and
+  LF), and a matching prior-release `.sc-lint/bootstrap.py` is refreshed with
+  the current asset. A current integration is idempotent; `--check` and
+  `--dry-run` do not mutate it. A consumer README is outside the command's
+  write set.
+  (Amendment Pending Rand — lint-085.98, ADR-022 decisions 1, 2 and 5:
+  sc-lint.toml and Justfile are consumer-owned templates seeded only when
+  absent; only bootstrap.py is product-owned.)
   `--check` reports a file that would be refreshed as
   `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
   lint-085.56 and lint-085.61; Accepted — Rand 2026-11-04

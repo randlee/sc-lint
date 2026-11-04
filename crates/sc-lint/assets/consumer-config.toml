@@ -1,5 +1,5 @@
-# User-owned configuration: edit lint/test steps as needed; `sc-lint init --just`
-# refreshes only missing files and generated version-only updates.
+# User-owned configuration: edit lint/test steps as needed. `sc-lint init --just` seeds
+# this file only when it is missing and never rewrites it.
 [tool.sc-lint]
 minimum_version = "{{SC_LINT_VERSION}}"
 
