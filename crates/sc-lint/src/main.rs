@@ -85,6 +85,10 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
 mod cli_reference_tests {
     use super::Cli;
 
+    fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n")
+    }
+
     #[test]
     fn cli_reference_matches_real_clap_definition() {
         use clap::CommandFactory;
@@ -98,12 +102,16 @@ mod cli_reference_tests {
             return;
         }
         assert_eq!(
-            docli::render::markdown::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint.md")
+            normalize_line_endings(&docli::render::markdown::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint.md"
+            ))
         );
         assert_eq!(
-            docli::render::html::render(&model),
-            include_str!("../../../docs-bundle/cli-reference/sc-lint/index.html")
+            normalize_line_endings(&docli::render::html::render(&model)),
+            normalize_line_endings(include_str!(
+                "../../../docs-bundle/cli-reference/sc-lint/index.html"
+            ))
         );
     }
 }
