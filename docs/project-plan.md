@@ -395,6 +395,28 @@ authoritative sprint/dependency plan is in the `lint-phase-l` beads;
 `docs/plans/phase-l.jsonl` is the phase index. The #82 Tokio sleep rule
 ships in `sc-lint-runtime` in l-7 (REQ-PRODUCT-004C as amended).
 
+Release `0.8.5` (epic `lint-085`, #640) adds the runtime rules
+`SCB-RUNTIME-004` to `007`: thread `sleep_until` in production Tokio packages,
+Tokio timer sleeps, Runtime/Handle/futures `block_on`, and std Mutex guards
+held across `.await` (#838). Follow-ups in the same release:
+
+- #840: guard tracking across diverging branches and common Mutex shapes,
+  shared `AnalyzeOptions`, path helpers and test-scope recognition in
+  `sc-lint-analyzer-support`, reasoned `SCB-RUNTIME-*` site allowances through
+  `sc-lint-directives`, and the separate-file `#![cfg(test)]` marker
+- #839: deterministic draining of analyzer test output
+- #841: adoption fixes from the sc-compose adoption (wheel excludes
+  repository-only tests, Action ARM64 targets, kit helper-policy tables and
+  `default_lint_profile`, bootstrap PATH order)
+- phase-end review and documentation fixes (`lint-085.35`, `lint-085.37`,
+  `lint-085.39`, `lint-085.40`), merged through the version-bump PR #842
+
+Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
+REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker
+ruling, which Rand accepted on 2026-11-03. Open issues #783, #832, #833, #835,
+#836 and #837 are not addressed by 0.8.5; team-lead confirms their deferral to
+the next release.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.

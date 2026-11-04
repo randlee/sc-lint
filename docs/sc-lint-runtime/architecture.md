@@ -69,8 +69,11 @@ locals, explicit drops release guards, and branch states conservatively join.
 
 Allowances validate before rule filtering and apply only to the annotated
 function/method, with nested functions forming a fresh boundary. Root test
-files and inline test scopes remain exempt. Existing 001–003 IDs/report shape
-are preserved; 003's recovery now suggests event-driven synchronization or
+files and inline test scopes remain exempt. A file whose inner attributes mark
+it test-only (`#![cfg(test)]`) is test code for every runtime rule, 001–007:
+`runtime.rs` returns no findings for it before the 001/002 collector, the 003
+sleep pass and the 004–007 practices run, exactly as for a file under
+`tests/`. Existing 001–003 IDs/report shape are preserved; 003's recovery now suggests event-driven synchronization or
 yielding because rule 005 rejects Tokio timers as well.
 
 Branch-tail reachability excludes return/break/continue, built-in diverging

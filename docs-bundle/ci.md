@@ -19,6 +19,10 @@ the consumer commands after the preflight.
     version: 0.8.5
 ```
 
+The Action runs on Linux, macOS, and Windows runners on x86_64 or ARM64 (the
+six release targets). Any other runner fails with
+`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`.
+
 `version` is required. It is the exact released product SemVer, without a
 leading `v`, and it selects the verified artifact. Do not infer it from Cargo
 metadata or a checkout.

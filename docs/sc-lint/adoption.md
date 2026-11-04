@@ -196,7 +196,7 @@ a consumer-owned recipe.
 
 ## Assignment template
 
-`packages/sc-lint-adoption/.claude/skills/sc-lint-adoption/adopt.xml.j2` is
+`packages/sc-lint-adoption/skills/sc-lint-adoption/adopt.xml.j2` is
 rendered by ATM when it assigns the adoption work. The rendered assignment is
 consumed by the `sc-lint-adopter` agent and carries the same seven-step
 procedure described by the installed skill; it does not define another

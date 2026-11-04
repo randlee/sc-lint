@@ -297,8 +297,10 @@ Implemented code moves for the completed extraction partition (historical):
   - `SCB-RUNTIME-003`
 - 0.8.5 extends the runtime inventory through `SCB-RUNTIME-007` for sleeps,
   executor entry and Mutex guards across await; see the
-  [current runtime guide](../../crates/sc-lint-runtime/README.md) and
-  [Pending runtime requirement](../sc-lint-runtime/requirements.md).
+  [current runtime guide](../../crates/sc-lint-runtime/README.md). The
+  product requirement REQ-PRODUCT-004E is Accepted; the detailed
+  [REQ-RUNTIME-001](../sc-lint-runtime/requirements.md) is Pending except the
+  accepted `#![cfg(test)]` marker ruling.
 - keep the portability wrapper surface pointed at `sc-lint-portability`:
   - `.just/lint_sc_portability.py`
   - `.just/run_lint.py`

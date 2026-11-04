@@ -17,7 +17,8 @@ runtime/concurrency-correctness rules.
   crate dependency nor Tokio runtime semantics may live here; `sc-lint-tokio`
   remains reserved for rules that need either. The sleep pass uses flattened
   imports and does not expand macros. A separate test-module file must carry
-  its own inner `#![cfg(test)]` attribute to be classified as test code.
+  its own inner `#![cfg(test)]` attribute to be classified as test code; the
+  marker then exempts the whole file from every runtime rule, 001–007.
 - `SCB-RUNTIME-003` exclusions use the runtime analyzer table:
 
   ```toml
@@ -64,7 +65,8 @@ Rule IDs and this analyzer's JSON output are stable consumer contracts
 - Existing ScopeKind classification and the sleep pass's test-attribute
   handling exempt test targets/files, `tests/`, inline `cfg(test)` (including
   `all(test, ...)`), bare and framework test attributes. A separate test-module
-  file whose first item is the inner attribute `#![cfg(test)]` is test code.
+  file whose first item is the inner attribute `#![cfg(test)]` is test code
+  for every runtime rule, 001–007, exactly like a file under `tests/`.
   Put that marker at the top of the separate file; the parent module's
   `#[cfg(test)] mod checks;` does not propagate into it.
   Marker approval receipt: Rand, 2026-11-03: "Putting #![cfg(test)] at the top

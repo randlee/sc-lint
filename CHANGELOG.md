@@ -20,8 +20,59 @@ All notable changes to sc-lint are documented here.
 - Analyzer crates share common analysis options and repository-relative
   source-path helpers, preserving existing public options shapes (#840).
 - Document REQ-PRODUCT-004E as Accepted with mandatory-reason per-function
-  opt-outs. Separate test-module files can put `#![cfg(test)]` at the top to
-  mark the whole file as test code (#840).
+  opt-outs (#840).
+- Runtime test exemption: a source file whose inner attributes mark it
+  test-only (`#![cfg(test)]` or `#![cfg(all(test, ...))]`) is test code for
+  every runtime rule, `SCB-RUNTIME-001` through `007`, exactly like a file
+  under `tests/`. An out-of-line `#[cfg(test)] mod checks;` therefore needs
+  `#![cfg(test)]` at the top of `checks.rs`; the earlier documented
+  limitation that such files were linted as production code is removed
+  (#840).
+- Runtime rules share one test-scope classifier from
+  `sc-lint-analyzer-support`, which recognizes `#[test]`, qualified test
+  attributes such as `#[tokio::test]`, `#[cfg(test)]` and
+  `#[cfg(all(test, ...))]` (#840).
+- `SCB-RUNTIME-003` recovery text now recommends event-driven
+  synchronization or `yield_now` instead of `tokio::time::sleep(..).await`,
+  which `SCB-RUNTIME-005` now reports (#838).
+- Runtime import aliases resolve per module and function scope, so a
+  `use ...::sleep` in one module no longer changes findings for a same-named
+  import in another; `SCB-RUNTIME-004` through `007` results no longer depend
+  on item order (lint-085.39).
+- Bootstrap `lint`, `test` and `exec` resolve the command's first word with
+  `shutil.which` against PATH before running it. On Windows the child
+  process otherwise searches the parent Python's directory first and can run
+  a host interpreter instead of the managed venv tool (#841).
+- The adoption kit writes `.sc-lint/install.json` in declaration order
+  instead of sorting keys, and rejects `null` helper-policy values instead of
+  rendering invalid TOML (#841).
+- The adoption kit writes TOML strings, keys and names as Unicode scalar
+  text and escapes DEL, so characters outside the Basic Multilingual Plane
+  render as valid TOML instead of invalid surrogate-pair escapes
+  (lint-085.39).
+- Published wheels exclude `**/*.pyc` (#841).
+
+### Public Rust API
+
+- New in `sc-lint-analyzer-support`: `AnalyzeOptions` (moved from the
+  analyzer crates), `repo_relative_source_path`,
+  `RepoRelativeSourcePathError`, `relative_path_under_root` and
+  `is_test_only`. `sc-lint-portability` and `sc-lint-runtime` re-export
+  `AnalyzeOptions`, so `sc_lint_portability::AnalyzeOptions` and
+  `sc_lint_runtime::AnalyzeOptions` keep their paths and fields;
+  `sc-lint-boundary` keeps its own `AnalyzeOptions` with the `rule` filter.
+- New in `sc-lint-directives`: `is_sc_lint_attribute`,
+  `unknown_owned_rule` and `DirectiveError::from_diagnostic`.
+- `sc-lint-analyzer-support`: `PackageDependency.name` is the validated
+  `PackageName` instead of `String` (`PackageTarget.name` is already
+  `TargetName`). `PackageName::new` and `TargetName::new` panic on empty
+  input in release builds as well as debug builds. The unused public
+  `count_scanned_crates(root)` is removed;
+  `count_scanned_crates_with_metadata` remains (lint-085.39).
+- Rust library consumers that build `AnalyzeOptions` by struct literal or
+  import it from an analyzer crate need no change. Consumers that read
+  `PackageDependency.name` as `String` or call `count_scanned_crates` must
+  update. CLI and Python users need no configuration migration.
 
 ### Fixed
 
@@ -122,7 +173,7 @@ Phase M ships the atm-core P1 tool fixes (#786, #720, #136, #385, #198,
   public directive and error variants and an optional `FindingsReport.allowed`
   field. Downstream exhaustive enum matches and `FindingsReport` struct
   literals may require source changes; see the
-  [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances).
+  [ADR-011 compatibility assessment](docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md#compatibility-assessment--port-010-site-allowances-2026-10-31).
 
 ## [0.8.2] — 2026-10-29
 
