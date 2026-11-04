@@ -10,6 +10,7 @@ use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
 use quote::ToTokens;
+use sc_lint_analyzer_support::AnalyzeOptions as CommonAnalyzeOptions;
 use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::load_analyzer_settings;
@@ -135,6 +136,17 @@ pub struct AnalyzeOptions {
     pub root: PathBuf,
     pub format: OutputFormat,
     pub rule: Option<RuleFilter>,
+}
+
+// Preserve boundary's published struct-literal API and keep its rule filter
+// local while adapting the common inputs to analyzer-support.
+impl From<&AnalyzeOptions> for CommonAnalyzeOptions {
+    fn from(options: &AnalyzeOptions) -> Self {
+        Self {
+            root: options.root.clone(),
+            format: options.format,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -436,11 +448,12 @@ type NodeSourcePaths = BTreeMap<NodeId, PathBuf>;
 pub(crate) fn analyze_workspace_with_paths(
     options: &AnalyzeOptions,
 ) -> std::result::Result<(FindingsReport, NodeSourcePaths), BoundaryError> {
+    let common = CommonAnalyzeOptions::from(options);
     if options.rule == Some(RuleFilter::Manifests) {
-        return Ok((analyze_manifests_only(options)?, NodeSourcePaths::new()));
+        return Ok((analyze_manifests_only(&common)?, NodeSourcePaths::new()));
     }
 
-    let root = options.root.as_path();
+    let root = common.root.as_path();
     let inventory = inventory::load_boundary_inventory(root)
         .map_err(|e| BoundaryError::inventory_load(root, e))?;
     let metadata =
@@ -557,7 +570,7 @@ fn rule_selected(filter: Option<RuleFilter>, accepted: &[RuleFilter]) -> bool {
 
 /// `--rule manifests` needs only package metadata, not the inventory or graph.
 fn analyze_manifests_only(
-    options: &AnalyzeOptions,
+    options: &CommonAnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
     let root = options.root.as_path();
     let metadata = graph::load_metadata_without_deps(root)
@@ -595,14 +608,15 @@ pub fn analyze_workspace_configured(
     config: Option<&Path>,
     rule_filter: Option<&str>,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
-    let settings = load_analyzer_settings(&BOUNDARY_CATALOG, &options.root, config, rule_filter)?;
+    let common = CommonAnalyzeOptions::from(options);
+    let settings = load_analyzer_settings(&BOUNDARY_CATALOG, &common.root, config, rule_filter)?;
     if !settings.enabled {
         return Ok(disabled_report());
     }
     if settings.rule_filter.as_ref().is_some_and(|selected| {
         selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
     }) {
-        return analyze_inventory_semantics(&options.root);
+        return analyze_inventory_semantics(&common.root);
     }
     let policy_config = if manifest_policy_selected(&settings) {
         manifest_dependency_policy::parse_policy(&settings, settings.rule_filter.as_ref())?
@@ -612,25 +626,25 @@ pub fn analyze_workspace_configured(
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
     if inventory_free_manifest_policy_selected(&settings) {
-        return analyze_inventory_free_manifest_policy(&options, &settings, &policy_config);
+        return analyze_inventory_free_manifest_policy(&common, &settings, &policy_config);
     }
     let (mut report, node_paths) = analyze_workspace_with_paths(&options)?;
     if manifest_policy_selected(&settings) && !policy_config.is_empty() {
-        let metadata = graph::load_metadata(&options.root)
-            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+        let metadata = graph::load_metadata(&common.root)
+            .map_err(|error| BoundaryError::manifest_policy(&common.root, error))?;
         let inventory = if policy_config.requires_inventory() {
-            Some(load_validated_inventory(&options.root, &metadata)?)
+            Some(load_validated_inventory(&common.root, &metadata)?)
         } else {
             None
         };
         report.findings.extend(
             manifest_dependency_policy::analyze_policy(
-                &options.root,
+                &common.root,
                 &metadata,
                 inventory.as_ref(),
                 &policy_config,
             )
-            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+            .map_err(|error| BoundaryError::manifest_policy(&common.root, error))?,
         );
         report.findings.sort_by(|left, right| {
             analysis::finding_sort_key(left)
@@ -646,13 +660,13 @@ pub fn analyze_workspace_configured(
     Ok(apply_configured_rule_filter(
         report,
         &settings,
-        &options.root,
+        &common.root,
         &node_paths,
     ))
 }
 
 fn analyze_inventory_free_manifest_policy(
-    options: &AnalyzeOptions,
+    options: &CommonAnalyzeOptions,
     settings: &sc_lint_analyzer_support::AnalyzerSettings,
     policy_config: &manifest_dependency_policy::ManifestPolicyConfig,
 ) -> std::result::Result<FindingsReport, BoundaryError> {

@@ -1,4 +1,10 @@
 use std::fmt;
+use std::path::Path;
+
+use anyhow::Context;
+use anyhow::Result;
+
+use crate::source_scan::relative_slash_path;
 
 use thiserror::Error;
 
@@ -67,4 +73,16 @@ fn is_windows_absolute(value: &str) -> bool {
         && value.as_bytes()[0].is_ascii_alphabetic()
         && value.as_bytes()[1] == b':'
         && value.as_bytes()[2] == b'/'
+}
+
+/// Normalize a source path relative to its repository, retaining path context on failure.
+pub fn repo_relative_source_path(root: &Path, source_path: &Path) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
 }

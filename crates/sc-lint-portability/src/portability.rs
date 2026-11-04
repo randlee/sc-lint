@@ -42,7 +42,7 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-use sc_lint_analyzer_support::relative_slash_path;
+pub(super) use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
 use sc_lint_schema::AllowedFinding;
 
@@ -54,20 +54,6 @@ use self::findings::convert_findings;
 
 type AnalyzedFinding = (Finding, Option<RepoRelativePath>);
 type PortabilityAnalysis = (Vec<AnalyzedFinding>, Vec<AllowedFinding<RuleId>>);
-
-pub(super) fn repo_relative_source_path(
-    root: &Path,
-    source_path: &Path,
-) -> Result<RepoRelativePath> {
-    let relative = relative_slash_path(root, source_path);
-    RepoRelativePath::parse(&relative).with_context(|| {
-        format!(
-            "failed to build repository-relative source path for `{}` under `{}`",
-            source_path.display(),
-            root.display()
-        )
-    })
-}
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {

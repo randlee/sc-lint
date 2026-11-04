@@ -35,22 +35,8 @@ use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
-use sc_lint_analyzer_support::relative_slash_path;
+pub(super) use sc_lint_analyzer_support::repo_relative_source_path;
 use sc_lint_analyzer_support::span_start_line;
-
-pub(super) fn repo_relative_source_path(
-    root: &Path,
-    source_path: &Path,
-) -> Result<RepoRelativePath> {
-    let relative = relative_slash_path(root, source_path);
-    RepoRelativePath::parse(&relative).with_context(|| {
-        format!(
-            "failed to build repository-relative source path for `{}` under `{}`",
-            source_path.display(),
-            root.display()
-        )
-    })
-}
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {

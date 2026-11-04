@@ -2,6 +2,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
+pub use sc_lint_analyzer_support::AnalyzeOptions;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
@@ -13,7 +14,7 @@ use sc_lint_analyzer_support::read_config_document;
 use sc_lint_directives::{DirectiveError, SiteRuleId};
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
-use sc_lint_schema::OutputFormat;
+
 use sc_lint_schema::OwnerId;
 use serde::Serialize;
 use serde::Serializer;
@@ -54,12 +55,6 @@ pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
         "platform_adapters",
     ],
 };
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AnalyzeOptions {
-    pub root: PathBuf,
-    pub format: OutputFormat,
-}
 
 pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
 pub type Finding = sc_lint_schema::Finding<RuleId>;
