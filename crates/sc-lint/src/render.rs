@@ -121,10 +121,14 @@ fn render_init_summary(data: Option<&Value>) -> String {
     } else {
         "Created"
     };
+    let refreshed_label = if status == "would_update" {
+        "Would refresh"
+    } else {
+        "Refreshed"
+    };
     for (key, label) in [
         ("created_files", created_label),
-        ("refreshed_files", "Refreshed"),
-        ("would_refresh_files", "Would refresh"),
+        ("refreshed_files", refreshed_label),
         ("preserved_files", "Preserved"),
         ("version_only_stale_files", "Version-only stale"),
     ] {

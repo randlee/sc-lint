@@ -344,10 +344,11 @@ is present in the JSON envelope. The rule reflects the existing
   in order: `Created:` (`Would create:` under `--dry-run`), `Refreshed:`
   (`Would refresh:` under `--dry-run`), `Preserved:` and `Version-only
   stale:`, each followed by the comma-separated paths from `created_files`,
-  `refreshed_files` (`would_refresh_files`), `preserved_files` and
-  `version_only_stale_files`. `refreshed_files` and `would_refresh_files` are
-  always arrays; the one that does not apply to the run is empty. A refreshed
-  file also appears in `version_only_stale_files`.
+  `refreshed_files`, `preserved_files` and `version_only_stale_files`.
+  `refreshed_files` is always an array of files that were or would be refreshed;
+  `dry_run` and `status` indicate whether the refresh occurred. Refreshed
+  prior-release files do not appear in `version_only_stale_files`; that list
+  reports preserved version-only config changes.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
 

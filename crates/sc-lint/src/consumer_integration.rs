@@ -1,6 +1,12 @@
 use std::fs;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use serde_json::Value;
 use serde_json::json;
@@ -20,8 +26,12 @@ const CURRENT_CONFIG_ADDED_COMMENTS: &str = concat!(
     "# User-owned configuration: edit lint/test steps as needed; `sc-lint init --just`\n",
     "# refreshes only missing files and generated version-only updates.\n",
 );
-const KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256: &[&str] =
-    &["5e26b4ab0d8fafbe856a94089d3b575b10164258776c4c5c828fecd9802a76db"];
+// v0.8.4 bootstrap SHA-256 over LF-normalized asset bytes.
+const KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256: &[[u8; 32]] = &[[
+    0x5e, 0x26, 0xb4, 0xab, 0x0d, 0x8f, 0xaf, 0xbe, 0x85, 0x6a, 0x94, 0x08, 0x9d, 0x3b, 0x57, 0x5b,
+    0x10, 0x16, 0x42, 0x58, 0x77, 0x6c, 0x4c, 0x5c, 0x82, 0x8f, 0xec, 0xd9, 0x80, 0x2a, 0x76, 0xdb,
+]];
+static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const CONSUMER_JUSTFILE_ASSET: &str = include_str!("../assets/consumer-Justfile");
 const CANONICAL_CONSUMER_CONFIG_ASSET: &str = include_str!("../assets/consumer-config.toml");
 const CONFIG_VERSION_TOKEN: &str = "{{SC_LINT_VERSION}}";
@@ -82,7 +92,6 @@ pub(crate) fn run_consumer_init_at(
             }
             ManagedFileState::RefreshablePriorRelease => {
                 refresh.push(file.path.clone());
-                version_only_stale.push(file.path.clone());
             }
             ManagedFileState::UserModified => conflicts.push(file.path.clone()),
         }
@@ -128,7 +137,7 @@ pub(crate) fn run_consumer_init_at(
                         .with_documentation(DOCS_SETUP_REFERENCE)
                     })?;
                 }
-                fs::write(&file.path, &file.contents).map_err(|error| {
+                write_file_atomically(&file.path, file.contents.as_bytes()).map_err(|error| {
                     CliError::config(format!(
                         "failed to write consumer integration file `{}`",
                         file.path.display()
@@ -186,8 +195,7 @@ fn init_result(
         "managed_files": files.iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(),
         "preserved_files": paths_to_strings(preserved),
         "created_files": paths_to_strings(created),
-        "refreshed_files": if request.dry_run { Vec::<String>::new() } else { paths_to_strings(refreshed) },
-        "would_refresh_files": if request.dry_run { paths_to_strings(refreshed) } else { Vec::<String>::new() },
+        "refreshed_files": paths_to_strings(refreshed),
         "version_only_stale_files": paths_to_strings(version_only_stale),
         "check": request.check,
         "dry_run": request.dry_run,
@@ -319,8 +327,57 @@ fn is_legacy_generated_justfile(actual: &str) -> bool {
 
 fn is_known_prior_release_bootstrap(actual: &str) -> bool {
     let normalized = normalize_line_endings(actual);
-    let digest = format!("{:x}", Sha256::digest(normalized.as_bytes()));
-    KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256.contains(&digest.as_str())
+    let digest: [u8; 32] = Sha256::digest(normalized.as_bytes()).into();
+    KNOWN_PRIOR_RELEASE_BOOTSTRAP_SHA256.contains(&digest)
+}
+
+fn write_file_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
+    write_file_atomically_with(path, contents, |file, contents| file.write_all(contents))
+}
+
+fn write_file_atomically_with(
+    path: &Path,
+    contents: &[u8],
+    write_contents: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
+) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let permissions = match fs::metadata(path) {
+        Ok(metadata) => Some(metadata.permissions()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    let (temporary_path, mut temporary_file) = create_temporary_sibling(parent)?;
+    let write_result = (|| {
+        write_contents(&mut temporary_file, contents)?;
+        temporary_file.flush()?;
+        if let Some(permissions) = permissions {
+            temporary_file.set_permissions(permissions)?;
+        }
+        Ok(())
+    })();
+    drop(temporary_file);
+
+    let result = write_result.and_then(|()| fs::rename(&temporary_path, path));
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+    result
+}
+
+fn create_temporary_sibling(parent: &Path) -> io::Result<(PathBuf, File)> {
+    loop {
+        let sequence = TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let name = format!(".sc-lint-init-{}-{sequence}.tmp", std::process::id());
+        let path = parent.join(name);
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 fn has_version_only_difference(actual: &str, template: &str) -> bool {
@@ -477,17 +534,36 @@ mod tests {
                 },
             )
             .expect("dry-run recognizes prior bootstrap");
-            assert_no_mixed_path_separators(&dry_run);
             assert_eq!(dry_run["status"], "would_update");
             assert_eq!(
-                dry_run["would_refresh_files"],
+                dry_run["refreshed_files"],
                 json!([bootstrap_path.display().to_string()])
             );
-            assert_eq!(dry_run["refreshed_files"], json!([]));
             assert_eq!(
                 fs::read(&bootstrap_path).expect("dry-run leaves prior bootstrap"),
                 expected_bootstrap
             );
+            #[cfg(windows)]
+            {
+                assert_windows_path_list(
+                    fixture.path(),
+                    &dry_run,
+                    "refreshed_files",
+                    &[&[".sc-lint", "bootstrap.py"]],
+                );
+                assert_windows_path_list(
+                    fixture.path(),
+                    &dry_run,
+                    "preserved_files",
+                    &[&[CONFIG_FILENAME], &["Justfile"]],
+                );
+                assert_windows_path_list(
+                    fixture.path(),
+                    &dry_run,
+                    "version_only_stale_files",
+                    &[&[CONFIG_FILENAME]],
+                );
+            }
 
             let result = run_consumer_init_at(
                 fixture.path(),
@@ -498,20 +574,36 @@ mod tests {
                 },
             )
             .expect("legacy generated config should be recognized");
-            assert_no_mixed_path_separators(&result);
             assert_eq!(result["status"], "updated");
             assert_eq!(
                 result["refreshed_files"],
                 json!([bootstrap_path.display().to_string()])
             );
-            assert_eq!(result["would_refresh_files"], json!([]));
             assert_eq!(
                 result["version_only_stale_files"],
-                json!([
-                    config_path.display().to_string(),
-                    bootstrap_path.display().to_string()
-                ])
+                json!([config_path.display().to_string()])
             );
+            #[cfg(windows)]
+            {
+                assert_windows_path_list(
+                    fixture.path(),
+                    &result,
+                    "refreshed_files",
+                    &[&[".sc-lint", "bootstrap.py"]],
+                );
+                assert_windows_path_list(
+                    fixture.path(),
+                    &result,
+                    "preserved_files",
+                    &[&[CONFIG_FILENAME], &["Justfile"]],
+                );
+                assert_windows_path_list(
+                    fixture.path(),
+                    &result,
+                    "version_only_stale_files",
+                    &[&[CONFIG_FILENAME]],
+                );
+            }
             assert_eq!(
                 fs::read_to_string(&config_path).expect("config remains user-owned"),
                 legacy_config
@@ -533,7 +625,11 @@ mod tests {
             )
             .expect_err("edited legacy Justfile remains user-owned");
             assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
-            assert_no_mixed_path_separators(&error.details["conflicts"]);
+            #[cfg(windows)]
+            {
+                let details = Value::Object(error.details.clone());
+                assert_windows_path_list(fixture.path(), &details, "conflicts", &[&["Justfile"]]);
+            }
             fs::write(&justfile_path, &justfile).expect("restore legacy Justfile");
 
             let edited_bootstrap = legacy_bootstrap.replace(
@@ -597,35 +693,52 @@ mod tests {
         normalize_line_endings(contents).replace('\n', "\r\n")
     }
 
-    fn assert_no_mixed_path_separators(paths: &Value) {
-        let path_lists = paths.as_array().map_or_else(
-            || {
-                paths
-                    .as_object()
-                    .expect("init result is an object")
-                    .values()
-                    .filter(|value| value.is_array())
-                    .collect::<Vec<_>>()
-            },
-            |_| vec![paths],
-        );
-        for path_list in path_lists {
-            for path in path_list
-                .as_array()
-                .expect("path list is an array")
-                .iter()
-                .filter_map(Value::as_str)
-            {
-                assert!(
-                    !(path.contains('/') && path.contains('\\')),
-                    "path mixes separator styles: {path}"
-                );
-            }
+    #[cfg(windows)]
+    fn assert_windows_path_list(
+        root: &Path,
+        result: &Value,
+        field: &str,
+        expected_components: &[&[&str]],
+    ) {
+        let actual = result
+            .get(field)
+            .and_then(Value::as_array)
+            .unwrap_or_else(|| panic!("{field} must be an array"));
+        assert!(!actual.is_empty(), "{field} must not be unexpectedly empty");
+        let actual = actual
+            .iter()
+            .map(|path| {
+                path.as_str()
+                    .unwrap_or_else(|| panic!("{field} has non-string path"))
+            })
+            .collect::<Vec<_>>();
+        let expected = expected_components
+            .iter()
+            .map(|components| {
+                components
+                    .iter()
+                    .fold(root.to_path_buf(), |path, component| path.join(component))
+                    .display()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        let alternate_separator = if std::path::MAIN_SEPARATOR == '\\' {
+            '/'
+        } else {
+            '\\'
+        };
+        for path in &actual {
+            assert!(
+                !path.contains(alternate_separator),
+                "{field} contains a non-native separator: {path}"
+            );
         }
+        assert_eq!(actual, expected, "unexpected native paths in {field}");
     }
 
+    #[cfg(windows)]
     #[test]
-    fn current_created_and_preserved_init_paths_use_consistent_separators() {
+    fn init_created_and_preserved_paths_match_native_windows_paths() {
         let fixture = tempfile::TempDir::new().expect("fixture");
         let create_request = ConsumerInitRequest {
             just: true,
@@ -633,9 +746,81 @@ mod tests {
             dry_run: false,
         };
         let created = run_consumer_init_at(fixture.path(), create_request).expect("create files");
-        assert_no_mixed_path_separators(&created);
+        let all_components: &[&[&str]] = &[
+            &[CONFIG_FILENAME],
+            &["Justfile"],
+            &[".sc-lint", "bootstrap.py"],
+        ];
+        assert_windows_path_list(fixture.path(), &created, "managed_files", all_components);
+        assert_windows_path_list(fixture.path(), &created, "created_files", all_components);
         let current = run_consumer_init_at(fixture.path(), create_request).expect("current files");
-        assert_no_mixed_path_separators(&current);
+        assert_windows_path_list(fixture.path(), &current, "managed_files", all_components);
+        assert_windows_path_list(fixture.path(), &current, "preserved_files", all_components);
+    }
+
+    #[test]
+    fn failed_atomic_refresh_keeps_existing_file_and_cleans_temporary_file() {
+        let fixture = tempfile::TempDir::new().expect("fixture");
+        let target = consumer_integration_path(fixture.path(), &[".sc-lint", "bootstrap.py"]);
+        fs::create_dir_all(target.parent().expect("bootstrap parent"))
+            .expect("create bootstrap directory");
+        fs::write(&target, b"prior bootstrap").expect("write prior bootstrap");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&target, fs::Permissions::from_mode(0o755))
+                .expect("make prior bootstrap executable");
+        }
+
+        let error = write_file_atomically_with(&target, b"replacement", |temporary, _| {
+            temporary.write_all(b"partial")?;
+            Err(io::Error::other("injected temp-file write failure"))
+        })
+        .expect_err("injected temp write fails");
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(
+            fs::read(&target).expect("prior bootstrap remains"),
+            b"prior bootstrap"
+        );
+        assert_eq!(
+            fs::read_dir(target.parent().expect("bootstrap parent"))
+                .expect("bootstrap directory entries")
+                .count(),
+            1,
+            "failed temp file is removed"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_ne!(
+                fs::metadata(&target)
+                    .expect("prior metadata")
+                    .permissions()
+                    .mode()
+                    & 0o111,
+                0,
+                "existing executable permission survives failure"
+            );
+        }
+
+        write_file_atomically(&target, b"replacement").expect("atomic refresh succeeds");
+        assert_eq!(
+            fs::read(&target).expect("refreshed bootstrap"),
+            b"replacement"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_ne!(
+                fs::metadata(&target)
+                    .expect("refreshed metadata")
+                    .permissions()
+                    .mode()
+                    & 0o111,
+                0,
+                "executable permission survives refresh"
+            );
+        }
     }
 
     #[test]
