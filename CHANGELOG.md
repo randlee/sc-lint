@@ -135,8 +135,12 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   `created`, `updated`, `would_create` or `would_update`) followed by
   `Created:` (`Would create:` under `--dry-run`), `Refreshed:` (`Would
   refresh:`), `Preserved:` and `Version-only stale:` file lists, instead of
-  `init: ok`. JSON adds `refreshed_files` and `would_refresh_files`, always
-  arrays (lint-085.61).
+  `init: ok`. JSON adds one `refreshed_files` array: the files refreshed on
+  a real run, or the files that would be refreshed under `--dry-run`, told
+  apart by `status` and `dry_run`. `version_only_stale_files` lists only
+  preserved config files that differ in version; a refreshed file is not
+  listed there. Every init path list uses the platform's native separators,
+  including on Windows (lint-085.61, lint-085.63, lint-085.64).
 - `sc-lint docs --path` prints the bare path without the
   `Documentation root:` prefix, so the output can be used directly in
   scripts; with a guide name, the bare path precedes the guide text.
@@ -225,7 +229,8 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   no override, `APPDATA`, `XDG_DATA_HOME` or home directory is available, the
   bootstrap prints one `CLI.SC_LINT_INSTALL_PERMISSION_DENIED` line that
   suggests setting `SC_LINT_INSTALL_DIR` and exits 4, instead of a Python
-  traceback (lint-085.58).
+  traceback. This includes Python 3.9 on a host where the user has no passwd
+  entry, which used to raise a `KeyError` (lint-085.58, lint-085.65).
 - `sc_lint.lint_common.rust_file_test_scope` classifies compound test cfgs such
   as `#[cfg(any(test, feature = "..."))]` and `#[cfg(all(test, ...))]` under
   `src/` as test scope; `cfg(not(test))` stays production (#837).
@@ -240,7 +245,10 @@ This release closes GitHub issues #640, #833, #834, #836, #837, #843 and
   conflict: a 0.8.4 `Justfile` with its old managed header is accepted as
   current, and an unedited 0.8.4 `.sc-lint/bootstrap.py` is refreshed with
   the current one and reported with status `updated` and a `Refreshed:` line
-  (`--check` reports it as outdated; lint-085.61). An edited `Justfile` or
+  (`--check` reports it as outdated). The refresh writes a temporary file in
+  the same directory and renames it over the old one, keeping the existing
+  permissions, so a failed write leaves the previous file intact (lint-085.61,
+  lint-085.64). An edited `Justfile` or
   `bootstrap.py` stays user-owned and is reported as a conflict. A
   `sc-lint.toml` counts as version-only stale only when the version value is
   a well-formed minimum version, so a key inserted after it makes the file a

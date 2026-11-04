@@ -418,11 +418,15 @@ held across `.await` (#838). It closes GitHub issues #640, #833, #834, #836,
 - phase-end review and documentation fixes (`lint-085.35`, `lint-085.37`,
   `lint-085.39`, `lint-085.40`, `lint-085.44`) and QA fixes:
   round 1 (`lint-085.45` to `lint-085.48`), round 2 (`lint-085.50` to
-  `lint-085.53`, and `lint-085.55` for generated-file line endings) and
-  round 3 (`lint-085.56` to `lint-085.59`), merged through the version-bump
-  PR #842
+  `lint-085.53`, and `lint-085.55` for generated-file line endings),
+  round 3 (`lint-085.56` to `lint-085.59`), round 4 (`lint-085.60` to
+  `lint-085.63`: refreshed-files init output and Windows path separators) and
+  round 5 (`lint-085.64` to `lint-085.67`: atomic refresh writes and the
+  Python 3.9 bootstrap no-home error), merged through the version-bump PR #842
 
 Requirement state: REQ-PRODUCT-004E is Accepted (Rand, 2026-11-03).
+The REQ-CLI-022 prior-release refresh exception (2026-11-04) is Pending
+Rand.
 REQ-RUNTIME-001 is Pending Rand acceptance except the `#![cfg(test)]` marker
 ruling, which Rand accepted on 2026-11-03. Open issues #783, #832 and #835
 are not addressed by 0.8.5 and are deferred to 0.8.6.
