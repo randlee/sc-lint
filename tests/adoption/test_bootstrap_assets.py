@@ -39,24 +39,6 @@ WINDOWS_SHELL_SETTING = 'set windows-shell := ["cmd.exe", "/c"]'
 WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/templates/Justfile.default",
     "Justfile")
 
-# The usage grammar of the POSIX `.sc-lint/bootstrap` at cc1d496, which printed:
-#   usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run];
-#   .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml;
-#   .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>
-# bootstrap.py must list the same operations and arguments under its own name (AC3), plus the
-# l-6 `--fail-fast` lint flag and the test selector grammar.
-CC1D496_USAGE_GRAMMAR = (
-    "usage: .sc-lint/bootstrap.py setup --config sc-lint.toml [--dry-run]",
-    ".sc-lint/bootstrap.py upgrade --config sc-lint.toml [--check] [--dry-run]",
-    ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml",
-    ".sc-lint/bootstrap.py exec [--config sc-lint.toml] -- <argv...>",
-)
-CC1D496_USAGE_TOKENS = ("setup", "lint", "test", "upgrade", "exec", "--config sc-lint.toml", "[--check]", "[--dry-run]",
-    "[selector]", "[host|all|linux|macos|windows]", "-- <argv...>")
-
-
 # Pinned rather than sys.stdlib_module_names, which is missing on Python 3.9.
 BOOTSTRAP_STDLIB_MODULES = frozenset({
     "hashlib", "json", "os", "pathlib", "platform", "re", "shutil", "subprocess",
@@ -91,7 +73,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
             assert shell_lines == [], relative
 
 
-@pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--config"],
+@pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--check", "--config", "sc-lint.toml"], ["setup", "--config"],
     ["setup", "extra", "--config", "a"], ["lint", "a", "b", "c", "--config", "a"],
     ["lint", "a", "", "--config", "a"], ["test", "--config", "a", "--list", "x"],
     ["exec"], ["exec", "--config", "a", "sc-lint"], ["exec", "--"]])
@@ -100,9 +82,7 @@ def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     assert result.returncode == 2
     usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
     assert len(usage_lines) == 1, result.stderr
-    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
-    for token in CC1D496_USAGE_TOKENS:
-        assert token in usage_lines[0], token
+    assert usage_lines[0] == load_bootstrap().USAGE
     assert ".sc-lint/bootstrap " not in usage_lines[0]
 
 
@@ -224,7 +204,7 @@ def test_just_reports_bootstrap_usage_errors(arguments: list[str]) -> None:
     assert result.returncode == 2, result.stdout + result.stderr
     usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
     assert len(usage_lines) == 1, result.stderr
-    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
+    assert usage_lines[0] == load_bootstrap().USAGE
 
 
 @pytest.mark.integration
