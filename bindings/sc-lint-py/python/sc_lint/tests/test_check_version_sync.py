@@ -11,8 +11,10 @@ from unittest.mock import patch
 from sc_lint.check_version_sync import main
 from sc_lint.check_version_sync import success_message
 from sc_lint.check_version_sync import validate_crate_versions
+from sc_lint.check_version_sync import validate_release_docs
 from sc_lint.check_version_sync import validate_lockfile
 from sc_lint.check_version_sync import validate_winget_manifests
+from sc_lint.python_adapter import AdapterError
 
 
 APP_CRATE = "fixture-app"
@@ -549,6 +551,88 @@ class CheckVersionSyncTests(unittest.TestCase):
             )
             self.assertTrue(ran)
             self.assertEqual(findings, [])
+
+
+class ReleaseDocsTests(unittest.TestCase):
+    """Finding 7 (lint-085.49): release-version literals in docs must track the workspace version."""
+
+    PATTERNS = [
+        r"docs\.rs/[A-Za-z0-9_-]+/(?P<version>\d+\.\d+\.\d+)",
+        r"Current (?:crate )?release: \*\*(?P<version>\d+\.\d+\.\d+)\*\*",
+        r"^\s*version: (?P<version>\d+\.\d+\.\d+)\s*$",
+    ]
+    FILES = ["README.md", "crates/*/Cargo.toml", "docs-bundle/**/*.md"]
+
+    def config(self, **overrides: object) -> dict:
+        docs = {"enabled": True, "files": self.FILES, "patterns": self.PATTERNS}
+        docs.update(overrides)
+        return {"release_docs": docs}
+
+    def write_docs(self, root: Path, *, stale: bool) -> None:
+        version = "1.1.1" if stale else WORKSPACE_VERSION
+        (root / "crates" / APP_CRATE).mkdir(parents=True)
+        (root / "crates" / APP_CRATE / "Cargo.toml").write_text(
+            f'[package]\nname = "{APP_PACKAGE}"\ndocumentation = "https://docs.rs/{APP_CRATE}/{version}"\n',
+            encoding="utf-8",
+        )
+        (root / "README.md").write_text(
+            f"Current release: **{version}**.\n[docs](https://docs.rs/{APP_CRATE}/{version})\n",
+            encoding="utf-8",
+        )
+        (root / "docs-bundle").mkdir()
+        (root / "docs-bundle" / "ci.md").write_text(
+            f"```yaml\n- uses: randlee/sc-lint@v1\n  with:\n    version: {version}\n```\n",
+            encoding="utf-8",
+        )
+
+    def test_release_docs_is_disabled_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_docs(root, stale=True)
+            self.assertEqual(validate_release_docs(root, WORKSPACE_VERSION, {}), (False, []))
+
+    def test_release_docs_passes_when_every_literal_matches_the_workspace_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_docs(root, stale=False)
+            self.assertEqual(validate_release_docs(root, WORKSPACE_VERSION, self.config()), (True, []))
+
+    def test_release_docs_reports_each_stale_literal_with_its_line(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_docs(root, stale=True)
+
+            ran, findings = validate_release_docs(root, WORKSPACE_VERSION, self.config())
+
+            self.assertTrue(ran)
+            self.assertEqual(
+                [finding.to_dict() for finding in findings],
+                [
+                    {"check": "release_docs.version", "file": "README.md", "expected": "1.1.2 (line 1)", "actual": "1.1.1 (line 1)"},
+                    {"check": "release_docs.version", "file": "README.md", "expected": "1.1.2 (line 2)", "actual": "1.1.1 (line 2)"},
+                    {"check": "release_docs.version", "file": f"crates/{APP_CRATE}/Cargo.toml", "expected": "1.1.2 (line 3)", "actual": "1.1.1 (line 3)"},
+                    {"check": "release_docs.version", "file": "docs-bundle/ci.md", "expected": "1.1.2 (line 4)", "actual": "1.1.1 (line 4)"},
+                ],
+            )
+
+    def test_release_docs_glob_matching_nothing_is_a_finding(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            ran, findings = validate_release_docs(root, WORKSPACE_VERSION, self.config(files=["missing/**/*.md"]))
+            self.assertTrue(ran)
+            self.assertEqual(
+                [finding.to_dict() for finding in findings],
+                [{"check": "release_docs.files", "file": "missing/**/*.md", "expected": "at least one file", "actual": "none"}],
+            )
+
+    def test_release_docs_rejects_patterns_without_a_version_group(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_docs(root, stale=False)
+            with self.assertRaises(AdapterError) as raised:
+                validate_release_docs(root, WORKSPACE_VERSION, self.config(patterns=[r"\d+\.\d+\.\d+"]))
+            self.assertEqual(raised.exception.kind, "config")
+            self.assertIn("(?P<version>", raised.exception.message)
 
 
 if __name__ == "__main__":

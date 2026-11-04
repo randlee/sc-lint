@@ -92,21 +92,23 @@ def run(argv, **kwargs):
         return 127
 
 
-def default_install_directory(environ, home, windows):
+def default_install_directory(environ, home_directory, windows):
     # Mirrors the native installer: SC_LINT_INSTALL_DIR, else the platform data
     # directory (%APPDATA% on Windows, XDG_DATA_HOME elsewhere) plus sc-lint/bin.
+    # home_directory is a callable so the home lookup runs only when no override
+    # supplies the directory; a host without a home still honours the override.
     if environ.get("SC_LINT_INSTALL_DIR"):
         return Path(environ["SC_LINT_INSTALL_DIR"])
     if windows:
-        data_dir = Path(environ.get("APPDATA") or home / "AppData" / "Roaming")
+        data_dir = Path(environ.get("APPDATA") or home_directory() / "AppData" / "Roaming")
     else:
-        data_dir = Path(environ.get("XDG_DATA_HOME") or home / ".local" / "share")
+        data_dir = Path(environ.get("XDG_DATA_HOME") or home_directory() / ".local" / "share")
     return data_dir / "sc-lint" / "bin"
 
 
 def managed_path():
     windows = os.name == "nt"
-    directory = default_install_directory(os.environ, Path.home(), windows)
+    directory = default_install_directory(os.environ, Path.home, windows)
     return directory / ("sc-lint.exe" if windows else "sc-lint")
 
 
