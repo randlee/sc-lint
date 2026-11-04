@@ -216,7 +216,7 @@ async function runAction(options = {}) {
     : path.join(nestedRoot, "bin", binaryName);
   const docs = hasFlatLayout ? flatDocs : nestedDocs;
   if (!fs.existsSync(binary) || !fs.existsSync(docs)) {
-    throw new ActionError(ERROR.artifact, "Verified release layout is missing sc-lint or sc-lint-docs.", "Use an E.5 release archive with the complete published layout.");
+    throw new ActionError(ERROR.artifact, "Verified release layout is missing sc-lint or sc-lint-docs.", "Use an unmodified official release archive with the complete published layout.");
   }
 
   const execute = options.execute || spawnSync;
@@ -243,16 +243,22 @@ async function runAction(options = {}) {
   return { binaryPath: binary, docsPath: docs, version };
 }
 
+function errorAnnotation(failure) {
+  const escape = (text) => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  return `::error title=${failure.code}::${escape(`${failure.message} Recovery: ${failure.recovery}`)}`;
+}
+
 async function main() {
   try {
     await runAction();
   } catch (error) {
     const failure = error instanceof ActionError ? error : new ActionError(ERROR.command, error.message, "Inspect the Action logs and retry.");
     console.error(`${failure.code}: ${failure.message}\nRecovery: ${failure.recovery}`);
+    if (process.env.GITHUB_ACTIONS === "true") console.log(errorAnnotation(failure));
     process.exitCode = 1;
   }
 }
 
 if (require.main === module) void main();
 
-module.exports = { ActionError, ERROR, extractTarGz, extractZip, releaseTarget, runAction, verifyChecksum };
+module.exports = { ActionError, ERROR, errorAnnotation, extractTarGz, extractZip, releaseTarget, runAction, verifyChecksum };

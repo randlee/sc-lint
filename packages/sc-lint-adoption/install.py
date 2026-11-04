@@ -19,6 +19,9 @@ MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
 INSTALL_INPUT = Path(".sc-lint/install.json")
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
+# Plugin components sit at the package root so Claude Code's plugin loader finds
+# them; a consumer repository receives them under .claude/ as before.
+PLUGIN_COMPONENTS = frozenset({"skills", "agents"})
 WINDOWS_SHELL = 'set windows-shell := ["cmd.exe", "/c"]\n'
 PYTHON_BINDING = 'python := if os_family() == "windows" { "python" } else { "python3" }\n'
 RECIPE = r"^([A-Za-z_][\w-]*)[^:\n]*:(?!=)"
@@ -266,13 +269,19 @@ def package_files() -> dict[Path, bytes]:
     }
 
 
+def consumer_path(relative: Path) -> Path:
+    if relative.parts[0] in PLUGIN_COMPONENTS:
+        return Path(".claude", *relative.parts)
+    return RENAMED.get(relative, relative)
+
+
 def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     result = package_files()
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
     for source in ROOT.rglob("*"):
         if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc" or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
-        result[RENAMED.get(source.relative_to(ROOT), source.relative_to(ROOT))] = source.read_bytes()
+        result[consumer_path(source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.tmpl" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
@@ -305,7 +314,18 @@ def load_manifest(repo: Path) -> dict[str, str] | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--input", type=Path); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("repo", type=Path); args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Install or update the managed sc-lint consumer contract in REPO.",
+        epilog=(
+            "The first install persists its validated input at REPO/.sc-lint/install.json, "
+            "which later runs reuse when --input is omitted. Exit codes: 0 converged or applied; "
+            "1 --dry-run found drift (nothing written); 2 conflict or invalid input."
+        ),
+    )
+    parser.add_argument("--input", type=Path, help="install input JSON; defaults to REPO/.sc-lint/install.json")
+    parser.add_argument("--dry-run", action="store_true", help="print the diff and report drift without writing")
+    parser.add_argument("repo", type=Path, help="consumer repository root")
+    args = parser.parse_args()
     input_path = args.input or args.repo / ".sc-lint" / "install.json"
     try: data = values(input_path); targets = desired(data, args.repo, input_path); prior = load_manifest(args.repo)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error: print(f"conflict: {error}", file=sys.stderr); return 2

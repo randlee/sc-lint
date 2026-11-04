@@ -1,9 +1,9 @@
 name: sc-lint
-description: Install a verified sc-lint release and run the consumer setup, lint, or test contract.
+description: Install a verified sc-lint release, then run its consumer lint or test contract. The setup operation only installs and preflights the release; it does not provision the consumer venv or tools.
 author: sc-lint maintainers
 inputs:
   operation:
-    description: "Consumer operation: setup, lint, or test."
+    description: "Consumer operation: setup (install and preflight only), lint (lint ci --consumer), or test (test). Supported runners: linux/x64, linux/arm64, darwin/x64, darwin/arm64, win32/x64, win32/arm64."
     required: false
     default: lint
   version:
@@ -35,7 +35,7 @@ outputs:
   version:
     description: Verified release version selected by this Action.
 runs:
-  using: node20
+  using: node24
   main: action/index.js
 branding:
   icon: check-circle

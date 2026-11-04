@@ -1,6 +1,6 @@
 ---
 name: sc-lint-version-adoption
-version: 1.0.0
+version: 0.8.5
 description: Guide a consuming repository through `sc-lint-version` adoption using the authoritative consumer-integration workflow, existing CLI testability seams, existing simulators or transcripts, and only thin normalization hooks when unavoidable.
 ---
 
@@ -13,7 +13,8 @@ Use this skill when a consuming repository is adopting the planned
 
 Always use:
 
-- `docs/sc-lint/version-adoption.md`
+- `docs/sc-lint/version-adoption.md` in the sc-lint repository
+  (https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/version-adoption.md)
 
 That document is the authoritative adoption guide. Do not replace it with
 spread-out repo notes or ad hoc instructions.

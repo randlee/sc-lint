@@ -464,7 +464,7 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
     def test_executable_help_documents_selector_and_scope(self) -> None:
         from sc_lint.print_help import render_help
 
-        text = render_help("example")
+        text = render_help()
         self.assertIn("lint <selector> <scope>", text)
         for scope in ("host", "all", "linux", "macos", "windows"):
             self.assertIn(scope, text)
