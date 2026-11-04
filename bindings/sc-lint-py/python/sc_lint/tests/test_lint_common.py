@@ -369,6 +369,33 @@ version = "0.1.0"
 
         self.assertEqual(scope, [False, True, True, True, True, True])
 
+    def test_rust_file_test_scope_marks_compound_test_cfg_items_under_src(self) -> None:
+        # Reproduction from issue #837: a feature-gated test helper in a src/ file.
+        lines = [
+            '#[cfg(any(test, feature = "test-support"))]',
+            "mod tests {",
+            "    use rusqlite::Connection;",
+            "}",
+        ]
+
+        scope = rust_file_test_scope(Path("crates/example/src/lib.rs"), lines)
+
+        self.assertEqual(scope, [True, True, True, True])
+
+    def test_rust_file_test_scope_keeps_negated_test_cfg_items_in_production(self) -> None:
+        lines = [
+            "#[cfg(not(test))]",
+            "mod production_only {",
+            "    pub fn run() {}",
+            "}",
+            "#[cfg(any(not(test), unix))]",
+            "fn either() {}",
+        ]
+
+        scope = rust_file_test_scope(Path("crates/example/src/lib.rs"), lines)
+
+        self.assertEqual(scope, [False, False, False, False, False, False])
+
     def test_iter_string_literal_contents_supports_rust_unicode_and_char_escapes(self) -> None:
         line = f'let a = "team\\nlead"; let b = r#"{TEAM_LEAD_IDENTITY}"#; let c = "\\u{{1F600}}"; let d = \'\\u{{7}}\';'
         self.assertEqual(

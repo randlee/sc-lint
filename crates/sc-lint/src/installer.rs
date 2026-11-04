@@ -972,6 +972,25 @@ mod tests {
     const PROBE_HOLDER_EXIT_CEILING: Duration = Duration::from_secs(30);
 
     #[test]
+    #[serial]
+    fn managed_install_dir_defaults_to_the_platform_data_directory() {
+        // Issue #833: the bootstrap default must match this rule. The data
+        // directory is a controlled absolute path, never the real %APPDATA%.
+        let controlled = env::temp_dir().join("sc-lint-controlled-data");
+        let _unset = InstallerEnvironment::unset(&[INSTALL_DIR_ENV]);
+        let _data = if cfg!(windows) {
+            InstallerEnvironment::set(&[("APPDATA", controlled.as_os_str())])
+        } else {
+            InstallerEnvironment::set(&[("XDG_DATA_HOME", controlled.as_os_str())])
+        };
+
+        assert_eq!(
+            managed_install_dir().expect("managed install directory"),
+            controlled.join("sc-lint").join("bin")
+        );
+    }
+
+    #[test]
     fn release_target_matches_the_published_release_matrix() {
         let target = ReleaseTarget::detect().expect("current test host is supported");
         assert!(
@@ -2105,6 +2124,17 @@ mod tests {
             for (name, value) in values {
                 // Tests are serialized because process environment is global.
                 unsafe { env::set_var(name, value) };
+            }
+            Self { original }
+        }
+
+        fn unset(names: &[&'static str]) -> Self {
+            let original = names
+                .iter()
+                .map(|name| (*name, env::var_os(name)))
+                .collect();
+            for name in names {
+                unsafe { env::remove_var(name) };
             }
             Self { original }
         }

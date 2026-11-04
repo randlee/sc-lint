@@ -90,14 +90,22 @@ def run(argv, **kwargs):
         return 127
 
 
-def managed_path():
-    if os.environ.get("SC_LINT_INSTALL_DIR"):
-        directory = Path(os.environ["SC_LINT_INSTALL_DIR"])
-    elif os.name == "nt":
-        directory = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "sc-lint" / "bin"
+def default_install_directory(environ, home, windows):
+    # Mirrors the native installer: SC_LINT_INSTALL_DIR, else the platform data
+    # directory (%APPDATA% on Windows, XDG_DATA_HOME elsewhere) plus sc-lint/bin.
+    if environ.get("SC_LINT_INSTALL_DIR"):
+        return Path(environ["SC_LINT_INSTALL_DIR"])
+    if windows:
+        data_dir = Path(environ.get("APPDATA") or home / "AppData" / "Roaming")
     else:
-        directory = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "sc-lint" / "bin"
-    return directory / ("sc-lint.exe" if os.name == "nt" else "sc-lint")
+        data_dir = Path(environ.get("XDG_DATA_HOME") or home / ".local" / "share")
+    return data_dir / "sc-lint" / "bin"
+
+
+def managed_path():
+    windows = os.name == "nt"
+    directory = default_install_directory(os.environ, Path.home(), windows)
+    return directory / ("sc-lint.exe" if windows else "sc-lint")
 
 
 def resolve_binary(managed):
