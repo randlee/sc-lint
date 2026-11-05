@@ -45,11 +45,6 @@ def test_non_build_change_passes(path):
     assert gate.changed_build_inputs([path]) == []
 
 
-def test_identical_commits_have_no_changes():
-    # V == C: git diff V C lists no paths, so nothing can be a changed build input.
-    assert gate.changed_build_inputs([]) == []
-
-
 def test_run_with_every_native_job_successful_proves_the_tag_and_commit():
     assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS, "main") is None
 
@@ -78,19 +73,19 @@ def test_unsuccessful_or_missing_native_job_fails(conclusion, shown):
     assert reason == f"native jobs did not succeed: Native aarch64-apple-darwin ({shown})"
 
 
-def fixed_commands(monkeypatch, *, changed, runs):
-    """Answer the gate's git and gh commands from fixed text; the candidate is commit c."""
+def fixed_commands(monkeypatch, *, changed, runs, candidate="c" * 40):
+    """Answer the gate's git and gh commands from fixed text."""
     import json
     manifest = "".join(f'[[release_targets]]\ntarget = "{target}"\n' for target in TARGETS)
     answers = {
         ("git", "rev-parse", "--verify", f"refs/tags/{TAG}^{{commit}}"): COMMIT,
-        ("git", "rev-parse", "--verify", "candidate^{commit}"): "c" * 40,
+        ("git", "rev-parse", "--verify", "candidate^{commit}"): candidate,
         ("git", "show", f"{COMMIT}:release/publish-artifacts.toml"): manifest,
         ("gh", "repo", "view", "--json", "defaultBranchRef"): json.dumps({"defaultBranchRef": {"name": "main"}}),
         ("gh", "run", "list", "--workflow", "release-native-verify.yml", "--status", "success", "--limit", "200",
          "--json", "databaseId,displayTitle,event,headBranch"): json.dumps(runs),
         ("gh", "run", "view", "7", "--json", "jobs"): json.dumps({"jobs": jobs()}),
-        ("git", "diff", "--name-only", "--no-renames", COMMIT, "c" * 40): "\n".join(changed),
+        ("git", "diff", "--name-only", "--no-renames", COMMIT, candidate): "\n".join(changed),
     }
     monkeypatch.setattr(gate, "out", lambda *argv: answers[argv])
 
@@ -98,6 +93,11 @@ def fixed_commands(monkeypatch, *, changed, runs):
 def test_gate_passes_a_verified_prerelease_with_only_docs_changes(monkeypatch):
     fixed_commands(monkeypatch, changed=["docs/requirements.md"], runs=[verify_run()])
     assert gate.gate(TAG, "candidate").startswith(f"run 7 verified {TAG} at {COMMIT}")
+
+
+def test_gate_passes_when_the_candidate_is_the_verified_commit(monkeypatch):
+    fixed_commands(monkeypatch, changed=[], runs=[verify_run()], candidate=COMMIT)
+    assert gate.gate(TAG, "candidate").endswith(f"candidate {COMMIT} has the same build inputs")
 
 
 def test_gate_fails_when_a_build_input_changed_after_the_verified_prerelease(monkeypatch):
