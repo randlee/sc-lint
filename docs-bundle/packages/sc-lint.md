@@ -2,8 +2,7 @@
 
 ## Purpose and ownership
 
-`sc-lint` is the product-owned CLI and the only consumer-facing orchestration
-entry point. It owns compatibility preflight, installation, upgrade,
+`sc-lint` is the product-owned CLI. It owns compatibility preflight, installation, upgrade,
 initialization, documentation discovery, profiles, and normalized diagnostics.
 
 ## Intended users

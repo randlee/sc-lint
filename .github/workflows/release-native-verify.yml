@@ -1,14 +1,21 @@
 name: Release Native Verify
+# The title binds the run to a tag and commit; release-preflight's native gate accepts only a run
+# titled with the prerelease tag and the commit it names. A Release run is titled with its branch.
+run-name: Release Native Verify ${{ inputs.tag || github.event.workflow_run.head_branch }} ${{ inputs.commit || github.event.workflow_run.head_sha }}
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Published release tag (for example v0.8.3)"
+        description: "Published release tag (for example v0.8.3) or prerelease tag (prerelease/v0.8.3)"
+        required: true
+        type: string
+      commit:
+        description: "Full commit SHA the tag names"
         required: true
         type: string
   workflow_run:
-    workflows: [Release]
+    workflows: [Release, Prerelease Archive]
     types: [completed]
 
 permissions:
@@ -38,8 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ inputs.commit || github.event.workflow_run.head_sha }}
           RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
-        run: python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --run-id "$RELEASE_RUN_ID" --output "$GITHUB_OUTPUT"
+          RELEASE_RUN_WORKFLOW: ${{ github.event.workflow_run.name }}
+          RELEASE_RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: >-
+          python .github/scripts/release_native_verify.py plan --tag "$RELEASE_TAG" --commit "$RELEASE_COMMIT"
+          --run-id "$RELEASE_RUN_ID" --workflow "$RELEASE_RUN_WORKFLOW" --branch "$RELEASE_RUN_BRANCH" --output "$GITHUB_OUTPUT"
 
   native:
     if: ${{ needs.plan.outputs.verify == 'true' }}
@@ -76,3 +88,52 @@ jobs:
         run: >-
           "$TOOLING_PYTHON" .github/scripts/release_native_verify.py verify
           --tag "$RELEASE_TAG" --target "$RELEASE_TARGET" --wheel-python "$WHEEL_PYTHON"
+          --result "native-results/${RELEASE_TARGET}.json"
+      - name: Upload the native result for the report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-results-${{ matrix.target }}
+          path: native-results/${{ matrix.target }}.json
+          if-no-files-found: warn
+
+  report:
+    name: Render native verification report
+    if: ${{ always() && needs.plan.outputs.verify == 'true' }}
+    needs: [plan, native]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-results-*
+          path: native-results
+          merge-multiple: true
+      - name: Install the pinned sc-compose CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SC_COMPOSE_VERSION: "1.7.0"
+        run: |
+          set -euo pipefail
+          archive="sc-compose_${SC_COMPOSE_VERSION}_x86_64-unknown-linux-gnu.tar.gz"
+          gh release download "v${SC_COMPOSE_VERSION}" -R randlee/sc-compose -p "$archive" -p checksums.txt -D "$RUNNER_TEMP/sc-compose"
+          cd "$RUNNER_TEMP/sc-compose"
+          grep " ${archive}\$" checksums.txt | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/${archive%.tar.gz}/bin" >> "$GITHUB_PATH"
+      - name: Render the report
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_COMMIT: ${{ inputs.commit || github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >-
+          python3 .github/scripts/release_native_report.py --results native-results --output native-report
+          --tag "$RELEASE_TAG" --commit "$RELEASE_COMMIT" --run-url "$RUN_URL"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-verify-report
+          path: native-report
+          if-no-files-found: error

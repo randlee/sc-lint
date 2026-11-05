@@ -95,7 +95,15 @@ Cache dependencies, not an unverified sc-lint binary. See
 
 ## Consumer workflow
 
-Generate and commit the managed files during onboarding. A clean CI runner can
+The generated workflow installs rustfmt and clippy for the root-selected Rust
+toolchain, including a toolchain pinned with the minimal profile. To opt out,
+delete the component step from the installed workflow; the installer preserves
+existing workflows. Existing adopters can add `rustup component add rustfmt
+clippy` after the Rust toolchain step.
+
+The adoption kit seeds missing destinations only. It leaves existing files,
+directories, and symlinks untouched. Generate and commit the files during
+onboarding. A clean CI runner can
 then use the same documented local sequence without a preinstalled binary:
 
 ```yaml

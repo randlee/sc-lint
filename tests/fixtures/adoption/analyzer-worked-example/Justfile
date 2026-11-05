@@ -1,2 +1,9 @@
+set windows-shell := ["cmd.exe", "/c"]
+python := if os_family() == "windows" { "python" } else { "python3" }
+import '.sc-lint/justfile'
+
+test *layer:
+    {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
+
 consumer-note:
     @echo consumer-owned

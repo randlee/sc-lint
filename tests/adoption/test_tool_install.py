@@ -26,10 +26,6 @@ def installer_schema() -> dict[str, Any]:
     return runpy.run_path(str(KIT / "install.py"), run_name="sc_lint_adoption_install")["load_schema"]()
 
 
-def persisted(consumer: Path) -> dict[str, Any]:
-    return json.loads((consumer / ".sc-lint" / "install.json").read_text())
-
-
 def test_tools_schema_comes_from_the_fragment_loader() -> None:
     fragment = json.loads((KIT / "schema.d" / "tools.json").read_text())
     base = json.loads((KIT / "install.schema.json").read_text())
@@ -40,12 +36,13 @@ def test_tools_schema_comes_from_the_fragment_loader() -> None:
     assert merged["required"] == base["required"]
 
 
-def test_declared_tools_are_accepted_and_persisted_verbatim() -> None:
+def test_declared_tools_are_accepted_without_copying_input() -> None:
     consumer = copy_fixture("empty-workspace")
     input_path = write_input(consumer, tools=TOOLS)
     result = run("--input", str(input_path), str(consumer))
     assert result.returncode == 0, result.stderr
-    assert persisted(consumer)["tools"] == TOOLS
+    assert json.loads(input_path.read_text())["tools"] == TOOLS
+    assert not (consumer / ".sc-lint" / "install.json").exists()
     clean = run("--dry-run", "--input", str(input_path), str(consumer))
     assert clean.returncode == 0, clean.stdout + clean.stderr
 
@@ -58,15 +55,14 @@ def test_empty_or_partial_tools_are_accepted(tools: dict[str, Any]) -> None:
     consumer = copy_fixture("empty-workspace")
     result = run("--input", str(write_input(consumer, tools=tools)), str(consumer))
     assert result.returncode == 0, result.stderr
-    assert persisted(consumer)["tools"] == tools
+    assert not (consumer / ".sc-lint" / "install.json").exists()
 
 
 def test_absent_tools_keep_existing_installed_output() -> None:
     consumer = copy_fixture("empty-workspace")
     result = run("--input", str(FIXTURES / "install.json"), str(consumer))
     assert result.returncode == 0, result.stderr
-    assert "tools" not in persisted(consumer)
-    assert persisted(consumer) == json.loads((FIXTURES / "install.json").read_text())
+    assert not (consumer / ".sc-lint" / "install.json").exists()
 
 
 @pytest.mark.parametrize(

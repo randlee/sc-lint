@@ -4,11 +4,11 @@ import re
 import unittest
 
 
-from sc_lint.lint_common import discover_repo_root
+from sc_lint.tests.source_checkout import source_checkout
 from sc_lint.print_help import SECTIONS, render_help
 
 
-JUSTFILE = discover_repo_root() / "Justfile"
+REPO_ROOT = source_checkout(__file__)
 
 
 class PrintHelpTests(unittest.TestCase):
@@ -38,9 +38,9 @@ class PrintHelpTests(unittest.TestCase):
         ):
             self.assertNotIn(stale, output)
 
-    @unittest.skipUnless(JUSTFILE.is_file(), "requires the source repository Justfile from the working directory")
+    @unittest.skipUnless(REPO_ROOT is not None, "needs the source checkout")
     def test_every_listed_recipe_is_defined_in_the_justfile(self) -> None:
-        recipes = set(re.findall(r"^([a-z][\w-]*)[^:\n]*:(?!=)", JUSTFILE.read_text(), re.M))
+        recipes = set(re.findall(r"^([a-z][\w-]*)[^:\n]*:(?!=)", (REPO_ROOT / "Justfile").read_text(), re.M))
         for _, entries in SECTIONS:
             for name, _ in entries:
                 self.assertIn(name.split()[0], recipes, name)

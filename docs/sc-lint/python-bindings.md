@@ -52,8 +52,26 @@ Consumer tool provisioning reuses the persisted `.sc-lint/install.json`
 `tools` object. After ordinary setup has ensured the product and managed wheel,
 `sc_lint.setup_tools` checks only the cargo package versions and rustup targets
 declared by that consumer; missing entries are installed/added and verified.
-Cargo versions are exact stable versions. The product supplies no default tool
-pins, and lint execution never installs tools. Setup check/dry-run can inspect
+Cargo versions are exact stable versions. An optional `tools.non_windows`
+object accepts the same `cargo` and `rustup_targets` fields and contributes
+entries only when `os.name != "nt"`:
+
+```json
+{
+  "tools": {
+    "cargo": {"cargo-common": "1.2.3"},
+    "rustup_targets": ["aarch64-unknown-linux-gnu"],
+    "non_windows": {
+      "cargo": {"cargo-audit": "0.21.2"},
+      "rustup_targets": ["x86_64-pc-windows-msvc"]
+    }
+  }
+}
+```
+
+Top-level tools remain in effect on Windows and other hosts; the nested
+collection is ignored on Windows. The product supplies no default tool pins,
+and lint execution never installs tools. Setup check/dry-run can inspect
 declared tools but never installs or writes. This does not add a new Python
 interpreter-selection policy.
 

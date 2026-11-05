@@ -477,13 +477,24 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     .expect("check current integration");
     assert_eq!(checked["status"], "current");
 
-    fs::write(root.join("Justfile"), "consumer-owned\n").expect("conflict");
-    let error = crate::config::run_consumer_init_at(root, request)
-        .expect_err("conflict is not overwritten");
-    assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+    fs::write(root.join("Justfile"), "consumer-owned\n").expect("consumer Justfile");
+    let preserved = crate::config::run_consumer_init_at(root, request)
+        .expect("consumer-owned Justfile is preserved, not a conflict");
+    assert_eq!(preserved["status"], "current");
     assert_eq!(
         fs::read_to_string(root.join("Justfile")).expect("Justfile"),
         "consumer-owned\n"
+    );
+
+    let bootstrap = root.join(".sc-lint").join("bootstrap.py");
+    fs::write(&bootstrap, "product drift\n").expect("bootstrap drift");
+    let error = crate::config::run_consumer_init_at(root, request)
+        .expect_err("product bootstrap drift is not overwritten");
+    assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+    assert_eq!(error.exit_code(), crate::consts::EXIT_CONFIG);
+    assert_eq!(
+        fs::read_to_string(&bootstrap).expect("bootstrap"),
+        "product drift\n"
     );
 }
 
@@ -2937,7 +2948,6 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
                 "created_files": ["sc-lint.toml"],
                 "refreshed_files": [".sc-lint/bootstrap.py"],
                 "preserved_files": ["README.md"],
-                "version_only_stale_files": [],
             }),
         ),
     );
@@ -2955,7 +2965,6 @@ fn render_success_human_covers_version_analyzer_and_summary_paths() {
                 "created_files": [],
                 "refreshed_files": [".sc-lint/bootstrap.py"],
                 "preserved_files": [],
-                "version_only_stale_files": [],
             }),
         ),
     );
