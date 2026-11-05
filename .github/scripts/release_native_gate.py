@@ -1,4 +1,4 @@
-"""Pass only when a native verify run proved prerelease commit V and no build input changed from V to candidate C."""
+"""Require a run from any branch with title binding the tag and V and headSha equal to V, plus unchanged build inputs through C."""
 from __future__ import annotations
 
 import json
@@ -9,10 +9,12 @@ import tomllib
 # Paths whose change can alter the released archives or wheels, or how they are built.
 BUILD_INPUTS = ("crates/", "bindings/", "docs-bundle/", ".cargo/", ".github/actions/", "Cargo.", "rust-toolchain",
                 "release/publish-artifacts.toml", ".github/workflows/prerelease-archive.yml", ".github/workflows/release.yml",
+                ".github/workflows/release-native-verify.yml",
                 *(f".github/scripts/{name}" for name in (
                     "build_release_target.sh", "release_artifacts.py", "release_manifest.py", "release_platforms.py",
                     "release_python.py", "release_registry.py", "release_stage.py", "npm_release.py",
-                    "verify_release_arch.py", "wheel_contents.py", "worker_result.py")))
+                    "verify_release_arch.py", "wheel_contents.py", "worker_result.py",
+                    "release_native_verify.py", "release_native_gate.py")))
 
 
 def out(*argv: str) -> str:
@@ -23,12 +25,12 @@ def changed_build_inputs(paths: list[str]) -> list[str]:
     return [path for path in paths if path.startswith(BUILD_INPUTS)]
 
 
-def run_failure(run: dict, jobs: list[dict], tag: str, commit: str, targets: list[str], default_branch: str) -> str | None:
+def run_failure(run: dict, jobs: list[dict], tag: str, commit: str, targets: list[str]) -> str | None:
     """Why a verify run does not prove tag at commit; None when every manifest native job succeeded."""
     if run["displayTitle"] != f"Release Native Verify {tag} {commit}":
         return "title does not bind the tag and commit"
-    if run["event"] != "workflow_run" and (run["event"], run["headBranch"]) != ("workflow_dispatch", default_branch):
-        return f"untrusted {run['event']} run from {run['headBranch']}"
+    if run["headSha"] != commit:
+        return "run headSha does not match the verified commit"
     conclusions = {job["name"]: job["conclusion"] for job in jobs}
     failed = [f"{name} ({conclusions.get(name) or 'missing'})" for name in (f"Native {t}" for t in targets)
               if conclusions.get(name) != "success"]
@@ -39,11 +41,10 @@ def gate(tag: str, candidate_ref: str) -> str:
     """Return the passing verdict for tag against the candidate, or raise ValueError naming why it fails."""
     verified, candidate = (out("git", "rev-parse", "--verify", f"{ref}^{{commit}}") for ref in (f"refs/tags/{tag}", candidate_ref))
     targets = [entry["target"] for entry in tomllib.loads(out("git", "show", f"{verified}:release/publish-artifacts.toml"))["release_targets"]]
-    default_branch = json.loads(out("gh", "repo", "view", "--json", "defaultBranchRef"))["defaultBranchRef"]["name"]
     runs = json.loads(out("gh", "run", "list", "--workflow", "release-native-verify.yml", "--status", "success",
-                          "--limit", "200", "--json", "databaseId,displayTitle,event,headBranch"))
+                          "--limit", "200", "--json", "databaseId,displayTitle,headSha"))
     reasons = {run["databaseId"]: run_failure(run, json.loads(out("gh", "run", "view", str(run["databaseId"]), "--json", "jobs"))["jobs"],
-                                              tag, verified, targets, default_branch) for run in runs if tag in run["displayTitle"]}
+                                              tag, verified, targets) for run in runs if tag in run["displayTitle"]}
     proof = next((run_id for run_id, reason in reasons.items() if reason is None), None)
     if proof is None:
         raise ValueError(f"no verify run proves {tag} at {verified}; dispatch Release Native Verify with that tag and commit: {reasons}")
