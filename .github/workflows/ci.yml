@@ -71,6 +71,8 @@ jobs:
         if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
         run: echo "Just lint is intentionally skipped for documentation-only changes."
 
+      - uses: actions/checkout@v5
+
       - name: Install Rust toolchain
         if: ${{ needs.ci-scope.outputs.runtime != 'false' }}
         uses: dtolnay/rust-toolchain@stable

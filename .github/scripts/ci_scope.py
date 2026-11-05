@@ -1,9 +1,9 @@
 """Classify whether a CI event's changed paths require the runtime CI matrix.
 
-Documentation-only pull requests skip the runtime jobs and still report the same
-check names. A path is runtime unless it is under an explicitly exempt prefix; Python
-sources remain runtime even under documentation prefixes. Unclassified paths run the
-full matrix. Pushes to develop and main always run it.
+Only paths that can change the Rust build, the shipped artifacts or a CI check
+are runtime. Pull requests that touch nothing else keep the same check names
+but skip the runtime jobs. Any other event runs the full matrix, and so does
+any unreadable revision range.
 """
 
 from __future__ import annotations
@@ -13,19 +13,26 @@ import subprocess
 import sys
 from collections.abc import Iterable
 
-# This is the canonical non-runtime prefix list.
-NON_RUNTIME_PATHS = (
-    "site/reports/",  # Rand, 2026-11-04 (lint-085.79): explicitly approved.
-    "docs/",  # lint-085.79: documentation-only direction; read files are reclassified.
+RUNTIME_PATHS = (
+    "crates/",
+    "bindings/",
+    "docs-bundle/",
+    "release/",
+    ".github/",
+    ".cargo/",
+    ".sc-lint/",
 )
+RUNTIME_FILES = {"Cargo.toml", "Cargo.lock", "Justfile", "sc-lint.toml", "pyproject.toml"}
 
 
 def is_runtime(path: str) -> bool:
     """Return whether one changed path can change the Rust build, the artifacts or a check."""
-    # Python sources are code wherever they sit, so they are never documentation.
-    if path.endswith(".py") or path.startswith("docs/sc-lint/"):
-        return True
-    return not path.startswith(NON_RUNTIME_PATHS)
+    return (
+        path in RUNTIME_FILES
+        or path.startswith("rust-toolchain")
+        or path.endswith(".py")
+        or path.startswith(RUNTIME_PATHS)
+    )
 
 
 def requires_runtime(changed_paths: Iterable[str]) -> bool:
@@ -36,7 +43,7 @@ def requires_runtime(changed_paths: Iterable[str]) -> bool:
 def changed_paths(base: str, head: str) -> list[str]:
     """Return paths changed between the pull request base and head."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", base, head, "--"],
+        ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
         capture_output=True, check=True, text=True,
     )
     return result.stdout.splitlines()
