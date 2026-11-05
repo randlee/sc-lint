@@ -34,23 +34,9 @@ one test suite.
    unchanged. When the interpreter is missing, the shell's command-not-found
    failure is reported before the bootstrap runs; an interpreter older than
    3.9 makes the bootstrap stop with `CLI.SC_LINT_PYTHON_UNAVAILABLE`.
-3. **Kit recipes.** The managed import block defines `setup`, `lint` and
-   `upgrade`. sc-lint provides a recommended `test` recipe calling the
-   bootstrap's `test` operation; the installer adds it outside the block only when the
-   consumer `Justfile` has none, and never changes an existing one. A
-   repository with no `Justfile` starts from sc-lint's default one, which
-   runs `lint` by default.
-4. **Generation.** `sc-lint init --just` creates or updates only
-   `sc-lint.toml`, `Justfile` and `.sc-lint/bootstrap.py`. It never writes a
-   consumer `README.md` and reports a conflict rather than overwriting a
-   user-owned file.
-5. **Retiring a managed file.** When a release stops shipping a managed file,
-   the adoption kit removes it only if its digest matches the one recorded in
-   the kit's install manifest; a file modified outside sc-lint is a conflict
-   (exit 2) and is left in place.
-6. `--check` and `--dry-run` are non-mutating. Re-running a current
-   integration is idempotent and reports the managed files.
-7. Source-maintainer recipes stay in this repository's root `Justfile`.
+3. `--check` and `--dry-run` are non-mutating. Re-running a current
+   integration is idempotent.
+4. Source-maintainer recipes stay in this repository's root `Justfile`.
    Source versus consumer behavior is selected by the generated integration,
    never inferred from a directory name, Cargo manifest or package.
 8. sc-lint generates no consumer CI workflow; consumer CI uses the reusable
