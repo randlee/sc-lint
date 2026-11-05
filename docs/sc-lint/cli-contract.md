@@ -671,7 +671,8 @@ Current CLI exit-code mapping:
 - `1`
   - top-level internal failure
 - `2`
-  - top-level usage failure
+  - top-level usage failure (a bare invocation with no arguments prints help
+    and exits `0`, REQ-CLI-029)
 - `3`
   - top-level config failure
 - `4`

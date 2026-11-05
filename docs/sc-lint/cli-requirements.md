@@ -783,6 +783,13 @@ specialized backend tools and mixed Rust/Python implementations.
 
   (Source: #822 and #784, Phase 0.8.4. Accepted 2026-11-01; delivered in 0.8.4 by the implementation layer stacked above this PR. See [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md).)
 
+- `REQ-CLI-029`
+  Every shipped binary (`sc-lint`, `sc-lint-boundary`, `sc-lint-portability`,
+  `sc-lint-runtime`) run with no arguments prints its help to stdout and
+  exits 0. Every other usage error keeps exit 2.
+  (Amendment Pending Rand — phase-n plan PR #858, sprint n-4, #782 winget
+  validation.)
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:
