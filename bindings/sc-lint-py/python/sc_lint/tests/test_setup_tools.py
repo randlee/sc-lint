@@ -24,6 +24,7 @@ from unittest import mock
 from sc_lint import setup_tools
 
 
+HERE = Path(__file__).resolve().parent
 WINDOWS_TARGET = "x86_64-pc-windows-msvc"
 XWIN_TOOLS = {"cargo": {"cargo-xwin": "0.18.4"}, "rustup_targets": [WINDOWS_TARGET]}
 WINDOWS_CHECK = ["cargo", "xwin", "check", "--target", WINDOWS_TARGET]
@@ -502,6 +503,31 @@ class HelperProvisioningTests(HelperFixture):
 
 
 class HostScopedToolsTests(HelperFixture):
+    def test_non_windows_tools_concatenate_cargo_pins_and_targets(self) -> None:
+        data = install_input({
+            "cargo": {"cargo-common": "1.2.3", "cargo-shared": "1.0.0"},
+            "rustup_targets": ["aarch64-unknown-linux-gnu", WINDOWS_TARGET],
+            "non_windows": {
+                "cargo": {"cargo-shared": "2.0.0", "cargo-xwin": "0.18.4"},
+                "rustup_targets": [WINDOWS_TARGET],
+            },
+        })
+        with mock.patch.object(setup_tools.os, "name", "posix"):
+            declaration = setup_tools.parse_tools(data)
+        self.assertEqual(
+            declaration.cargo,
+            (
+                ("cargo-common", "1.2.3"),
+                ("cargo-shared", "1.0.0"),
+                ("cargo-shared", "2.0.0"),
+                ("cargo-xwin", "0.18.4"),
+            ),
+        )
+        self.assertEqual(
+            declaration.rustup_targets,
+            ("aarch64-unknown-linux-gnu", WINDOWS_TARGET, WINDOWS_TARGET),
+        )
+
     def test_non_windows_tools_are_provisioned_only_off_windows(self) -> None:
         data = install_input({
             "cargo": {"cargo-common": "1.2.3"},
@@ -544,9 +570,9 @@ class HostScopedToolsTests(HelperFixture):
             self.assertEqual(recorded, expected)
 
     def test_non_windows_schema_is_closed_and_accepts_valid_object(self) -> None:
-        installer_path = Path.cwd() / "packages/sc-lint-adoption/install.py"
+        installer_path = HERE.parents[4] / "packages/sc-lint-adoption/install.py"
         if not installer_path.is_file():
-            self.skipTest("adoption kit schema is unavailable in the isolated wheel consumer")
+            self.skipTest("needs the source checkout")
         installer = runpy.run_path(
             str(installer_path),
             run_name="sc_lint_adoption_installer_schema_test",

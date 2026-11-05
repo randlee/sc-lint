@@ -155,10 +155,9 @@ def parse_tools(data: object) -> ToolDeclaration:
     if os.name == "nt":
         return common
 
-    cargo = dict(common.cargo)
-    cargo.update(non_windows.cargo)
-    targets = tuple(dict.fromkeys((*common.rustup_targets, *non_windows.rustup_targets)))
-    return ToolDeclaration(tuple(cargo.items()), targets)
+    cargo = (*common.cargo, *non_windows.cargo)
+    targets = (*common.rustup_targets, *non_windows.rustup_targets)
+    return ToolDeclaration(cargo, targets)
 
 
 def load_tools(root: Path) -> ToolDeclaration:
