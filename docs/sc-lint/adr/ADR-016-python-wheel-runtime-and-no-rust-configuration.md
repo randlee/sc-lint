@@ -73,10 +73,13 @@ support policy). Windows ARM64 wheels still require Python 3.11 or newer.
 `toml_loads` is a parser exposed by the bridge, not configuration policy, so
 decision 1 is unchanged.
 
-Rand approved on 2026-11-05 that Linux x64 and ARM64 and Windows ARM64 CI
-runs use Python 3.11 because the runner images no longer provide Python 3.9.
-macOS and Windows x64 CI keep the Python 3.9 floor tests. The consumer wheel
-floor remains Python 3.9, except for Windows ARM64, which remains Python 3.11.
+Rand approved on 2026-11-05 that the CI workflow (`.github/workflows/ci.yml`)
+uses Python 3.11 on Linux x64 and ARM64 and Windows ARM64 because those runner
+images no longer provide Python 3.9; macOS and Windows x64 retain Python 3.9
+floor tests. Release native verification still tests the Python 3.9 wheel
+floor on pinned Ubuntu 24.04 runners, and Python 3.11 on Windows ARM64. The
+consumer wheel floor remains Python 3.9, except for Windows ARM64, which
+remains Python 3.11.
 
 ## Consequences
 
