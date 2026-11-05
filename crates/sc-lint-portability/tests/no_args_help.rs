@@ -25,3 +25,18 @@ fn no_arguments_prints_help_and_exits_zero() {
         "stdout must contain the usage line: {stdout}"
     );
 }
+
+#[test]
+fn unknown_flag_keeps_the_usage_error_exit_code() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .arg("--definitely-not-a-flag")
+        .output()
+        .expect("run sc-lint-portability with an unknown flag");
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
