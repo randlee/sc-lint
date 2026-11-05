@@ -185,7 +185,7 @@ fn init_result(
         "refreshed_files": paths_to_strings(refreshed),
         "check": request.check,
         "dry_run": request.dry_run,
-        "summary": "consumer Just integration is managed by sc-lint",
+        "summary": "consumer integration templates are seeded; bootstrap is managed by sc-lint",
     })
 }
 

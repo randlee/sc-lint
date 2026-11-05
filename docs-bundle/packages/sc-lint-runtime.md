@@ -20,7 +20,8 @@ sc-lint lint ci --consumer
 ```
 
 The analyzer reads Rust source under the configured root and emits normalized
-findings. The top-level product owns command dispatch and CI aggregation.
+findings. The top-level product runs configured commands; the consumer owns
+CI orchestration.
 
 ## Runtime rules
 
