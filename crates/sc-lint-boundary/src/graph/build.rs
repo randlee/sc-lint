@@ -43,6 +43,7 @@ pub(crate) fn build_workspace_graph_from(
     let mut pending_files = queue_workspace_sources(metadata, &mut builder)?;
     merge_source_file_partials(&mut builder, &mut pending_files)?;
     resolve_trait_method_edges(&mut builder);
+    remove_unresolved_cross_crate_references(&mut builder);
     Ok(builder.finish())
 }
 
@@ -129,6 +130,20 @@ fn queue_target_source(
         source_path,
         resolution_context: None,
     })
+}
+
+// A workspace dependency path can name an item that is not in the graph.
+// Do not export an edge to a nonexistent node when the dependency is scanned.
+fn remove_unresolved_cross_crate_references(builder: &mut GraphBuilder) {
+    let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
+    builder.edges.retain(|edge| {
+        if !edge.kind.starts_with("references") || known.contains(&edge.to) {
+            return true;
+        }
+        let source = edge.from.split_once("::module::").map(|(id, _)| id);
+        let target = edge.to.split_once("::module::").map(|(id, _)| id);
+        source.is_none() || target.is_none() || source == target
+    });
 }
 
 fn resolve_trait_method_edges(builder: &mut GraphBuilder) {

@@ -4766,7 +4766,7 @@ fn bin_only_owner_package_skips_lib_target_validation() {
 }
 
 #[test]
-fn graph_ignores_proc_macro_only_workspace_dependencies() {
+fn graph_includes_proc_macro_without_dangling_dependency_references() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/app", "crates/macros"]);
     fixture.write(
@@ -4784,6 +4784,13 @@ fn graph_ignores_proc_macro_only_workspace_dependencies() {
         root: fixture.root().to_path_buf(),
     })
     .expect("graph export succeeds");
+
+    assert!(
+        graph
+            .nodes
+            .iter()
+            .any(|node| node.kind == "crate" && node.package == "macros")
+    );
 
     assert!(graph.edges.iter().all(|edge| {
         graph.nodes.iter().any(|node| node.id == edge.from)
