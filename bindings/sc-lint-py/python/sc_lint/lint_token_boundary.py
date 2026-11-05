@@ -93,7 +93,7 @@ def collect_violations(repo_root: Path, config: TokenBoundaryConfig) -> list[Bou
             continue
         lines = source.read_text(encoding="utf-8").splitlines()
         test_scope = rust_file_test_scope(relative, lines)
-        for line_number, (line, in_test_scope) in enumerate(zip(lines, test_scope, strict=True), start=1):
+        for line_number, (line, in_test_scope) in enumerate(zip(lines, test_scope), start=1):
             if in_test_scope or not is_code_line(line):
                 continue
             if any(token in line for token in config.tokens):

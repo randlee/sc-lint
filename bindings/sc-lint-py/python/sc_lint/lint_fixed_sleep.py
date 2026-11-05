@@ -56,7 +56,7 @@ def collect_fixed_sleep_violations(
         relative_path = relative.as_posix()
         lines = source.read_text(encoding="utf-8").splitlines()
         test_scope = rust_file_test_scope(relative, lines)
-        for line_number, (line, in_test_scope) in enumerate(zip(lines, test_scope, strict=True), start=1):
+        for line_number, (line, in_test_scope) in enumerate(zip(lines, test_scope), start=1):
             if not in_test_scope or relative_path in allowed_path_set or not is_code_line(line):
                 continue
             if SLEEP_RE.search(line):
