@@ -245,14 +245,7 @@ pub(crate) fn default_rule_defaults() -> &'static RuleDefaults {
 }
 
 pub(crate) fn is_supported_target(target: &cargo_metadata::Target) -> bool {
-    target.kind.iter().any(|kind| {
-        matches!(
-            kind,
-            cargo_metadata::TargetKind::Lib
-                | cargo_metadata::TargetKind::Bin
-                | cargo_metadata::TargetKind::Example
-        )
-    })
+    crate::is_library_target(target) || target.is_bin() || target.is_example()
 }
 
 pub(crate) fn crate_id(package_name: &str, target_name: &str) -> CrateId {

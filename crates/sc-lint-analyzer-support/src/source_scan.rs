@@ -404,6 +404,11 @@ fn is_supported_target(target: &cargo_metadata::Target) -> bool {
         matches!(
             kind,
             cargo_metadata::TargetKind::Lib
+                | cargo_metadata::TargetKind::RLib
+                | cargo_metadata::TargetKind::DyLib
+                | cargo_metadata::TargetKind::CDyLib
+                | cargo_metadata::TargetKind::StaticLib
+                | cargo_metadata::TargetKind::ProcMacro
                 | cargo_metadata::TargetKind::Bin
                 | cargo_metadata::TargetKind::Example
         )
