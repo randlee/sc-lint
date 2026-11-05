@@ -11,7 +11,6 @@ import runpy
 import shutil
 import subprocess
 import sys
-import tempfile
 from textwrap import dedent
 from pathlib import Path
 from typing import Any
@@ -73,62 +72,23 @@ def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> No
     clean = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
     assert clean.returncode == 0, clean.stdout
     assert (consumer / ".sc-lint" / "bootstrap.py").is_file()
+    justfile = (consumer / "Justfile").read_text()
+    assert "managed integration" not in justfile.lower()
+    (consumer / ".sc-lint" / "bootstrap.py").write_text(
+        "from pathlib import Path\nimport sys\n"
+        "Path('.test-recipe-ran').write_text(' '.join(sys.argv[1:]))\n"
+    )
     recipes = run_subprocess(
         ["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False
     )
     assert recipes.returncode == 0, recipes.stderr
     for recipe in ("default", "setup", "lint", "test", "upgrade"):
         assert f"    {recipe}" in recipes.stdout
-
-
-def test_retired_managed_bootstraps_are_removed_only_if_unmodified() -> None:
-    consumer = copy_fixture("empty-workspace")
-    args = ("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert run(*args).returncode == 0
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest = json.loads(manifest_path.read_text())
-    # Synthetic equivalent of the cc1d496 pre-upgrade state: its manifest
-    # records both retired paths as managed, unmodified files.
-    for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
-        path = consumer / name
-        payload = ("retired " + name + "\n").encode()
-        path.write_bytes(payload)
-        manifest["managed"][name] = hashlib.sha256(payload).hexdigest()
-    manifest_path.write_text(json.dumps(manifest))
-    before = {name: (consumer / name).read_bytes() for name in manifest["managed"] if (consumer / name).is_file()}
-    manifest_before = manifest_path.read_bytes()
-
-    dry_run = run("--dry-run", *args)
-    assert dry_run.returncode == 1, dry_run.stderr
-    for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
-        assert f"--- {consumer / name}\n+++ /dev/null\n" in dry_run.stdout
-    assert (consumer / ".sc-lint/bootstrap").is_file()
-    assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
-    assert manifest_path.read_bytes() == manifest_before
-    assert all((consumer / name).read_bytes() == content for name, content in before.items())
-
-    modified = consumer / ".sc-lint/bootstrap"
-    modified.write_text("consumer modification\n")
-    conflict = run(*args)
-    assert conflict.returncode == 2
-    assert "conflict: .sc-lint/bootstrap was modified outside sc-lint" in conflict.stderr
-    assert modified.read_text() == "consumer modification\n"
-    assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
-
-    # A newline conversion changes the bytes and must remain a conflict on
-    # every host; restore the recorded bytes without text-mode translation.
-    recorded = before[".sc-lint/bootstrap"]
-    modified.write_bytes(recorded.replace(b"\n", b"\r\n"))
-    newline_conflict = run(*args)
-    assert newline_conflict.returncode == 2
-    assert "conflict: .sc-lint/bootstrap was modified outside sc-lint" in newline_conflict.stderr
-    modified.write_bytes(recorded)
-    assert hashlib.sha256(modified.read_bytes()).hexdigest() == manifest["managed"][".sc-lint/bootstrap"]
-    installed = run(*args)
-    assert installed.returncode == 0, installed.stderr
-    assert not modified.exists()
-    assert not (consumer / ".sc-lint/bootstrap.ps1").exists()
-    assert (consumer / ".sc-lint/bootstrap.py").is_file()
+    test_recipe = run_subprocess(
+        ["just", "test", "--list"], cwd=consumer, text=True, capture_output=True, check=False
+    )
+    assert test_recipe.returncode == 0, test_recipe.stderr
+    assert (consumer / ".test-recipe-ran").read_text() == "test --config sc-lint.toml --list"
 
 
 def test_established_justfile_preserves_unmanaged_recipe() -> None:
@@ -137,8 +97,7 @@ def test_established_justfile_preserves_unmanaged_recipe() -> None:
     result = run("--input", str(FIXTURES / "install.json"), str(consumer))
     assert result.returncode == 0, result.stderr
     rendered = (consumer / "Justfile").read_text()
-    assert before in rendered
-    assert rendered.count("# >>> sc-lint managed integration >>>") == 1
+    assert before == rendered
 
 
 def test_established_test_recipe_is_a_declared_layer_after_migration() -> None:
@@ -154,70 +113,29 @@ def test_established_test_recipe_is_a_declared_layer_after_migration() -> None:
     assert "hello:" in justfile
 
 
-def test_dry_run_reports_modified_managed_asset() -> None:
-    consumer = copy_fixture("empty-workspace")
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    managed = consumer / ".sc-lint" / "justfile"
-    managed.write_text(managed.read_text() + "# consumer edit\n")
-    result = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
-    assert result.returncode == 1
-    assert str(managed) in result.stdout
+def test_package_tests_stay_in_plugin(
+    tmp_path: Path,
+) -> None:
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    consumer_installer = consumer / "install.py"
+    consumer_installer.write_text("consumer-owned installer\n")
+    consumer_test = consumer / "tests" / "test_consumer.py"
+    consumer_test.parent.mkdir()
+    consumer_test.write_text("def test_consumer_owned():\n    assert True\n")
+    args = ("--input", str(FIXTURES / "install.json"), str(consumer))
 
+    install = run(*args)
+    assert install.returncode == 0, install.stderr
 
-def test_install_rejects_a_modified_managed_asset_without_writing() -> None:
-    consumer = copy_fixture("empty-workspace")
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    managed = consumer / ".sc-lint" / "justfile"
-    managed.write_text(managed.read_text() + "# consumer edit\n")
-    before = managed.read_bytes()
-    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert result.returncode == 2
-    assert str(managed) in result.stderr
-    assert managed.read_bytes() == before
+    projected_test = consumer / "tests" / "test_toml_strings.py"
+    plugin_test = consumer / "plugins" / "sc-lint" / "tests" / "test_toml_strings.py"
+    assert not projected_test.exists()
+    assert plugin_test.is_file()
+    assert consumer_installer.read_text() == "consumer-owned installer\n"
+    assert consumer_test.read_text() == "def test_consumer_owned():\n    assert True\n"
 
-
-def test_first_install_refuses_pre_existing_kit_file_without_writing() -> None:
-    for dry_run in (False, True):
-        consumer = copy_fixture("empty-workspace")
-        existing = [consumer / ".sc-lint" / "justfile", consumer / "README.sc-lint.md"]
-        existing[0].parent.mkdir()
-        for path in existing:
-            path.write_text("consumer-owned content\n")
-        arguments = ["--input", str(FIXTURES / "install.json"), str(consumer)]
-        if dry_run:
-            arguments.insert(0, "--dry-run")
-
-        result = run(*arguments)
-        assert result.returncode == 2
-        assert all(str(path) in result.stderr for path in existing)
-        assert all(path.read_text() == "consumer-owned content\n" for path in existing)
-        assert not (consumer / ".sc-lint" / "installed.json").exists()
-        assert not (consumer / "sc-lint.toml").exists()
-        assert not (consumer / "plugins" / "sc-lint").exists()
-
-
-def test_rerun_refuses_pre_existing_new_kit_file_without_writing() -> None:
-    consumer = copy_fixture("empty-workspace")
-    input_path = FIXTURES / "install.json"
-    assert run("--input", str(input_path), str(consumer)).returncode == 0
-
-    relative = "plugins/sc-lint/README.md"
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest = json.loads(manifest_path.read_text())
-    assert relative in manifest["managed"]
-    del manifest["managed"][relative]
-    manifest_path.write_text(json.dumps(manifest))
-
-    new_kit_file = consumer / relative
-    new_kit_file.write_text("consumer-owned content\n")
-    before_manifest = manifest_path.read_bytes()
-
-    result = run("--input", str(input_path), str(consumer))
-
-    assert result.returncode == 2
-    assert str(new_kit_file) in result.stderr
-    assert new_kit_file.read_text() == "consumer-owned content\n"
-    assert manifest_path.read_bytes() == before_manifest
+    assert not (consumer / ".sc-lint" / "installed.json").exists()
 
 
 def test_package_tests_stay_in_plugin(tmp_path: Path) -> None:
@@ -331,7 +249,7 @@ def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:
     assert installer.is_file()
     assert not (consumer / "install.schema.json").exists()
     result = run_subprocess(
-        ["python3", "plugins/sc-lint/install.py", "."],
+        ["python3", "plugins/sc-lint/install.py", "--input", str(input_path), "."],
         cwd=consumer,
         text=True,
         capture_output=True,
@@ -339,20 +257,19 @@ def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:
     )
     assert result.returncode == 0, result.stderr
     result = run_subprocess(
-        ["python3", "plugins/sc-lint/install.py", "--dry-run", "."],
+        ["python3", "plugins/sc-lint/install.py", "--dry-run", "--input", str(input_path), "."],
         cwd=consumer,
         text=True,
         capture_output=True,
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert (consumer / ".sc-lint" / "install.json").is_file()
+    assert not (consumer / ".sc-lint" / "install.json").exists()
 
 
 def test_bare_rerun_reports_a_missing_persisted_input() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    (consumer / ".sc-lint" / "install.json").unlink()
     result = run_subprocess(
         ["python3", "plugins/sc-lint/install.py", "."],
         cwd=consumer,
@@ -364,7 +281,7 @@ def test_bare_rerun_reports_a_missing_persisted_input() -> None:
     assert ".sc-lint" in result.stderr and "install.json" in result.stderr
 
 
-def test_custom_input_refuses_to_overwrite_pre_existing_consumer_manifest() -> None:
+def test_custom_input_preserves_pre_existing_consumer_input() -> None:
     consumer = copy_fixture("empty-workspace")
     input_path = write_input(consumer, minimum_version="9.9.9")
     existing = consumer / ".sc-lint" / "install.json"
@@ -374,11 +291,9 @@ def test_custom_input_refuses_to_overwrite_pre_existing_consumer_manifest() -> N
 
     result = run("--input", str(input_path), str(consumer))
 
-    assert result.returncode == 2
-    assert str(existing) in result.stderr
+    assert result.returncode == 0, result.stderr
     assert existing.read_bytes() == before
-    assert not (consumer / "sc-lint.toml").exists()
-    assert not (consumer / "plugins" / "sc-lint").exists()
+    assert (consumer / "sc-lint.toml").exists()
 
 
 def test_consumer_manifest_is_allowed_when_it_is_the_input() -> None:
@@ -391,10 +306,10 @@ def test_consumer_manifest_is_allowed_when_it_is_the_input() -> None:
 
     assert result.returncode == 0, result.stderr
     assert input_path.is_file()
-    assert (consumer / ".sc-lint" / "installed.json").is_file()
+    assert not (consumer / ".sc-lint" / "installed.json").exists()
 
 
-def test_rerun_accepts_updated_input_manifest() -> None:
+def test_rerun_does_not_regenerate_config_from_updated_input() -> None:
     consumer = copy_fixture("empty-workspace")
     input_path = consumer / ".sc-lint" / "install.json"
     input_path.parent.mkdir(parents=True)
@@ -407,7 +322,7 @@ def test_rerun_accepts_updated_input_manifest() -> None:
     result = run("--input", str(input_path), str(consumer))
 
     assert result.returncode == 0, result.stderr
-    assert 'minimum_version = "9.9.9"' in (consumer / "sc-lint.toml").read_text()
+    assert 'minimum_version = "0.5.0"' in (consumer / "sc-lint.toml").read_text()
 
 
 def test_rerun_preserves_unmanaged_justfile_edits() -> None:
@@ -421,34 +336,6 @@ def test_rerun_preserves_unmanaged_justfile_edits() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "consumer-task:\n    echo kept\n" in justfile.read_text()
-
-
-def test_rerun_repairs_merged_justfile_and_keeps_consumer_edits() -> None:
-    consumer = copy_fixture("empty-workspace")
-    input_path = FIXTURES / "install.json"
-    assert run("--input", str(input_path), str(consumer)).returncode == 0
-    justfile = consumer / "Justfile"
-    content = justfile.read_text()
-    justfile.write_text(content.replace("import '.sc-lint/justfile'", "import 'broken'") + "\nconsumer-task:\n    echo kept\n")
-
-    result = run("--input", str(input_path), str(consumer))
-
-    assert result.returncode == 0, result.stderr
-    repaired = justfile.read_text()
-    assert "import '.sc-lint/justfile'" in repaired
-    assert "import 'broken'" not in repaired
-    assert "consumer-task:\n    echo kept\n" in repaired
-
-
-def test_duplicate_markers_are_conflicts_without_writes() -> None:
-    consumer = copy_fixture("empty-workspace")
-    justfile = consumer / "Justfile"
-    justfile.write_text("# >>> sc-lint managed integration >>>\n# <<< sc-lint managed integration <<<\n" * 2)
-    before = justfile.read_bytes()
-    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert result.returncode == 2
-    assert str(justfile) in result.stderr or "marker conflict" in result.stderr
-    assert justfile.read_bytes() == before
 
 
 def test_analyzer_worked_example_is_declarative() -> None:
@@ -799,27 +686,12 @@ def test_new_repository_gets_the_default_justfile() -> None:
     assert text.count("set windows-shell") == 1
 
 
-def test_existing_justfile_without_test_gets_the_recommended_recipe() -> None:
-    consumer = copy_fixture("empty-workspace")
-    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    assert run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    assert (consumer / "Justfile").read_text().count("test *layer:") == 1
-
-
 def test_consumer_test_recipe_is_kept() -> None:
     consumer = copy_fixture("empty-workspace")
     (consumer / "Justfile").write_text("test:\n    cargo nextest run\n")
     assert run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 1
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     assert (consumer / "Justfile").read_text().startswith("test:\n    cargo nextest run\n")
-
-
-def test_windows_shell_rendered_in_managed_block_when_consumer_has_none() -> None:
-    consumer = copy_fixture("empty-workspace")
-    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    assert "managed integration >>>\nset windows-shell := " in (consumer / "Justfile").read_text()
 
 
 def test_consumer_windows_shell_is_not_duplicated() -> None:
@@ -832,9 +704,8 @@ def test_consumer_windows_shell_is_not_duplicated() -> None:
     ).returncode == 0
 
 
-def test_windows_shell_false_omits_setting() -> None:
+def test_windows_shell_false_omits_setting_from_seed() -> None:
     consumer = copy_fixture("empty-workspace")
-    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
     input_path = write_input(consumer, justfile={"windows_shell": False})
     assert run("--input", str(input_path), str(consumer)).returncode == 0
     assert "windows-shell" not in (consumer / "Justfile").read_text()
@@ -854,18 +725,7 @@ def test_non_boolean_windows_shell_is_rejected() -> None:
     assert result.stderr == "conflict: justfile.windows_shell must be a boolean\n"
 
 
-def test_dry_run_names_colliding_recipes_without_writing() -> None:
-    consumer = copy_fixture("empty-workspace")
-    original = "lint:\n    echo mine\n\nupgrade:\n    echo mine\n"
-    (consumer / "Justfile").write_text(original)
-    result = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
-    assert result.returncode == 2
-    assert result.stderr == "conflict: Justfile collisions: lint, upgrade\n"
-    assert (consumer / "Justfile").read_text() == original
-    assert not (consumer / ".sc-lint").exists()
-
-
-def test_dry_run_without_just_on_path_exits_2_and_says_so() -> None:
+def test_dry_run_does_not_need_just_on_path() -> None:
     consumer = copy_fixture("empty-workspace")
     environment = {**os.environ, "PATH": str(consumer / "src")}
     python = shutil.which("python3")
@@ -884,90 +744,67 @@ def test_dry_run_without_just_on_path_exits_2_and_says_so() -> None:
         capture_output=True,
         check=False,
     )
-    assert result.returncode == 2
-    assert "--dry-run needs `just` on PATH" in result.stderr
+    assert result.returncode == 1, result.stderr
 
 
-def test_hyphenated_test_recipe_still_gets_the_recommended_recipe() -> None:
-    consumer = copy_fixture("empty-workspace")
-    (consumer / "Justfile").write_text("test-unit:\n    echo unit\n")
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    text = (consumer / "Justfile").read_text()
-    assert "test-unit:" in text
-    assert text.count("\ntest *layer:") == 1
+@pytest.mark.parametrize("legacy_manifest", [b"recorded", b"not JSON"])
+def test_rerun_preserves_consumer_files_and_ignores_old_manifest(
+    tmp_path: Path, legacy_manifest: bytes,
+) -> None:
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    arguments = ("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert run(*arguments).returncode == 0
+    contents = {
+        "Justfile": b"# >>> sc-lint managed integration >>>\n" * 2 + b"lint:\n    custom-command\n\xff",
+        "sc-lint.toml": b"consumer config, deliberately not TOML\xff\n",
+        ".sc-lint/install.json": b"consumer input, deliberately not JSON\n",
+        ".sc-lint/installed.json": legacy_manifest,
+        ".sc-lint/justfile": b"consumer recipes\n",
+        "README.sc-lint.md": b"consumer guide\n",
+        "retired.txt": b"consumer file\n",
+    }
+    if legacy_manifest == b"recorded":
+        contents[".sc-lint/installed.json"] = json.dumps({"managed": {
+            name: hashlib.sha256(contents[name]).hexdigest()
+            for name in ("Justfile", "sc-lint.toml", ".sc-lint/install.json", "retired.txt")
+        }}).encode()
+    for relative, content in contents.items():
+        (consumer / relative).write_bytes(content)
+    for flags in (("--dry-run",), ()):
+        result = run(*flags, *arguments)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert result.stdout == ""
+        for relative, content in contents.items():
+            assert (consumer / relative).read_bytes() == content
 
 
-PRE_UPGRADE_TEMPLATES = ("sc-lint.toml.j2", "Justfile.import.j2", "sc-lint-workflow.yml.j2")
-
-
-def _seed_pre_upgrade_state(consumer: Path) -> list[str]:
-    # Synthetic pre-upgrade state: the kit installed the old .j2 copies under
-    # plugins/sc-lint/templates/, recorded as managed and unmodified.
-    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest = json.loads(manifest_path.read_text())
-    old_paths = []
-    for name in PRE_UPGRADE_TEMPLATES:
-        old = f"plugins/sc-lint/templates/{name}"
-        payload = ("old " + name + "\n").encode()
-        (consumer / old).write_bytes(payload)
-        manifest["managed"][old] = hashlib.sha256(payload).hexdigest()
-        new = f"plugins/sc-lint/templates/{name.removesuffix('.j2')}.tmpl"
-        (consumer / new).unlink()
-        del manifest["managed"][new]
-        old_paths.append(old)
-    manifest_path.write_text(json.dumps(manifest))
-    return old_paths
-
-
-def test_upgrade_dry_run_lists_old_j2_templates_as_deletions() -> None:
-    consumer = copy_fixture("empty-workspace")
-    old_paths = _seed_pre_upgrade_state(consumer)
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest_before = manifest_path.read_bytes()
-
-    dry_run = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
-    assert dry_run.returncode == 1, dry_run.stderr
-    for old in old_paths:
-        assert f"--- {consumer / old}\n+++ /dev/null\n" in dry_run.stdout
-        assert (consumer / old).is_file()
-    assert manifest_path.read_bytes() == manifest_before
-
-
-def test_upgrade_retires_old_j2_templates_and_installs_tmpl() -> None:
-    consumer = copy_fixture("empty-workspace")
-    old_paths = _seed_pre_upgrade_state(consumer)
-
-    upgrade = run("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert upgrade.returncode == 0, upgrade.stderr
-    managed = json.loads((consumer / ".sc-lint" / "installed.json").read_text())["managed"]
-    for old in old_paths:
-        assert not (consumer / old).exists()
-        assert old not in managed
-    for name in PRE_UPGRADE_TEMPLATES:
-        stem = name.removesuffix(".j2")
-        new = f"plugins/sc-lint/templates/{stem}.tmpl"
-        assert (consumer / new).read_bytes() == (KIT / "templates" / f"{stem}.tmpl").read_bytes()
-        assert new in managed
-
-
-def test_upgrade_with_modified_old_j2_template_conflicts_without_writing() -> None:
-    consumer = copy_fixture("empty-workspace")
-    old_paths = _seed_pre_upgrade_state(consumer)
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest_before = manifest_path.read_bytes()
-    edited = consumer / "plugins/sc-lint/templates/Justfile.import.j2"
-    edited.write_bytes(b"consumer edit\n")
-
-    conflict = run("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert conflict.returncode == 2
-    assert (
-        "conflict: plugins/sc-lint/templates/Justfile.import.j2 was modified outside sc-lint"
-        in conflict.stderr
-    )
-    assert edited.read_bytes() == b"consumer edit\n"
-    for old in old_paths:
-        assert (consumer / old).is_file()
-    for name in PRE_UPGRADE_TEMPLATES:
-        assert not (consumer / f"plugins/sc-lint/templates/{name.removesuffix('.j2')}.tmpl").exists()
-    assert manifest_path.read_bytes() == manifest_before
+@pytest.mark.parametrize("kind", ["symlink", "dangling", "directory"])
+def test_existing_seed_destinations_are_not_followed_or_replaced(tmp_path: Path, kind: str) -> None:
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    arguments = ("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert run(*arguments).returncode == 0
+    outside = tmp_path / "outside"
+    if kind != "dangling":
+        outside.write_bytes(b"outside consumer content\n")
+    for relative in ("Justfile", "sc-lint.toml"):
+        path = consumer / relative
+        path.unlink()
+        if kind == "directory":
+            path.mkdir()
+        else:
+            try:
+                path.symlink_to(outside)
+            except OSError as error:
+                pytest.skip(f"symlink creation unavailable: {error}")
+    for flags in (("--dry-run",), ()):
+        result = run(*flags, *arguments)
+        assert result.returncode == 0, result.stdout + result.stderr
+    for relative in ("Justfile", "sc-lint.toml"):
+        path = consumer / relative
+        assert path.is_dir() if kind == "directory" else path.is_symlink()
+    if kind == "dangling":
+        assert not outside.exists()
+    else:
+        assert outside.read_bytes() == b"outside consumer content\n"

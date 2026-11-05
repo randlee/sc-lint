@@ -25,7 +25,7 @@ def install_policy(consumer, version="0.8.4"):
                        profiles={"z-first": [sys.executable, "-c", "pass"], "a-next": [sys.executable, "-c", "raise SystemExit(9)"]})
 
 
-def test_helper_policies_and_default_profile_roundtrip_without_drift():
+def test_helper_policies_and_default_profile_seed_config_once():
     consumer = copy_fixture("empty-workspace")
     source = install_policy(consumer)
     result = run("--input", str(source), str(consumer))
@@ -35,9 +35,10 @@ def test_helper_policies_and_default_profile_roundtrip_without_drift():
     assert rendered["tool"]["sc-lint"]["default_lint_profile"] == "quick"
     assert [row["name"] for row in rendered["tool"]["sc-lint"]["lint"]] == ["z-first", "a-next"]
     for arguments in [("--dry-run",), ()]:
-        result = run(*arguments, "--input", str(consumer / ".sc-lint/install.json"), str(consumer))
+        result = run(*arguments, "--input", str(source), str(consumer))
         assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads((consumer / ".sc-lint/install.json").read_text())["logging"] == POLICIES["logging"]
+    assert json.loads(source.read_text())["logging"] == POLICIES["logging"]
+    assert not (consumer / ".sc-lint" / "install.json").exists()
 
 
 @pytest.mark.parametrize("field,value", [("line_counts", []), ("logging", "bad"),

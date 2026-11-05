@@ -95,7 +95,9 @@ Cache dependencies, not an unverified sc-lint binary. See
 
 ## Consumer workflow
 
-Generate and commit the managed files during onboarding. A clean CI runner can
+The adoption kit seeds missing destinations only. It leaves existing files,
+directories, and symlinks untouched. Generate and commit the files during
+onboarding. A clean CI runner can
 then use the same documented local sequence without a preinstalled binary:
 
 ```yaml
