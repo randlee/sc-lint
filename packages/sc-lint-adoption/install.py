@@ -253,7 +253,7 @@ def desired(data: dict, repo: Path) -> dict[Path, bytes]:
         + "\n" + render(ROOT / "templates/Justfile.import.tmpl", data)
     ).encode()
     return {relative: content for relative, content in result.items()
-            if not (repo / relative).exists() and not (repo / relative).is_symlink()}
+            if not (repo / relative).exists()}
 
 
 def main() -> int:

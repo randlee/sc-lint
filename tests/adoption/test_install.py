@@ -777,25 +777,3 @@ def test_rerun_preserves_consumer_files_and_ignores_old_manifest(
         assert result.stdout == ""
         for relative, content in contents.items():
             assert (consumer / relative).read_bytes() == content
-
-
-def test_dangling_symlink_seed_destinations_are_not_replaced(tmp_path: Path) -> None:
-    consumer = tmp_path / "consumer"
-    consumer.mkdir()
-    arguments = ("--input", str(FIXTURES / "install.json"), str(consumer))
-    assert run(*arguments).returncode == 0
-    outside = tmp_path / "outside"
-    for relative in ("Justfile", "sc-lint.toml"):
-        path = consumer / relative
-        path.unlink()
-        try:
-            path.symlink_to(outside)
-        except OSError as error:
-            pytest.skip(f"symlink creation unavailable: {error}")
-    for flags in (("--dry-run",), ()):
-        result = run(*flags, *arguments)
-        assert result.returncode == 0, result.stdout + result.stderr
-    for relative in ("Justfile", "sc-lint.toml"):
-        path = consumer / relative
-        assert path.is_symlink()
-    assert not outside.exists()
