@@ -117,6 +117,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.1"
+          components: clippy, rustfmt
 
       - name: Install Python 3.9
         uses: actions/setup-python@v5
