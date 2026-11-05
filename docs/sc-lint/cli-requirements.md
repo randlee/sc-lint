@@ -382,7 +382,8 @@ specialized backend tools and mixed Rust/Python implementations.
   the current asset. A current integration is idempotent; `--check` and
   `--dry-run` do not mutate it. A consumer README is outside the command's
   write set.
-  (Amendment Pending Rand — phase-n plan PR, ADR-022 decisions 1, 2 and 5:
+  (Amended for phase-n, PR #858, ADR-022 decisions 1, 2 and 5; Accepted —
+  Rand 2026-11-04 "yes adr/rq approved":
   sc-lint.toml and Justfile are consumer-owned templates seeded only when
   absent; only bootstrap.py is product-owned.)
   `--check` reports a file that would be refreshed as
@@ -787,8 +788,8 @@ specialized backend tools and mixed Rust/Python implementations.
   Every shipped binary (`sc-lint`, `sc-lint-boundary`, `sc-lint-portability`,
   `sc-lint-runtime`) run with no arguments prints its help to stdout and
   exits 0. Every other usage error keeps exit 2.
-  (Amendment Pending Rand — phase-n plan PR #858, sprint n-4, #782 winget
-  validation.)
+  (Added for phase-n, PR #858, sprint n-4, #782 winget validation; Accepted —
+  Rand 2026-11-04 "yes adr/rq approved".)
 
 ## Contract References
 
