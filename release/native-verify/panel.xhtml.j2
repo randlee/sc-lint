@@ -1,0 +1,22 @@
+---
+required_variables:
+  - title
+  - target
+  - status
+  - status_class
+  - error
+  - checks
+defaults: {}
+metadata:
+  purpose: Per-target XHTML panel for the release native verification report
+---
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-{{ status_class }}">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>{{ title }}</h2>
+    <p class="target">Target <code>{{ target }}</code></p>
+    <span class="status status-{{ status_class }}">{{ status }}</span>
+  </header>
+  <ol class="checks">{% for check in checks %}<li><span class="check-status">{{ check.status }}</span> <strong>{{ check.name }}</strong>: {{ check.detail }}</li>{% endfor %}</ol>
+  <p class="error">{{ error }}</p>
+</section>

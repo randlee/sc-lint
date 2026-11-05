@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import release_native_verify as native
 
 ROOT = Path(__file__).resolve().parents[3]
+COMMIT = "a" * 40
+PRERELEASE_TAG = "prerelease/v1.2.3"
 
 
 def test_matrix_uses_manifest_targets_and_native_hosts():
@@ -58,8 +60,9 @@ def executable(target):
 
 
 class Assets:
-    def __init__(self, target, *, payload_target=None):
+    def __init__(self, target, *, payload_target=None, tag="v1.2.3"):
         self.target = target
+        self.tag = tag
         self.version = "1.2.3"
         windows = native.native_host(target)[0] == "Windows"
         extension = "zip" if windows else "tar.gz"
@@ -98,11 +101,11 @@ class Assets:
         self.downloads = []
 
     def manifest(self, tag):
-        assert tag == "v1.2.3"
+        assert tag == self.tag
         return self.manifest_data
 
     def json(self, endpoint):
-        assert endpoint == "releases/tags/v1.2.3"
+        assert endpoint == "releases/tags/" + self.tag.replace("/", "%2F")
         return {"assets": self.assets}
 
     def get(self, endpoint, *, binary):
@@ -271,7 +274,12 @@ def test_workflow_only_triggers_for_release_or_explicit_dispatch():
     import yaml
     workflow = yaml.load((ROOT / ".github/workflows/release-native-verify.yml").read_text(), Loader=yaml.BaseLoader)
     assert set(workflow["on"]) == {"workflow_dispatch", "workflow_run"}
-    assert workflow["on"]["workflow_run"]["workflows"] == ["Release"]
+    assert workflow["on"]["workflow_run"]["workflows"] == ["Release", "Prerelease Archive"]
+    assert set(workflow["on"]["workflow_dispatch"]["inputs"]) == {"tag", "commit"}
+    assert workflow["run-name"] == (
+        "Release Native Verify ${{ inputs.tag || github.event.workflow_run.head_branch }} "
+        "${{ inputs.commit || github.event.workflow_run.head_sha }}"
+    )
     assert workflow["on"]["workflow_run"]["types"] == ["completed"]
     assert workflow["permissions"] == {"contents": "read"}
     plan = workflow["jobs"]["plan"]
@@ -378,17 +386,21 @@ def test_payload_commands_do_not_receive_github_tokens(monkeypatch):
 
 
 class ReleaseRun(RunArtifact):
-    def __init__(self, conclusion="success", *, published=True):
+    def __init__(self, conclusion="success", *, published=True, tag="v1.2.3"):
         super().__init__("tool_1.2.3_x86_64-unknown-linux-gnu.tar.gz")
         self.conclusion = conclusion
         self.published = published
+        self.tag = tag
         self.manifest_data = Assets("x86_64-unknown-linux-gnu").manifest_data
 
     def json(self, endpoint):
         if "/jobs?" in endpoint:
             self.calls.append(endpoint)
             return {"total_count": 1, "jobs": [{"name": "release", "conclusion": self.conclusion}]}
-        if endpoint == "releases/tags/v1.2.3":
+        if endpoint == "commits/" + self.tag.replace("/", "%2F"):
+            self.calls.append(endpoint)
+            return {"sha": COMMIT}
+        if endpoint == "releases/tags/" + self.tag.replace("/", "%2F"):
             self.calls.append(endpoint)
             if not self.published:
                 raise native.GitHubError(endpoint, 404)
@@ -396,7 +408,7 @@ class ReleaseRun(RunArtifact):
         return super().json(endpoint)
 
     def manifest(self, tag):
-        assert tag == "v1.2.3"
+        assert tag == self.tag
         self.calls.append("manifest:" + tag)
         return self.manifest_data
 
@@ -435,9 +447,65 @@ def test_production_missing_assets_fails_instead_of_skipping(monkeypatch, tmp_pa
 
 def test_manual_dispatch_checks_the_release_even_if_no_run_id():
     client = ReleaseRun()
-    tag, _ = native.plan_release(client, {}, "v1.2.3", "")
+    tag, _ = native.plan_release(client, {}, "v1.2.3", "", commit=COMMIT)
     assert tag == "v1.2.3"
     assert not any("/jobs?" in call for call in client.calls)
+    assert "commits/v1.2.3" in client.calls
+
+
+def test_release_version_accepts_release_and_prerelease_tags():
+    assert native.release_version("v1.2.3") == "1.2.3"
+    assert native.release_version(PRERELEASE_TAG) == "1.2.3"
+    for tag in ("1.2.3", "prerelease/1.2.3", "other/v1.2.3", "prerelease/v1.2"):
+        with pytest.raises(ValueError, match="invalid release tag"):
+            native.release_version(tag)
+
+
+def test_prerelease_run_verifies_its_triggering_tag_at_its_commit():
+    client = ReleaseRun(tag=PRERELEASE_TAG)
+    tag, matrix = native.plan_release(
+        client, client.manifest_data, "", "42", workflow="Prerelease Archive", branch=PRERELEASE_TAG, commit=COMMIT
+    )
+    assert tag == PRERELEASE_TAG
+    assert matrix["include"][0]["target"] == "x86_64-unknown-linux-gnu"
+    assert client.calls[-3:] == ["commits/prerelease%2Fv1.2.3", "releases/tags/prerelease%2Fv1.2.3", "manifest:" + PRERELEASE_TAG]
+
+
+@pytest.mark.parametrize("dispatched", [True, False])
+def test_prerelease_tag_naming_another_commit_fails(dispatched):
+    client = ReleaseRun(tag=PRERELEASE_TAG)
+    arguments = (PRERELEASE_TAG, "") if dispatched else ("", "42")
+    with pytest.raises(ValueError, match=f"names commit {COMMIT}, not the commit"):
+        native.plan_release(client, client.manifest_data, *arguments, workflow="Prerelease Archive",
+                            branch=PRERELEASE_TAG, commit="b" * 40)
+
+
+def test_prerelease_run_from_a_non_prerelease_ref_fails():
+    client = ReleaseRun(tag=PRERELEASE_TAG)
+    with pytest.raises(ValueError, match="is not a prerelease tag"):
+        native.plan_release(client, client.manifest_data, "", "42", workflow="Prerelease Archive", branch="main", commit=COMMIT)
+
+
+def test_prerelease_assets_are_verified_and_recorded(monkeypatch, tmp_path):
+    target = "x86_64-unknown-linux-gnu"
+    host(monkeypatch, target)
+    assets = Assets(target, tag=PRERELEASE_TAG)
+    checks = []
+    native.verify_release(assets, PRERELEASE_TAG, target, tmp_path, run=commands()[1], checks=checks)
+    assert [check["name"].split()[0] for check in checks] == ["sha256", "sha256", "binary", "binary", "wheel"]
+
+
+@pytest.mark.parametrize("error", [None, ValueError("checksum mismatch")])
+def test_verify_result_is_the_report_panel_variables(tmp_path, error):
+    import json
+    path = tmp_path / "results" / "x86_64-unknown-linux-gnu.json"
+    checks = [{"name": "sha256 a", "status": "pass", "detail": "matches checksums.txt"}]
+    native.write_result(path, PRERELEASE_TAG, "x86_64-unknown-linux-gnu", checks, error)
+    status = "FAIL" if error else "PASS"
+    assert json.loads(path.read_text()) == {
+        "title": f"x86_64-unknown-linux-gnu ({PRERELEASE_TAG})", "target": "x86_64-unknown-linux-gnu", "status": status,
+        "status_class": status.lower(), "error": str(error or ""), "checks": checks,
+    }
 
 
 @pytest.mark.parametrize("jobs", [[{"name": "release", "conclusion": None}], [{"name": "release", "conclusion": "success"}] * 2])
@@ -517,3 +585,19 @@ def test_release_probe_errors_other_than_404_fail(conclusion):
     client.json = denied_release
     with pytest.raises(native.GitHubError, match="HTTP 403"):
         native.plan_release(client, client.manifest_data, "", "42")
+
+
+def test_failed_verification_still_writes_its_result(monkeypatch, tmp_path):
+    import json
+
+    class Unavailable:
+        def __getattr__(self, name):
+            raise ValueError("controlled release lookup failure")
+
+    monkeypatch.setattr(native, "GitHub", lambda *args: Unavailable())
+    result = tmp_path / "x86_64-unknown-linux-gnu.json"
+    argv = ["verify", "--tag", PRERELEASE_TAG, "--target", "x86_64-unknown-linux-gnu", "--wheel-python", "python3",
+            "--result", str(result)]
+    assert native.main(argv) == 1
+    recorded = json.loads(result.read_text())
+    assert recorded["status"] == "FAIL" and recorded["error"]
