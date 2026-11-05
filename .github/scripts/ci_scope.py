@@ -1,9 +1,10 @@
 """Classify whether a CI event's changed paths require the runtime CI matrix.
 
-Only paths that can change the Rust build, the shipped artifacts or a CI check
-are runtime. Pull requests that touch nothing else keep the same check names
-but skip the runtime jobs. Any other event runs the full matrix, and so does
-any unreadable revision range.
+Every path is runtime unless it sits under a non-runtime prefix. Python sources
+and the sc-lint documentation that the Rust code embeds stay runtime even under
+those prefixes. Pull requests that touch only non-runtime paths keep the same
+check names but skip the runtime jobs. Any other event runs the full matrix,
+and so does any unreadable revision range.
 """
 
 from __future__ import annotations
@@ -13,26 +14,22 @@ import subprocess
 import sys
 from collections.abc import Iterable
 
-RUNTIME_PATHS = (
-    "crates/",
-    "bindings/",
-    "docs-bundle/",
-    "release/",
-    ".github/",
-    ".cargo/",
-    ".sc-lint/",
+# This is the canonical non-runtime prefix list. Unknown paths are runtime.
+NON_RUNTIME = (
+    "docs/",
+    "site/reports/",
+    ".beads/",
+    ".atm-bd/",
+    ".triage/",
 )
-RUNTIME_FILES = {"Cargo.toml", "Cargo.lock", "Justfile", "sc-lint.toml", "pyproject.toml"}
 
 
 def is_runtime(path: str) -> bool:
     """Return whether one changed path can change the Rust build, the artifacts or a check."""
-    return (
-        path in RUNTIME_FILES
-        or path.startswith("rust-toolchain")
-        or path.endswith(".py")
-        or path.startswith(RUNTIME_PATHS)
-    )
+    # Python sources and the docs embedded by include_str! are code, never documentation.
+    if path.endswith(".py") or path.startswith("docs/sc-lint/"):
+        return True
+    return not path.startswith(NON_RUNTIME)
 
 
 def requires_runtime(changed_paths: Iterable[str]) -> bool:

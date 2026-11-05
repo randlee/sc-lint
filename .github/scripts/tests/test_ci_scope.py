@@ -12,12 +12,19 @@ import ci_scope
 
 @pytest.mark.parametrize(("path", "runtime"), [
     ("docs/guide.md", False),
-    ("README.md", False),
     ("site/reports/release/index.html", False),
+    (".beads/issues.jsonl", False),
+    (".atm-bd/sc-lint.bd-cache.sqlite3", False),
+    (".triage/phase-A/findings/A8-SC-002.ttl", False),
+    ("docs/sc-lint/cli-contract.md", True),
     ("docs/examples/check.py", True),
+    ("tests/adr/check.rs", True),
+    ("packages/sc-lint-adoption/README.md", True),
+    ("deny.toml", True),
+    ("README.md", True),
     ("Cargo.toml", True),
     ("crates/sc-lint/src/lib.rs", True),
-    ("rust-toolchain.toml", True),
+    ("brand-new/path.txt", True),
 ])
 def test_path_classification(path, runtime):
     assert ci_scope.is_runtime(path) is runtime
