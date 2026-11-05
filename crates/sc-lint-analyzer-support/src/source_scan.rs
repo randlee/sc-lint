@@ -399,7 +399,8 @@ fn collect_rust_files(
     Ok(())
 }
 
-fn is_supported_target(target: &cargo_metadata::Target) -> bool {
+/// Whether a Cargo target participates in production source analysis.
+pub fn is_supported_target(target: &cargo_metadata::Target) -> bool {
     target.kind.iter().any(|kind| {
         matches!(
             kind,
