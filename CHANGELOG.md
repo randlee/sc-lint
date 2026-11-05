@@ -17,6 +17,9 @@ This release closes GitHub issues #851, #849, #862, #863, #132, #134, #138,
 
 ### Changed
 
+- `sc-lint init` help, its JSON summary, and the offline guides describe the
+  Justfile and `sc-lint.toml` as consumer-owned templates and only
+  `.sc-lint/bootstrap.py` as product-owned (ADR-022, #893).
 - Adoption seeds missing files only and leaves existing consumer files in place;
   bundled wheel tests no longer depend on the source repository (#851, #862,
   #878).
