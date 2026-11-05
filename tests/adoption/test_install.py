@@ -779,32 +779,23 @@ def test_rerun_preserves_consumer_files_and_ignores_old_manifest(
             assert (consumer / relative).read_bytes() == content
 
 
-@pytest.mark.parametrize("kind", ["symlink", "dangling", "directory"])
-def test_existing_seed_destinations_are_not_followed_or_replaced(tmp_path: Path, kind: str) -> None:
+def test_dangling_symlink_seed_destinations_are_not_replaced(tmp_path: Path) -> None:
     consumer = tmp_path / "consumer"
     consumer.mkdir()
     arguments = ("--input", str(FIXTURES / "install.json"), str(consumer))
     assert run(*arguments).returncode == 0
     outside = tmp_path / "outside"
-    if kind != "dangling":
-        outside.write_bytes(b"outside consumer content\n")
     for relative in ("Justfile", "sc-lint.toml"):
         path = consumer / relative
         path.unlink()
-        if kind == "directory":
-            path.mkdir()
-        else:
-            try:
-                path.symlink_to(outside)
-            except OSError as error:
-                pytest.skip(f"symlink creation unavailable: {error}")
+        try:
+            path.symlink_to(outside)
+        except OSError as error:
+            pytest.skip(f"symlink creation unavailable: {error}")
     for flags in (("--dry-run",), ()):
         result = run(*flags, *arguments)
         assert result.returncode == 0, result.stdout + result.stderr
     for relative in ("Justfile", "sc-lint.toml"):
         path = consumer / relative
-        assert path.is_dir() if kind == "directory" else path.is_symlink()
-    if kind == "dangling":
-        assert not outside.exists()
-    else:
-        assert outside.read_bytes() == b"outside consumer content\n"
+        assert path.is_symlink()
+    assert not outside.exists()

@@ -246,16 +246,12 @@ def desired(data: dict, repo: Path) -> dict[Path, bytes]:
         result[consumer_path(source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.tmpl" and not data["ci"]["enabled"]: continue
-        path = repo / target
-        if not path.exists() and not path.is_symlink():
-            result[target] = render(ROOT / source, data).encode()
-    justfile = repo / "Justfile"
-    if not justfile.exists() and not justfile.is_symlink():
-        result[Path("Justfile")] = (
-            (ROOT / "templates/Justfile.default").read_text()
-            + "\n" + (ROOT / "templates/test.just").read_text()
-            + "\n" + render(ROOT / "templates/Justfile.import.tmpl", data)
-        ).encode()
+        result[target] = render(ROOT / source, data).encode()
+    result[Path("Justfile")] = (
+        (ROOT / "templates/Justfile.default").read_text()
+        + "\n" + (ROOT / "templates/test.just").read_text()
+        + "\n" + render(ROOT / "templates/Justfile.import.tmpl", data)
+    ).encode()
     return {relative: content for relative, content in result.items()
             if not (repo / relative).exists() and not (repo / relative).is_symlink()}
 
