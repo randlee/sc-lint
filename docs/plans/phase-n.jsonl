@@ -6,5 +6,5 @@
 {"sprint": "n-7"}
 {"sprint": "n-8"}
 {"sprint": "n-9", "depends_on": ["n-2"]}
-{"sprint": "n-10"}
+{"sprint": "n-10", "depends_on": ["n-2"]}
 {"sprint": "n-6", "depends_on": ["n-1", "n-3", "n-4", "n-5", "n-2", "n-7", "n-8", "n-9", "n-10"]}
