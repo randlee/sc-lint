@@ -60,4 +60,4 @@ def test_product_accepts_kit_helper_policies_and_default_profile(product_artifac
     result = run_subprocess([str(product_artifacts.binary), "--json", "--config", str(consumer / "sc-lint.toml"),
                              "lint", "ci", "--consumer"], cwd=consumer, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert run("--dry-run", "--input", str(consumer / ".sc-lint/install.json"), str(consumer)).returncode == 0
+    assert run("--dry-run", "--input", str(source), str(consumer)).returncode == 0
