@@ -22,9 +22,8 @@ matrix. Its `native_matrix_gate` step runs
 - resolves `prerelease/vX.Y.Z` to its commit V;
 - requires a successful `Release Native Verify` run titled with that tag and V
   in which every manifest target's `Native <target>` job succeeded (a skipped
-  or missing job fails). The run may be dispatched from any branch, so a
-  prerelease is verified before its release lands on `main`; the title binding
-  the exact tag and commit is the proof;
+  or missing job fails). The run may be dispatched from any branch at V; its
+  title must bind the exact tag and commit, and its `headSha` must equal V;
 - fails if any build input (crates, bindings, docs-bundle, Cargo and toolchain
   files, the release manifest, release build scripts, actions and build
   workflows) changed between V and the release candidate commit C.

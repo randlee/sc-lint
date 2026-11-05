@@ -12,8 +12,8 @@ COMMIT = "a" * 40
 TARGETS = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
 
 
-def verify_run(*, title=f"Release Native Verify {TAG} {COMMIT}", event="workflow_run", branch="main"):
-    return {"databaseId": 7, "displayTitle": title, "event": event, "headBranch": branch}
+def verify_run(*, title=f"Release Native Verify {TAG} {COMMIT}", head_sha=COMMIT):
+    return {"databaseId": 7, "displayTitle": title, "headSha": head_sha}
 
 
 def jobs(**conclusions):
@@ -35,6 +35,9 @@ def jobs(**conclusions):
     ".cargo/config.toml",
     ".github/actions/setup-python-release-build/action.yml",
     ".github/workflows/prerelease-archive.yml",
+    ".github/workflows/release-native-verify.yml",
+    ".github/scripts/release_native_verify.py",
+    ".github/scripts/release_native_gate.py",
 ])
 def test_build_input_change_fails(path):
     assert gate.changed_build_inputs(["docs/requirements.md", path]) == [path]
@@ -49,9 +52,8 @@ def test_run_with_every_native_job_successful_proves_the_tag_and_commit():
     assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS) is None
 
 
-def test_dispatch_from_any_branch_is_trusted_when_the_title_binds_the_tag_and_commit():
-    for branch in ("main", "develop", "release/1.2.3", "feature"):
-        assert gate.run_failure(verify_run(event="workflow_dispatch", branch=branch), jobs(), TAG, COMMIT, TARGETS) is None
+def test_run_with_a_different_head_sha_fails():
+    assert gate.run_failure(verify_run(head_sha="b" * 40), jobs(), TAG, COMMIT, TARGETS) == "run headSha does not match the verified commit"
 
 
 @pytest.mark.parametrize("title", [
@@ -78,7 +80,7 @@ def fixed_commands(monkeypatch, *, changed, runs, candidate="c" * 40):
         ("git", "rev-parse", "--verify", "candidate^{commit}"): candidate,
         ("git", "show", f"{COMMIT}:release/publish-artifacts.toml"): manifest,
         ("gh", "run", "list", "--workflow", "release-native-verify.yml", "--status", "success", "--limit", "200",
-         "--json", "databaseId,displayTitle"): json.dumps(runs),
+         "--json", "databaseId,displayTitle,headSha"): json.dumps(runs),
         ("gh", "run", "view", "7", "--json", "jobs"): json.dumps({"jobs": jobs()}),
         ("git", "diff", "--name-only", "--no-renames", COMMIT, candidate): "\n".join(changed),
     }
