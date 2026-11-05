@@ -347,7 +347,8 @@ specialized backend tools and mixed Rust/Python implementations.
   and `rustup_targets` keys; its entries are provisioned and inspected only
   when the host is not Windows, and are ignored on a Windows host. Absent, it
   adds no work, and no tool is skipped by default (#865).
-  (Amendment Pending Rand — phase-n sprint n-9.)
+  (Amended for phase-n sprint n-9, PR #866; Accepted — Rand 2026-11-04
+  "i did read and approve".)
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
