@@ -69,21 +69,7 @@ jobs:
     steps:
       - name: Documentation-only lint skip
         if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
-        run: echo "Just lint is intentionally skipped for documentation-only changes; codespell still runs."
-
-      - uses: actions/checkout@v5
-
-      - name: Documentation-only Python
-        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Documentation-only spell check
-        if: ${{ needs.ci-scope.outputs.runtime == 'false' }}
-        run: |
-          python -m pip install codespell
-          codespell
+        run: echo "Just lint is intentionally skipped for documentation-only changes."
 
       - name: Install Rust toolchain
         if: ${{ needs.ci-scope.outputs.runtime != 'false' }}

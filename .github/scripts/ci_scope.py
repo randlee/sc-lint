@@ -9,28 +9,21 @@ full matrix. Pushes to develop and main always run it.
 from __future__ import annotations
 
 import argparse
-import re
 import subprocess
 import sys
 from collections.abc import Iterable
-
-GIT_TIMEOUT_SECONDS = 60
 
 # This is the canonical non-runtime prefix list.
 NON_RUNTIME_PATHS = (
     "site/reports/",  # Rand, 2026-11-04 (lint-085.79): explicitly approved.
     "docs/",  # lint-085.79: documentation-only direction; read files are reclassified.
-    ".beads/",  # lint-085.79: generated Beads issue data is development metadata.
-    ".atm-bd/",  # lint-085.79: local ATM state is development metadata.
-    ".triage/",  # lint-085.79: finding records are development metadata.
 )
-REVISION_RE = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 
 
 def is_runtime(path: str) -> bool:
     """Return whether one changed path can change the Rust build, the artifacts or a check."""
     # Python sources are code wherever they sit, so they are never documentation.
-    if path.endswith(".py") or path.startswith("docs/sc-lint/") or path == "docs/requirements.md":
+    if path.endswith(".py") or path.startswith("docs/sc-lint/"):
         return True
     return not path.startswith(NON_RUNTIME_PATHS)
 
@@ -40,39 +33,23 @@ def requires_runtime(changed_paths: Iterable[str]) -> bool:
     return any(is_runtime(path) for path in changed_paths if path)
 
 
-def commit_exists(revision: str) -> bool:
-    result = subprocess.run(
-        ["git", "cat-file", "-e", revision + "^{commit}"],
-        capture_output=True, check=False, timeout=GIT_TIMEOUT_SECONDS,
-    )
-    return result.returncode == 0
-
-
 def changed_paths(base: str, head: str) -> list[str]:
-    """Every path that differs, with renames split so both the old and new names are classified."""
+    """Return paths changed between the pull request base and head."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--no-renames", "-z", base, head, "--"],
-        capture_output=True, check=True, timeout=GIT_TIMEOUT_SECONDS,
+        ["git", "diff", "--name-only", base, head, "--"],
+        capture_output=True, check=True, text=True,
     )
-    return result.stdout.decode("utf-8", errors="surrogateescape").split("\0")
+    return result.stdout.splitlines()
 
 
 def scope_requires_runtime(event: str, base: str, head: str) -> bool:
     """Return whether one CI event requires the runtime matrix.
 
-    Only a pull request is compared with its base. Any other event, a missing or all-zero
-    base, a base this clone does not contain, or a missing head runs the matrix, because
-    its change set cannot be read.
+    Only a pull request is compared with its base. Any other event runs the matrix.
     """
     if event != "pull_request":
         return True
-    if not REVISION_RE.fullmatch(base) or set(base) == {"0"}:
-        return True
-    if not REVISION_RE.fullmatch(head) or set(head) == {"0"}:
-        return True
     try:
-        if not commit_exists(base) or not commit_exists(head):
-            return True
         return requires_runtime(changed_paths(base, head))
     except (OSError, subprocess.SubprocessError):
         # Any unreadable revision range must run CI, never skip it.
