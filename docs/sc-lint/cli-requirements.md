@@ -343,6 +343,11 @@ specialized backend tools and mixed Rust/Python implementations.
   inspect/install/verify and non-mutating dry-run follow
   [ADR-017, change 6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts)
   (Accepted, Rand, 2026-10-12); lint execution never installs tools.
+  The tools object may also hold a `non_windows` object with the same `cargo`
+  and `rustup_targets` keys; its entries are provisioned and inspected only
+  when the host is not Windows, and are ignored on a Windows host. Absent, it
+  adds no work, and no tool is skipped by default (#865).
+  (Amendment Pending Rand — phase-n sprint n-9.)
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
