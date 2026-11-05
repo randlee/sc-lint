@@ -2,7 +2,35 @@
 
 All notable changes to sc-lint are documented here.
 
-## [Unreleased]
+## [0.8.6]
+
+This release closes GitHub issues #851, #849, #862, #863, #132, #134, #138,
+#865, #876, #878 and #885.
+
+### Added
+
+- Add opt-in fixed-sleep and token-boundary Python source checks (#132, #134).
+- Support a `tools.non_windows` declaration for cargo tools and Rust targets
+  that should only be installed on non-Windows hosts (#865).
+- Require a native-verified prerelease before release preflight and publish;
+  native verification produces a report for the release gate (#863).
+
+### Changed
+
+- Adoption seeds missing files only and leaves existing consumer files in place;
+  bundled wheel tests no longer depend on the source repository (#851, #862,
+  #878).
+- `sc-lint init --just` treats generated configuration and recipes as
+  consumer-owned, preserving existing files on subsequent runs (#849).
+- Running any sc-lint binary without arguments prints help and exits
+  successfully; invalid arguments still fail.
+- Boundary graph export and source discovery include all Cargo library target
+  kinds, including proc macros and multi-kind libraries (#876).
+- Generated CI installs rustfmt and clippy on the effective Rust toolchain;
+  consumers can remove that step from their own workflow (#885).
+- Boundary documentation points to the portability and runtime tools for rules
+  moved out of the boundary analyzer (#138).
+
 
 ## [0.8.5]
 

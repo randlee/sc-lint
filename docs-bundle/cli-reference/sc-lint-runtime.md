@@ -1,6 +1,6 @@
 # sc-lint-runtime CLI Reference
 
-Version 0.8.5
+Version 0.8.6
 
 Generated from the CLI command tree. Do not hand-edit.
 
