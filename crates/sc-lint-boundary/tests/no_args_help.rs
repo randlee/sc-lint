@@ -4,7 +4,10 @@ use std::process::Command;
 
 #[test]
 fn no_arguments_prints_help_and_exits_zero() {
+    // Clap colours help by environment; pin it off so the plain usage line is asserted.
     let output = Command::new(env!("CARGO_BIN_EXE_sc-lint-boundary"))
+        .env_remove("CLICOLOR_FORCE")
+        .env("NO_COLOR", "1")
         .output()
         .expect("run sc-lint-boundary without arguments");
 
