@@ -399,15 +399,12 @@ fn collect_rust_files(
     Ok(())
 }
 
-fn is_supported_target(target: &cargo_metadata::Target) -> bool {
-    target.kind.iter().any(|kind| {
-        matches!(
-            kind,
-            cargo_metadata::TargetKind::Lib
-                | cargo_metadata::TargetKind::Bin
-                | cargo_metadata::TargetKind::Example
-        )
-    })
+/// Whether a Cargo target participates in production source analysis.
+pub fn is_supported_target(target: &cargo_metadata::Target) -> bool {
+    matches!(
+        classify_target_kinds(&target.kind),
+        PackageTargetKind::Lib | PackageTargetKind::Bin | PackageTargetKind::Example
+    )
 }
 
 pub fn load_workspace_metadata(root: &Path) -> Result<WorkspaceMetadata> {

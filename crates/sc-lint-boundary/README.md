@@ -5,12 +5,12 @@
 ownership, boundary, and manifest-policy checks. The `sc-boundary` name is the
 analyzer target accepted by `sc-lint lint`.
 
-Current crate release: **0.8.5**. Install the product CLI with
+Current crate release: **0.8.6**. Install the product CLI with
 `brew install randlee/tap/sc-lint` or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
 crate as a Rust library, run `cargo add sc-lint-boundary@0.8`. See the
 [repository](https://github.com/randlee/sc-lint) and
-[API documentation](https://docs.rs/sc-lint-boundary/0.8.5).
+[API documentation](https://docs.rs/sc-lint-boundary/0.8.6).
 
 ## Purpose
 

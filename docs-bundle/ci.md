@@ -16,7 +16,7 @@ the consumer commands after the preflight.
 - uses: randlee/sc-lint@v1
   with:
     operation: lint
-    version: 0.8.5
+    version: 0.8.6
 ```
 
 The Action runs on Linux, macOS, and Windows runners on x86_64 or ARM64 (the
@@ -34,7 +34,7 @@ commit SHA and keep `version` explicit:
 - uses: randlee/sc-lint@<full-commit-sha>
   with:
     operation: test
-    version: 0.8.5
+    version: 0.8.6
 ```
 
 The `v1` tag identifies the Action interface and is a movable tag, refreshed
@@ -95,7 +95,15 @@ Cache dependencies, not an unverified sc-lint binary. See
 
 ## Consumer workflow
 
-Generate and commit the managed files during onboarding. A clean CI runner can
+The generated workflow installs rustfmt and clippy for the root-selected Rust
+toolchain, including a toolchain pinned with the minimal profile. To opt out,
+delete the component step from the installed workflow; the installer preserves
+existing workflows. Existing adopters can add `rustup component add rustfmt
+clippy` after the Rust toolchain step.
+
+The adoption kit seeds missing destinations only. It leaves existing files,
+directories, and symlinks untouched. Generate and commit the files during
+onboarding. A clean CI runner can
 then use the same documented local sequence without a preinstalled binary:
 
 ```yaml

@@ -9,7 +9,7 @@ runner scripts or overwrite a consumer README.
 ```sh
 sc-lint init --just --check   # inspect drift without writing
 sc-lint init --just --dry-run # validate without writing; --json lists paths
-sc-lint init --just           # create or update managed files
+sc-lint init --just           # seed missing files or refresh bootstrap
 ```
 
 Human output starts with `init: <status>`:
@@ -24,16 +24,13 @@ Human output starts with `init: <status>`:
 
 Non-empty file lists follow, one line each, in this order: `Created:` (or
 `Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
-`--dry-run`), `Preserved:` and `Version-only stale:` (generated files from an
-earlier release). A refreshed prior-release file appears under `Refreshed:`
-(`Would refresh:` for `--dry-run`) and is not included in `Version-only stale:`.
-A generated `sc-lint.toml` that differs only in the sc-lint version is kept,
-not rewritten, and appears under `Version-only stale:`. An unedited 0.8.4
+`--dry-run`) and `Preserved:`. A refreshed prior-release bootstrap appears under
+`Refreshed:` (`Would refresh:` for `--dry-run`). An unedited 0.8.4
 `.sc-lint/bootstrap.py` is refreshed with the current one, and `--check`
-reports it as outdated. An unedited 0.8.4
-`Justfile` with its old managed header is accepted as current. Edits to any
-of these files make it user-owned, and init reports a conflict instead of
-overwriting it. For example:
+reports it as outdated. `sc-lint.toml` and `Justfile` are consumer-owned: an
+existing file is preserved exactly as it is, whatever its content, and is never
+a conflict. Only a differing `.sc-lint/bootstrap.py` makes init report a
+conflict instead of overwriting it. For example:
 
 ```text
 init: created
@@ -48,22 +45,23 @@ Upgrading an unedited 0.8.4 integration prints, for example:
 init: updated
 Refreshed: /work/repo/.sc-lint/bootstrap.py
 Preserved: /work/repo/sc-lint.toml, /work/repo/Justfile
-Version-only stale: /work/repo/sc-lint.toml
 ```
 
-`sc-lint --json init --just` reports these nine data fields: `status`,
+`sc-lint --json init --just` reports these eight data fields: `status`,
 `managed_files`, `preserved_files`, `created_files`, `refreshed_files`,
-`version_only_stale_files`, `check`, `dry_run` and `summary`. The file-list
+`check`, `dry_run` and `summary`. The file-list
 fields are always arrays. `refreshed_files` contains files that were refreshed
 on a real run or would be refreshed on `--dry-run`; `dry_run` and `status`
 distinguish the two cases.
 
-The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
-Conflicting user-owned files produce a structured error instead of an
-overwrite. A managed path that is a symbolic link is classified by its
-target's content and refreshed by writing through to the target, so the link
-itself is kept; a dangling link is a conflict
-(`CLI.SC_LINT_INTEGRATION_CONFLICT`).
+The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only,
+and only `.sc-lint/bootstrap.py` is product-owned. `sc-lint.toml` and `Justfile`
+are consumer-owned templates: seeded only when missing, and an existing file is
+never read for drift, rewritten, or reported as a conflict. A differing existing
+bootstrap is a structured error (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3)
+instead of an overwrite. A bootstrap symbolic link is classified by its target's
+content and refreshed by writing through to the target, so the link itself is
+kept; a dangling bootstrap link is a conflict.
 The installer also rejects unresolved template variables before writing;
 details are in [Best practices](./best-practices.md#template-rendering).
 
@@ -136,8 +134,8 @@ Consumers run the generated file from their repository root. Source maintainers
 use this repository's root `Justfile` as the executable reference model: its
 public `setup`, `lint`, `test`, and `upgrade` recipes use the same private
 product compatibility preflight, while its complete source-maintainer profiles
-stay behind the product command boundary. The consumer template remains
-product-owned and must not invoke Cargo analyzer packages directly. The root
+stay behind the product command boundary. The consumer owns the generated
+Justfile and may change its recipes; the product owns the bootstrap. The root
 model adds `--dry-run` to `just setup` and `just upgrade` so source maintenance
 can inspect product installation behavior without mutating a local managed
 installation; generated consumer recipes perform the real operation.

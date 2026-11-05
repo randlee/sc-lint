@@ -27,6 +27,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 INSTALL_INPUT = Path(".sc-lint") / "install.json"
 TOOL_KEYS = ("cargo", "rustup_targets")
+TOOL_SCOPE_KEYS = (*TOOL_KEYS, "non_windows")
 EXACT_VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 CARGO_PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
 TARGET_IDENTIFIER = re.compile(r"\S+")
@@ -98,30 +99,40 @@ class SetupContext:
         return Path(self.env["CARGO_HOME"]) / "bin"
 
 
-def _cargo_pins(value: object) -> Tuple[Tuple[str, str], ...]:
+def _cargo_pins(value: object, label: str = "tools.cargo") -> Tuple[Tuple[str, str], ...]:
     if not isinstance(value, dict):
-        raise ToolsConfigError("tools.cargo must be an object mapping package names to exact versions")
+        raise ToolsConfigError(f"{label} must be an object mapping package names to exact versions")
     pins = []
     for package, version in value.items():
         if not CARGO_PACKAGE.fullmatch(package):
-            raise ToolsConfigError(f"tools.cargo has an invalid cargo package name: {package!r}")
+            raise ToolsConfigError(f"{label} has an invalid cargo package name: {package!r}")
         if not isinstance(version, str) or not EXACT_VERSION.fullmatch(version):
             raise ToolsConfigError(
-                f"tools.cargo.{package} must be an exact stable version such as 1.2.3; found {version!r}"
+                f"{label}.{package} must be an exact stable version such as 1.2.3; found {version!r}"
             )
         pins.append((package, version))
     return tuple(pins)
 
 
-def _rustup_targets(value: object) -> Tuple[str, ...]:
+def _rustup_targets(value: object, label: str = "tools.rustup_targets") -> Tuple[str, ...]:
     if not isinstance(value, list):
-        raise ToolsConfigError("tools.rustup_targets must be an array of target identifiers")
+        raise ToolsConfigError(f"{label} must be an array of target identifiers")
     for index, target in enumerate(value):
         if not isinstance(target, str) or not TARGET_IDENTIFIER.fullmatch(target):
             raise ToolsConfigError(
-                f"tools.rustup_targets[{index}] must be a nonempty target identifier; found {target!r}"
+                f"{label}[{index}] must be a nonempty target identifier; found {target!r}"
             )
     return tuple(value)
+
+
+def _tool_entries(tools: Mapping[str, object], label: str) -> ToolDeclaration:
+    unknown = sorted(set(tools) - set(TOOL_KEYS))
+    if unknown:
+        raise ToolsConfigError(f"{label} has unknown keys: {unknown}")
+    return ToolDeclaration(
+        _cargo_pins(tools.get("cargo", {}), f"{label}.cargo"),
+        _rustup_targets(tools.get("rustup_targets", []), f"{label}.rustup_targets"),
+    )
 
 
 def parse_tools(data: object) -> ToolDeclaration:
@@ -133,13 +144,20 @@ def parse_tools(data: object) -> ToolDeclaration:
     tools = data["tools"]
     if not isinstance(tools, dict):
         raise ToolsConfigError("tools must be an object")
-    unknown = sorted(set(tools) - set(TOOL_KEYS))
+    unknown = sorted(set(tools) - set(TOOL_SCOPE_KEYS))
     if unknown:
         raise ToolsConfigError(f"tools has unknown keys: {unknown}")
-    return ToolDeclaration(
-        _cargo_pins(tools.get("cargo", {})),
-        _rustup_targets(tools.get("rustup_targets", [])),
-    )
+    common = _tool_entries({key: tools[key] for key in TOOL_KEYS if key in tools}, "tools")
+    non_windows_data = tools.get("non_windows", {})
+    if not isinstance(non_windows_data, dict):
+        raise ToolsConfigError("tools.non_windows must be an object")
+    non_windows = _tool_entries(non_windows_data, "tools.non_windows")
+    if os.name == "nt":
+        return common
+
+    cargo = (*common.cargo, *non_windows.cargo)
+    targets = (*common.rustup_targets, *non_windows.rustup_targets)
+    return ToolDeclaration(cargo, targets)
 
 
 def load_tools(root: Path) -> ToolDeclaration:

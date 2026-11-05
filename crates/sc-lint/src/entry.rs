@@ -127,6 +127,12 @@ where
     T: Into<OsString> + Clone,
 {
     let argv: Vec<OsString> = args.into_iter().map(Into::into).collect();
+    if argv.len() == 1 {
+        return ParsedInvocation::Immediate(ImmediateOutcome {
+            rendered: render::RenderedOutput::stdout(Cli::command().render_help().to_string()),
+            exit_code: consts::EXIT_SUCCESS,
+        });
+    }
     match Cli::try_parse_from(argv.clone()) {
         Ok(cli) => ParsedInvocation::Ready(cli),
         Err(error) => ParsedInvocation::Immediate(handle_parse_error(&argv, error)),

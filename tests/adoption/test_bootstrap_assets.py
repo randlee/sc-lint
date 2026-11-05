@@ -36,8 +36,7 @@ def test_release_target_selects_controlled_host(monkeypatch, system, machine, ex
 WINDOWS_SHELL_SETTING = 'set windows-shell := ["cmd.exe", "/c"]'
 # The root-level assets ship the setting; the included `.sc-lint/justfile` and `test.just`
 # inherit it from the consumer's root Justfile and must not set one of their own.
-WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/templates/Justfile.default",
-    "Justfile")
+WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "Justfile")
 
 # Pinned rather than sys.stdlib_module_names, which is missing on Python 3.9.
 BOOTSTRAP_STDLIB_MODULES = frozenset({

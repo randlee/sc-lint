@@ -95,7 +95,7 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Create or verify the product-owned consumer integration files.
+    /// Seed consumer integration files and manage the bootstrap.
     Init {
         /// Generate the canonical thin Just integration.
         #[arg(long, required = true)]

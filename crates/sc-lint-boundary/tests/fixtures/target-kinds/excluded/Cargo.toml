@@ -1,0 +1,14 @@
+[package]
+name = "excluded"
+version = "0.1.0"
+edition = "2021"
+autotests = false
+autobenches = false
+
+[[test]]
+name = "only_test"
+path = "tests/check.rs"
+
+[[bench]]
+name = "only_bench"
+path = "benches/check.rs"

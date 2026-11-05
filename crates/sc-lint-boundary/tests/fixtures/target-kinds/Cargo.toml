@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["rlib", "dylib", "cdylib", "staticlib", "proc_macro", "multi", "excluded"]

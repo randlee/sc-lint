@@ -59,6 +59,24 @@ family names `cycles`, `boundaries`, `internal-only`, `forbid-external-impls`,
 | `SCB-MANIFEST-005` | manifests | A dependency in a manifest section its rule does not allow. |
 | `SCB-MANIFEST-006` | manifests | Stale or inconsistent manifest policy, including record locks. |
 
+## Moved rules: old to new
+
+Portability and runtime rules no longer run from `sc-lint-boundary`. Its
+`--rule-filter` rejects them with a usage error (exit 2), and its
+configuration reads only boundary keys. Use the owning tool instead:
+
+| Old rule (bundled) | New tool | Runnable selector | Configuration table |
+| --- | --- | --- | --- |
+| `PORT-001` to `PORT-005` | `sc-lint-portability` | `sc-lint lint sc-portability --rule-filter PORT-001` (any `PORT-*` ID) | `[tool.sc-lint.analyzers.portability]` |
+| `SCB-RUNTIME-001`, `SCB-RUNTIME-002` | `sc-lint-runtime` | `sc-lint lint sc-runtime --rule-filter SCB-RUNTIME-001` (any `SCB-RUNTIME-00N` ID) | `[tool.sc-lint.analyzers.runtime]` |
+
+The portability and runtime selectors take rule IDs only; `sc-lint-runtime`
+rejects families. Their `exclude_rules`, `fail_rules`, `exclude_paths` and
+`exclude_paths_by_rule` keys use the same names as the boundary table, and
+`portability` also takes `unix_path_prefixes`, `config_home_env` and
+`platform_adapters`. See [configuration](../configuration.md#analyzer-tables)
+for the complete key list.
+
 ## Recovering inventory and stale-policy findings
 
 For `SCB-BOUNDARY-004`, use the reported record and field to correct the
