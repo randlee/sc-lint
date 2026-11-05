@@ -46,11 +46,12 @@ def test_non_build_change_passes(path):
 
 
 def test_run_with_every_native_job_successful_proves_the_tag_and_commit():
-    assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS, "main") is None
+    assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS) is None
 
 
-def test_dispatch_from_the_default_branch_is_trusted():
-    assert gate.run_failure(verify_run(event="workflow_dispatch"), jobs(), TAG, COMMIT, TARGETS, "main") is None
+def test_dispatch_from_any_branch_is_trusted_when_the_title_binds_the_tag_and_commit():
+    for branch in ("main", "develop", "release/1.2.3", "feature"):
+        assert gate.run_failure(verify_run(event="workflow_dispatch", branch=branch), jobs(), TAG, COMMIT, TARGETS) is None
 
 
 @pytest.mark.parametrize("title", [
@@ -59,17 +60,12 @@ def test_dispatch_from_the_default_branch_is_trusted():
     f"Release Native Verify prerelease/v1.2.4 {COMMIT}",
 ])
 def test_run_for_another_commit_or_tag_fails(title):
-    assert gate.run_failure(verify_run(title=title), jobs(), TAG, COMMIT, TARGETS, "main") == "title does not bind the tag and commit"
-
-
-def test_dispatch_from_another_branch_fails():
-    reason = gate.run_failure(verify_run(event="workflow_dispatch", branch="feature"), jobs(), TAG, COMMIT, TARGETS, "main")
-    assert reason == "untrusted workflow_dispatch run from feature"
+    assert gate.run_failure(verify_run(title=title), jobs(), TAG, COMMIT, TARGETS) == "title does not bind the tag and commit"
 
 
 @pytest.mark.parametrize("conclusion, shown", [("skipped", "skipped"), ("failure", "failure"), (None, "missing")])
 def test_unsuccessful_or_missing_native_job_fails(conclusion, shown):
-    reason = gate.run_failure(verify_run(), jobs(**{"aarch64-apple-darwin": conclusion}), TAG, COMMIT, TARGETS, "main")
+    reason = gate.run_failure(verify_run(), jobs(**{"aarch64-apple-darwin": conclusion}), TAG, COMMIT, TARGETS)
     assert reason == f"native jobs did not succeed: Native aarch64-apple-darwin ({shown})"
 
 
@@ -81,9 +77,8 @@ def fixed_commands(monkeypatch, *, changed, runs, candidate="c" * 40):
         ("git", "rev-parse", "--verify", f"refs/tags/{TAG}^{{commit}}"): COMMIT,
         ("git", "rev-parse", "--verify", "candidate^{commit}"): candidate,
         ("git", "show", f"{COMMIT}:release/publish-artifacts.toml"): manifest,
-        ("gh", "repo", "view", "--json", "defaultBranchRef"): json.dumps({"defaultBranchRef": {"name": "main"}}),
         ("gh", "run", "list", "--workflow", "release-native-verify.yml", "--status", "success", "--limit", "200",
-         "--json", "databaseId,displayTitle,event,headBranch"): json.dumps(runs),
+         "--json", "databaseId,displayTitle"): json.dumps(runs),
         ("gh", "run", "view", "7", "--json", "jobs"): json.dumps({"jobs": jobs()}),
         ("git", "diff", "--name-only", "--no-renames", COMMIT, candidate): "\n".join(changed),
     }
