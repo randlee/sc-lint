@@ -15,4 +15,4 @@ class SourceCheckoutTests(unittest.TestCase):
             self.assertIsNone(source_checkout(str(module)))
             for name in ("Cargo.toml", "Justfile", "bindings/sc-lint-py/pyproject.toml"):
                 (root / name).touch()
-            self.assertEqual(source_checkout(str(module)), root)
+            self.assertEqual(source_checkout(str(module)), root.resolve())
