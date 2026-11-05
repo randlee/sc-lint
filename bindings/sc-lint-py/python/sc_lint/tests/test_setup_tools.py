@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -468,6 +469,9 @@ class HelperProvisioningTests(HelperFixture):
             (install_input([]), "tools must be an object"),
             (install_input(None), "tools must be an object"),
             (install_input({"pip": {}}), "tools has unknown keys: ['pip']"),
+            (install_input({"non_windows": []}), "tools.non_windows must be an object"),
+            (install_input({"non_windows": {"pip": {}}}), "tools.non_windows has unknown keys: ['pip']"),
+            (install_input({"non_windows": {"cargo": {"cargo-xwin": "0.18"}}}), "tools.non_windows.cargo.cargo-xwin must be an exact stable version"),
             (install_input({"cargo": []}), "tools.cargo must be an object"),
             (install_input({"cargo": {"cargo-xwin": "0.18"}}), "tools.cargo.cargo-xwin must be an exact stable version"),
             (install_input({"cargo": {"cargo-xwin": "^0.18.4"}}), "found '^0.18.4'"),
@@ -497,6 +501,69 @@ class HelperProvisioningTests(HelperFixture):
         self.assertEqual(self.fake.calls(), [])
 
 
+class HostScopedToolsTests(HelperFixture):
+    def test_non_windows_tools_are_provisioned_only_off_windows(self) -> None:
+        data = install_input({
+            "cargo": {"cargo-common": "1.2.3"},
+            "rustup_targets": ["aarch64-unknown-linux-gnu"],
+            "non_windows": {
+                "cargo": {"cargo-xwin": "0.18.4"},
+                "rustup_targets": [WINDOWS_TARGET],
+            },
+        })
+        context = setup_tools.SetupContext(
+            self.consumer,
+            {"CARGO_HOME": str(self.cargo_home), "PATH": str(self.fake.bin)},
+            dry_run=True,
+        )
+        expected_by_host = {
+            "posix": [
+                ["cargo", "install", "--locked", "--version", "=1.2.3", "cargo-common"],
+                ["cargo", "install", "--locked", "--version", "=0.18.4", "cargo-xwin"],
+                ["rustup", "target", "add", "aarch64-unknown-linux-gnu"],
+                ["rustup", "target", "add", WINDOWS_TARGET],
+            ],
+            "nt": [
+                ["cargo", "install", "--locked", "--version", "=1.2.3", "cargo-common"],
+                ["rustup", "target", "add", "aarch64-unknown-linux-gnu"],
+            ],
+        }
+        for host, expected in expected_by_host.items():
+            recorded = []
+
+            def record(command, _item, _context):
+                recorded.append(list(command))
+
+            with self.subTest(host=host), \
+                 mock.patch.object(setup_tools.os, "name", host), \
+                 mock.patch.object(setup_tools, "Path", type(self.consumer)), \
+                 mock.patch.object(setup_tools, "installed_cargo_packages", return_value={}), \
+                 mock.patch.object(setup_tools, "installed_rustup_targets", return_value=frozenset()), \
+                 mock.patch.object(setup_tools, "run", side_effect=record):
+                setup_tools.provision(setup_tools.parse_tools(data), context)
+            self.assertEqual(recorded, expected)
+
+    def test_non_windows_schema_is_closed_and_accepts_valid_object(self) -> None:
+        installer_path = Path.cwd() / "packages/sc-lint-adoption/install.py"
+        if not installer_path.is_file():
+            self.skipTest("adoption kit schema is unavailable in the isolated wheel consumer")
+        installer = runpy.run_path(
+            str(installer_path),
+            run_name="sc_lint_adoption_installer_schema_test",
+        )
+        schema = installer["load_schema"]()["properties"]["tools"]
+        validate = installer["_schema_value"]
+        valid = {
+            "cargo": {"cargo-common": "1.2.3"},
+            "rustup_targets": ["aarch64-unknown-linux-gnu"],
+            "non_windows": {
+                "cargo": {"cargo-xwin": "0.18.4"},
+                "rustup_targets": [WINDOWS_TARGET],
+            },
+        }
+        validate(valid, schema, "tools")
+        with self.assertRaisesRegex(ValueError, "tools.non_windows has unknown fields"):
+            validate({**valid, "non_windows": {"pip": {}}}, schema, "tools")
 
 
 if __name__ == "__main__":

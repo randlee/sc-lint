@@ -142,19 +142,28 @@ for the new validation codes.
 
 When a consumer adopts the kit, ordinary setup can provision only tools
 declared in `.sc-lint/install.json`, next to `sc-lint.toml`. The persisted JSON
-has a top-level `tools` object with `cargo` and `rustup_targets` collections:
+has a top-level `tools` object with `cargo` and `rustup_targets` collections.
+An optional `non_windows` object accepts the same collections for tools that
+are provisioned only on Linux and macOS:
 
 ```json
 {
   "tools": {
     "cargo": {"cargo-xwin": "0.18.4"},
-    "rustup_targets": ["x86_64-pc-windows-msvc"]
+    "rustup_targets": ["x86_64-pc-windows-msvc"],
+    "non_windows": {
+      "cargo": {"cargo-audit": "0.21.2"},
+      "rustup_targets": ["x86_64-unknown-linux-musl"]
+    }
   }
 }
 ```
 
-Cargo packages require exact stable versions. During declared-tool setup, the
-effective `CARGO_HOME` is the environment value when set, otherwise the
+Entries at the top level are provisioned on every host. Entries inside
+`non_windows` are provisioned only when the host is not Windows; on Windows
+that object is ignored. No tools are skipped by default. Cargo packages
+require exact stable versions. During declared-tool setup, the effective
+`CARGO_HOME` is the environment value when set, otherwise the
 platform user's `.cargo` directory; setup adds its `bin` directory to the
 child `PATH`. Setup checks the installed package version and executable,
 installing a missing version with
