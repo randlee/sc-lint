@@ -21,7 +21,6 @@ from sc_lint.python_adapter import success_payload
 from sc_lint.python_adapter import write_json
 
 
-TOOL_NAME = "fixed-sleep"
 SLEEP_RE = re.compile(r"\b(?:(?:std::)?thread|tokio::time)::sleep\s*\(")
 
 

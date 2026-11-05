@@ -1,6 +1,5 @@
 ---
 required_variables:
-  - generated_at
   - runs
 defaults: {}
 metadata:
@@ -17,16 +16,14 @@ metadata:
     table { border-collapse: collapse; width: 100%; }
     th { text-align: left; color: #475569; border-bottom: 2px solid #cbd5e1; padding: 6px 8px; font-size: 14px; }
     td { border-bottom: 1px solid #e2e8f0; padding: 8px; vertical-align: top; font-size: 14px; }
-    .fail { color: #991b1b; font-weight: 700; }
-    .pass { color: #166534; font-weight: 700; }
   </style>
 </head>
 <body>
   <h1>Release native verification reports</h1>
-  <p>Each report is the durable record of the native matrix run that verified a prerelease or published release. Generated {{ generated_at }}.</p>
+  <p>Each report is the durable record of the native matrix run that verified a prerelease or published release.</p>
   <table>
-    <thead><tr><th>Report</th><th>Result</th><th>Tag</th><th>Commit</th><th>Triggered by</th><th>Generated</th></tr></thead>
-    <tbody>{% for run in runs %}<tr><td><a href="{{ run.href }}">{{ run.label }}</a></td><td class="{{ run.status_class }}">{{ run.status }}</td><td>{{ run.tag }}</td><td><code>{{ run.commit }}</code></td><td>{{ run.trigger }}</td><td>{{ run.generated_at }}</td></tr>{% endfor %}</tbody>
+    <thead><tr><th>Report</th><th>Tag</th><th>Commit</th><th>Triggered by</th></tr></thead>
+    <tbody>{% for run in runs %}<tr><td><a href="{{ run.href }}">{{ run.label }}</a></td><td>{{ run.tag }}</td><td><code>{{ run.commit }}</code></td><td>{{ run.trigger }}</td></tr>{% endfor %}</tbody>
   </table>
 </body>
 </html>

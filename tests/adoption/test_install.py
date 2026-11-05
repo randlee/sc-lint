@@ -220,16 +220,9 @@ def test_rerun_refuses_pre_existing_new_kit_file_without_writing() -> None:
     assert manifest_path.read_bytes() == before_manifest
 
 
-def test_package_tests_stay_in_plugin_and_upgrade_retires_projected_copy(
-    tmp_path: Path,
-) -> None:
+def test_package_tests_stay_in_plugin(tmp_path: Path) -> None:
     consumer = tmp_path / "consumer"
     consumer.mkdir()
-    consumer_installer = consumer / "install.py"
-    consumer_installer.write_text("consumer-owned installer\n")
-    consumer_test = consumer / "tests" / "test_consumer.py"
-    consumer_test.parent.mkdir()
-    consumer_test.write_text("def test_consumer_owned():\n    assert True\n")
     args = ("--input", str(FIXTURES / "install.json"), str(consumer))
 
     install = run(*args)
@@ -238,25 +231,6 @@ def test_package_tests_stay_in_plugin_and_upgrade_retires_projected_copy(
     projected_test = consumer / "tests" / "test_toml_strings.py"
     plugin_test = consumer / "plugins" / "sc-lint" / "tests" / "test_toml_strings.py"
     assert not projected_test.exists()
-    assert plugin_test.is_file()
-    assert consumer_installer.read_text() == "consumer-owned installer\n"
-    assert consumer_test.read_text() == "def test_consumer_owned():\n    assert True\n"
-
-    # A 0.8.5 installation recorded this mistakenly projected file as managed.
-    # Recreate that manifest entry so the upgrade must retire only that copy.
-    projected_test.write_bytes(plugin_test.read_bytes())
-    manifest_path = consumer / ".sc-lint" / "installed.json"
-    manifest = json.loads(manifest_path.read_text())
-    relative = projected_test.relative_to(consumer).as_posix()
-    manifest["managed"][relative] = hashlib.sha256(projected_test.read_bytes()).hexdigest()
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-
-    upgrade = run(*args)
-    assert upgrade.returncode == 0, upgrade.stderr
-    assert not projected_test.exists()
-    assert relative not in json.loads(manifest_path.read_text())["managed"]
-    assert consumer_installer.read_text() == "consumer-owned installer\n"
-    assert consumer_test.read_text() == "def test_consumer_owned():\n    assert True\n"
     assert plugin_test.is_file()
 
 

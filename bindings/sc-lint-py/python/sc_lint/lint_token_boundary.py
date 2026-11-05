@@ -20,7 +20,6 @@ from sc_lint.python_adapter import success_payload
 from sc_lint.python_adapter import write_json
 
 
-TOOL_NAME = "token-boundary"
 
 
 @dataclass(frozen=True)

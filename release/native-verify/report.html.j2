@@ -1,11 +1,6 @@
 ---
 required_variables:
   - title
-  - status
-  - status_class
-  - generated_at
-  - description
-  - overview
   - panels_html
 defaults: {}
 metadata:
@@ -20,20 +15,12 @@ metadata:
   <style type="text/css">
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px; color: #1f2937; background: #f8fafc; }
     main { max-width: 1100px; margin: 0 auto; }
-    header, .overview, .panels { background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+    header, .panels { background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
     h1 { margin: 4px 0 8px 0; }
     h2 { margin: 0 0 10px 0; }
     .eyebrow { margin: 0; color: #1e40af; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
-    .meta { color: #64748b; font-size: 14px; }
-    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 0 0; }
-    dt { font-weight: 600; color: #334155; }
-    dd { margin: 0; word-break: break-all; }
-    .status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; }
-    .status-pass { background: #dcfce7; color: #166534; }
-    .status-fail { background: #fee2e2; color: #991b1b; }
     .panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
     .native-panel { border: 1px solid #d1d5db; border-radius: 10px; padding: 14px 16px; background: #fffdfa; }
-    .native-panel-fail { border-color: #fca5a5; }
     .native-panel header { background: none; border: 0; padding: 0; margin: 0; }
     .native-panel h2 { font-size: 18px; }
     .target code, code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
@@ -47,14 +34,7 @@ metadata:
     <header>
       <p class="eyebrow">Native release verification</p>
       <h1>{{ title }}</h1>
-      <p class="meta">Generated {{ generated_at }}</p>
-      <span class="status status-{{ status_class }}">{{ status }}</span>
     </header>
-    <section class="overview">
-      <h2>Overview</h2>
-      <p>{{ description }}</p>
-      <dl>{% for row in overview %}<dt>{{ row.label }}</dt><dd>{{ row.value }}</dd>{% endfor %}</dl>
-    </section>
     <section class="panels">
       <h2>Native targets</h2>
       <div class="panel-grid">{{ panels_html | safe }}</div>
