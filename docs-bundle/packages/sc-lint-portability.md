@@ -20,7 +20,8 @@ sc-lint lint ci --consumer
 
 The analyzer inspects the configured repository root and reports source path,
 rule, and portable remediation. It does not read consumer `sc-lint.toml`
-profiles directly; the top-level product orchestrates it.
+profiles directly; the top-level product runs configured commands while the
+consumer owns orchestration.
 
 ## Rules
 

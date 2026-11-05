@@ -103,6 +103,33 @@ jobs:
       - name: Run just test
         run: just test
 
+  python39-floor:
+    name: Python 3.9 floor tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+          components: clippy, rustfmt
+
+      - name: Install Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install editable package
+        run: python -m pip install -e bindings/sc-lint-py
+
+      - name: Run Python 3.9 floor tests
+        run: python -m unittest sc_lint.tests.test_lint_fixed_sleep sc_lint.tests.test_lint_token_boundary
+
   adoption:
     name: Adoption kit (${{ matrix.os }})
     strategy:

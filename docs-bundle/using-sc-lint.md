@@ -1,13 +1,13 @@
 # Using sc-lint
 
-The installed product owns consumer lint, test, setup, upgrade, and diagnostic
-behavior. `just` is a thin memorable interface over these commands.
+The product provides lint and test tools, configuration, installation, upgrade,
+and diagnostics. Consumers own their recipes, CI, and other orchestration.
+`just` can provide a thin interface over these commands.
 
 ## First use
 
 For the first consumer repository, install the product from the supported
-package or verified release archive, then generate and commit the managed
-integration:
+package or verified release archive, then seed and commit the integration:
 
 ```sh
 sc-lint init --just

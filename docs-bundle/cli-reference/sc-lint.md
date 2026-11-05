@@ -90,7 +90,7 @@ Guide aliases: `README.md` and `overview` select `README`; `setup` selects `inst
 
 ### `sc-lint init`
 
-Create or verify the product-owned consumer integration files
+Seed consumer integration files and manage the bootstrap
 
 ```text
 Usage: sc-lint init [OPTIONS] --just

@@ -9,7 +9,7 @@ runner scripts or overwrite a consumer README.
 ```sh
 sc-lint init --just --check   # inspect drift without writing
 sc-lint init --just --dry-run # validate without writing; --json lists paths
-sc-lint init --just           # create or update managed files
+sc-lint init --just           # seed missing files or refresh bootstrap
 ```
 
 Human output starts with `init: <status>`:
@@ -134,8 +134,8 @@ Consumers run the generated file from their repository root. Source maintainers
 use this repository's root `Justfile` as the executable reference model: its
 public `setup`, `lint`, `test`, and `upgrade` recipes use the same private
 product compatibility preflight, while its complete source-maintainer profiles
-stay behind the product command boundary. The consumer template remains
-product-owned and must not invoke Cargo analyzer packages directly. The root
+stay behind the product command boundary. The consumer owns the generated
+Justfile and may change its recipes; the product owns the bootstrap. The root
 model adds `--dry-run` to `just setup` and `just upgrade` so source maintenance
 can inspect product installation behavior without mutating a local managed
 installation; generated consumer recipes perform the real operation.

@@ -25,9 +25,10 @@ for accepted key forms, parser failures, and recovery.
 
 ## Keep ownership clear
 
-The product owns installation, upgrade, diagnostics, and documentation. The
-consumer owns its README, source policy, and profile command lists. A generated
-file may be regenerated, but a user-owned file must never be silently replaced.
+The product provides tools, configuration, installation, upgrade, diagnostics,
+and documentation. The consumer owns its Justfile, sc-lint.toml, README, source
+policy, profile commands, and orchestration. Init seeds the Justfile and
+sc-lint.toml only when missing; only `.sc-lint/bootstrap.py` is product-owned.
 
 ## Shipped behavior notes
 

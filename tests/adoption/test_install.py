@@ -138,20 +138,6 @@ def test_package_tests_stay_in_plugin(
     assert not (consumer / ".sc-lint" / "installed.json").exists()
 
 
-def test_package_tests_stay_in_plugin(tmp_path: Path) -> None:
-    consumer = tmp_path / "consumer"
-    consumer.mkdir()
-    args = ("--input", str(FIXTURES / "install.json"), str(consumer))
-
-    install = run(*args)
-    assert install.returncode == 0, install.stderr
-
-    projected_test = consumer / "tests" / "test_toml_strings.py"
-    plugin_test = consumer / "plugins" / "sc-lint" / "tests" / "test_toml_strings.py"
-    assert not projected_test.exists()
-    assert plugin_test.is_file()
-
-
 def test_workflow_uses_vendored_action_and_root_has_no_action() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
