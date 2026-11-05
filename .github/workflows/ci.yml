@@ -104,8 +104,12 @@ jobs:
         run: just test
 
   python39-floor:
-    name: Python 3.9 floor tests
-    runs-on: ubuntu-latest
+    name: Python 3.9 floor tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
