@@ -147,7 +147,7 @@ Current implementation status:
     every `[[tool.sc-lint.test]]` row), the named selector with forwarded
     arguments, or lists the declared selectors
 - `init`
-  - implemented product-owned consumer integration renderer with check,
+  - implemented consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
 - `check.native`
   - implemented native preflight path
@@ -342,15 +342,12 @@ is present in the JSON envelope. The rule reflects the existing
   file makes it `updated` (`would_update` under `--dry-run`), even when
   missing files are also created. Then one line for each non-empty file list,
   in order: `Created:` (`Would create:` under `--dry-run`), `Refreshed:`
-  (`Would refresh:` under `--dry-run`), `Preserved:` and `Version-only
-  stale:`, each followed by the comma-separated paths from `created_files`,
-  `refreshed_files`, `preserved_files` and `version_only_stale_files`.
-  `refreshed_files` is always an array of files that were or would be refreshed;
-  `dry_run` and `status` indicate whether the refresh occurred. Refreshed
-  prior-release files do not appear in `version_only_stale_files`; that list
-  reports preserved version-only config changes. The init data object also
-  includes `status`, `managed_files`, `preserved_files`, `created_files`,
-  `refreshed_files`, `version_only_stale_files`, `check`, `dry_run` and
+  (`Would refresh:` under `--dry-run`) and `Preserved:`, each followed by the
+  comma-separated paths from `created_files`, `refreshed_files` and
+  `preserved_files`. `refreshed_files` is always an array of files that were or
+  would be refreshed; `dry_run` and `status` indicate whether the refresh
+  occurred. The init data object also includes `status`, `managed_files`,
+  `preserved_files`, `created_files`, `refreshed_files`, `check`, `dry_run` and
   `summary`.
 - `test` and `lint.ci.consumer` render
   `<command>: <status> (<n> steps)`.
@@ -365,11 +362,14 @@ their human-visible machine-significant fields in the test's pointer table.
 Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
-- `sc-lint init --just` writes the generated config, Justfile, and bootstrap
-  helper only when each path is missing or product-managed. A managed path
-  that is a symbolic link is refreshed through its target (a temporary file
-  beside the target, fsynced and renamed over it) and the link is kept; a
-  dangling link is `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
+- `sc-lint init --just` seeds the generated config and Justfile only when each
+  is missing. An existing `sc-lint.toml` or `Justfile` is consumer-owned: it is
+  left exactly as it is and is never read for drift, rewritten, or reported as a
+  conflict. The bootstrap helper is the only product-owned file. A bootstrap
+  matching a known prior release is refreshed through its target (a temporary
+  file beside the target, fsynced and renamed over it) and the link is kept; a
+  dangling bootstrap link, or a bootstrap that differs from the product asset, is
+  `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer.
@@ -671,7 +671,8 @@ Current CLI exit-code mapping:
 - `1`
   - top-level internal failure
 - `2`
-  - top-level usage failure
+  - top-level usage failure (a bare invocation with no arguments prints help
+    and exits `0`, REQ-CLI-029)
 - `3`
   - top-level config failure
 - `4`

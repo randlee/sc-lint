@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release native verification: prerelease/v0.8.5</title>
+  <style type="text/css">
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px; color: #1f2937; background: #f8fafc; }
+    main { max-width: 1100px; margin: 0 auto; }
+    header, .overview, .panels { background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+    h1 { margin: 4px 0 8px 0; }
+    h2 { margin: 0 0 10px 0; }
+    .eyebrow { margin: 0; color: #1e40af; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .meta { color: #64748b; font-size: 14px; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 0 0; }
+    dt { font-weight: 600; color: #334155; }
+    dd { margin: 0; word-break: break-all; }
+    .status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; }
+    .status-pass { background: #dcfce7; color: #166534; }
+    .status-fail { background: #fee2e2; color: #991b1b; }
+    .panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .native-panel { border: 1px solid #d1d5db; border-radius: 10px; padding: 14px 16px; background: #fffdfa; }
+    .native-panel-fail { border-color: #fca5a5; }
+    .native-panel header { background: none; border: 0; padding: 0; margin: 0; }
+    .native-panel h2 { font-size: 18px; }
+    .target code, code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+    .checks { padding-left: 20px; font-size: 14px; }
+    .check-status { font-weight: 700; color: #166534; text-transform: uppercase; font-size: 12px; }
+    .error { color: #991b1b; font-weight: 600; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Native release verification</p>
+      <h1>Release native verification: prerelease/v0.8.5</h1>
+      <p class="meta">Generated 2026-11-04T18:21:29+00:00</p>
+      <span class="status status-pass">PASS</span>
+    </header>
+    <section class="overview">
+      <h2>Overview</h2>
+      <p>Each native target is verified by its own job on a GitHub-hosted runner for that target. The job downloads the archive and wheels for the tag, checks each against checksums.txt, runs the bundled binaries with --version, and installs each wheel under the target&#x27;s Python to check its version. A prerelease run gates publication: release-preflight accepts it only while the prerelease commit is an ancestor of the release candidate and no artifact input changed between them.</p>
+      <dl><dt>Tag</dt><dd>prerelease/v0.8.5</dd><dt>Commit</dt><dd>91647590248320b9e8ce06ee03d6fc1fbdfcaae7</dd><dt>Triggered by</dt><dd>workflow_dispatch with tag prerelease/v0.8.5</dd><dt>Verify run</dt><dd>41885639373 https://github.com/randlee/sc-lint/actions/runs/41885639373</dd><dt>Targets</dt><dd>x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-msvc, aarch64-pc-windows-msvc</dd><dt>Generated</dt><dd>2026-11-04T18:21:29+00:00</dd></dl>
+    </section>
+    <section class="panels">
+      <h2>Native targets</h2>
+      <div class="panel-grid"><section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>x86_64-unknown-linux-gnu</h2>
+    <p class="target">Target <code>x86_64-unknown-linux-gnu</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: x86_64-unknown-linux-gnu on Linux</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_x86_64-unknown-linux-gnu.tar.gz</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-manylinux_2_28_x86_64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches x86_64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches x86_64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches x86_64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches x86_64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-manylinux_2_28_x86_64.whl</strong>: installs and reports 0.8.5 under Python 3.9</li></ol>
+  <p class="error"></p>
+</section>
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>aarch64-unknown-linux-gnu</h2>
+    <p class="target">Target <code>aarch64-unknown-linux-gnu</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: aarch64-unknown-linux-gnu on Linux</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_aarch64-unknown-linux-gnu.tar.gz</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-manylinux_2_28_aarch64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches aarch64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches aarch64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches aarch64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches aarch64-unknown-linux-gnu; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-manylinux_2_28_aarch64.whl</strong>: installs and reports 0.8.5 under Python 3.9</li></ol>
+  <p class="error"></p>
+</section>
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>x86_64-apple-darwin</h2>
+    <p class="target">Target <code>x86_64-apple-darwin</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: x86_64-apple-darwin on Darwin</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_x86_64-apple-darwin.tar.gz</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-macosx_11_0_x86_64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches x86_64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches x86_64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches x86_64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches x86_64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-macosx_11_0_x86_64.whl</strong>: installs and reports 0.8.5 under Python 3.9</li></ol>
+  <p class="error"></p>
+</section>
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>aarch64-apple-darwin</h2>
+    <p class="target">Target <code>aarch64-apple-darwin</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: aarch64-apple-darwin on Darwin</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_aarch64-apple-darwin.tar.gz</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-macosx_11_0_arm64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches aarch64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches aarch64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches aarch64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches aarch64-apple-darwin; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-macosx_11_0_arm64.whl</strong>: installs and reports 0.8.5 under Python 3.9</li></ol>
+  <p class="error"></p>
+</section>
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>x86_64-pc-windows-msvc</h2>
+    <p class="target">Target <code>x86_64-pc-windows-msvc</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: x86_64-pc-windows-msvc on Windows</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_x86_64-pc-windows-msvc.zip</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-win_amd64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches x86_64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches x86_64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches x86_64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches x86_64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-win_amd64.whl</strong>: installs and reports 0.8.5 under Python 3.9</li></ol>
+  <p class="error"></p>
+</section>
+<section xmlns="http://www.w3.org/1999/xhtml" class="native-panel native-panel-pass">
+  <header>
+    <p class="eyebrow">Native target</p>
+    <h2>aarch64-pc-windows-msvc</h2>
+    <p class="target">Target <code>aarch64-pc-windows-msvc</code></p>
+    <span class="status status-pass">PASS</span>
+  </header>
+  <ol class="checks"><li><span class="check-status">pass</span> <strong>native host</strong>: aarch64-pc-windows-msvc on Windows</li><li><span class="check-status">pass</span> <strong>sha256 sc-lint_0.8.5_aarch64-pc-windows-msvc.zip</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>sha256 sc_lint-0.8.5-cp39-abi3-win_arm64.whl</strong>: matches checksums.txt</li><li><span class="check-status">pass</span> <strong>binary sc-lint</strong>: architecture matches aarch64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-boundary</strong>: architecture matches aarch64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-portability</strong>: architecture matches aarch64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>binary sc-lint-runtime</strong>: architecture matches aarch64-pc-windows-msvc; --version reports 0.8.5</li><li><span class="check-status">pass</span> <strong>wheel sc_lint-0.8.5-cp39-abi3-win_arm64.whl</strong>: installs and reports 0.8.5 under Python 3.11</li></ol>
+  <p class="error"></p>
+</section></div>
+    </section>
+  </main>
+</body>
+</html>

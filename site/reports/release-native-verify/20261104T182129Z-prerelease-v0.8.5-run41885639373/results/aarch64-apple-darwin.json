@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "detail": "aarch64-apple-darwin on Darwin",
+      "name": "native host",
+      "status": "pass"
+    },
+    {
+      "detail": "matches checksums.txt",
+      "name": "sha256 sc-lint_0.8.5_aarch64-apple-darwin.tar.gz",
+      "status": "pass"
+    },
+    {
+      "detail": "matches checksums.txt",
+      "name": "sha256 sc_lint-0.8.5-cp39-abi3-macosx_11_0_arm64.whl",
+      "status": "pass"
+    },
+    {
+      "detail": "architecture matches aarch64-apple-darwin; --version reports 0.8.5",
+      "name": "binary sc-lint",
+      "status": "pass"
+    },
+    {
+      "detail": "architecture matches aarch64-apple-darwin; --version reports 0.8.5",
+      "name": "binary sc-lint-boundary",
+      "status": "pass"
+    },
+    {
+      "detail": "architecture matches aarch64-apple-darwin; --version reports 0.8.5",
+      "name": "binary sc-lint-portability",
+      "status": "pass"
+    },
+    {
+      "detail": "architecture matches aarch64-apple-darwin; --version reports 0.8.5",
+      "name": "binary sc-lint-runtime",
+      "status": "pass"
+    },
+    {
+      "detail": "installs and reports 0.8.5 under Python 3.9",
+      "name": "wheel sc_lint-0.8.5-cp39-abi3-macosx_11_0_arm64.whl",
+      "status": "pass"
+    }
+  ],
+  "error": "",
+  "schema_version": 1,
+  "status": "PASS",
+  "tag": "prerelease/v0.8.5",
+  "target": "aarch64-apple-darwin"
+}

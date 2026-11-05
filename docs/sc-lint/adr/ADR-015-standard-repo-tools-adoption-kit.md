@@ -26,11 +26,8 @@ now defines how shared tooling is vendored into consumers.
    `packages/sc-lint-adoption`, installed into consumers as
    `plugins/sc-lint`, in the exact form of `sc-publish`: `install.py` driven
    by `install.json`, byte-for-byte copied assets, renamed README
-   (`README.sc-lint.md`), templates rendered only for `sc-lint.toml` and the
-   `Justfile` import block, `--dry-run` drift as unified diff with exit 1,
-   conflict with a user-owned file as exit 2, and no delete operation other
-   than retiring an unmodified managed file (ADR-012).
-2. The kit is the **only** adoption path. `sc-publish` delegates sc-lint
+   (`README.sc-lint.md`) and templates.
+2. `sc-publish` delegates sc-lint
    setup to the kit (its `setup-sc-lint` action and version pin are removed);
    `sc-lint.toml` `[tool.sc-lint].minimum_version` is the sole version pin in
    a consumer.
@@ -43,11 +40,9 @@ now defines how shared tooling is vendored into consumers.
    product-owned bootstrap verbatim.
 5. Greenfield and adoption produce an identical end state: the new-repository
    template is the kits applied to an empty Cargo workspace.
-6. ADR-014 is rejected. No Phase F code is merged; salvageable text (the
-   managed-import marker block, the canonical workflow YAML) is recovered by
-   copy into the kit.
+6. ADR-014 is rejected. No Phase F code is merged.
 7. **Modular applicability.** The independent crates apply only where their
-   premises hold. The kit installs one uniform file set but never forces an
+   premises hold. The kit never forces an
    analyzer; `[tool.sc-lint.analyzers]` is the sole repo-specific declarative
    input, with entries such as `runtime = { enabled = true, reason = "tokio" }`
    and `portability = { enabled = true, targets = ["linux", "macos", "windows"] }`.
@@ -55,14 +50,11 @@ now defines how shared tooling is vendored into consumers.
    crate, kit asset, skill, or template presumes another crate is enabled. The
    adoption skill derives this table from runtime/platform facts and records
    reasons in `sc-lint.toml` comments. Templates render the table and derived
-   steps from `install.json`; drift fails if they disagree. Rust may validate
+   steps from `install.json`. Rust may validate
    the schema but contains no selection policy.
 
 ## Consequences
 
-- Consumer repositories converge on one auditable file set (see the Phase G
-  plan "Consumer End State"); drift is a defect reported by `install.py
-  --dry-run`, not a wizard prompt.
 - Adoption is a skill plus templates (`sc-lint-adoption`), never a Rust
   engine; the `sc-lint` binary gains no `configure` surface.
 - Consumer-specific migration knowledge lives in the consumer's PR, not in
@@ -70,7 +62,7 @@ now defines how shared tooling is vendored into consumers.
 - Rejected alternative: a `sc-lint configure` Rust command with per-consumer
   fingerprints (Phase F). It coupled the product to one consumer's snapshot
   and fought `sc-publish`'s own installer.
-- “Identical tooling” means identical installer, interface, and drift check,
+- “Identical tooling” means identical installer and interface,
   not an identical lint set. The kit covers the common base only and documents
   how to extend; it does not anticipate consumer-specific needs.
 - A consumer-local extension observed in at least two repositories may be
@@ -109,4 +101,4 @@ These declarations are consumer-owned inputs, not product defaults. The kit
 continues to render/validate; Rust owns lint execution and analyzer semantics,
 and Python owns installation. Missing optional declarations preserve prior
 behavior. ADR-017 is authoritative for the exact contracts and compatibility
-exceptions; the existing adoption path and managed-file rules remain unchanged.
+exceptions.

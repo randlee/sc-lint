@@ -130,7 +130,6 @@ fn render_init_summary(data: Option<&Value>) -> String {
         ("created_files", created_label),
         ("refreshed_files", refreshed_label),
         ("preserved_files", "Preserved"),
-        ("version_only_stale_files", "Version-only stale"),
     ] {
         let files = data
             .get(key)

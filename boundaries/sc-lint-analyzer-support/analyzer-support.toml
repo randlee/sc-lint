@@ -44,6 +44,7 @@ roots = [
   "count_scanned_crates_with_metadata",
   "discover_source_files",
   "discover_source_files_with_metadata",
+  "is_supported_target",
   "is_test_only",
   "item_attrs",
   "item_identifier",

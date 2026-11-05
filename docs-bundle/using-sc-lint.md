@@ -1,13 +1,13 @@
 # Using sc-lint
 
-The installed product owns consumer lint, test, setup, upgrade, and diagnostic
-behavior. `just` is a thin memorable interface over these commands.
+The product provides lint and test tools, configuration, installation, upgrade,
+and diagnostics. Consumers own their recipes, CI, and other orchestration.
+`just` can provide a thin interface over these commands.
 
 ## First use
 
 For the first consumer repository, install the product from the supported
-package or verified release archive, then generate and commit the managed
-integration:
+package or verified release archive, then seed and commit the integration:
 
 ```sh
 sc-lint init --just
@@ -127,7 +127,7 @@ Only rows surviving scope appear in output.
 `default_lint_profile` must name a profile in `[tool.sc-lint.lint_profiles]`;
 it is resolved only for a bare consumer lint run. Scope-only selection still
 uses that default. Explicit selectors override it, including `all`;
-`sc-lint test` is unaffected. With the managed Justfile:
+`sc-lint test` is unaffected. With the Justfile:
 
 ```sh
 just lint          # configured default, or every row if no default
@@ -142,19 +142,28 @@ for the new validation codes.
 
 When a consumer adopts the kit, ordinary setup can provision only tools
 declared in `.sc-lint/install.json`, next to `sc-lint.toml`. The persisted JSON
-has a top-level `tools` object with `cargo` and `rustup_targets` collections:
+has a top-level `tools` object with `cargo` and `rustup_targets` collections.
+An optional `non_windows` object accepts the same collections for tools that
+are provisioned only on Linux and macOS:
 
 ```json
 {
   "tools": {
     "cargo": {"cargo-xwin": "0.18.4"},
-    "rustup_targets": ["x86_64-pc-windows-msvc"]
+    "rustup_targets": ["x86_64-pc-windows-msvc"],
+    "non_windows": {
+      "cargo": {"cargo-audit": "0.21.2"},
+      "rustup_targets": ["x86_64-unknown-linux-musl"]
+    }
   }
 }
 ```
 
-Cargo packages require exact stable versions. During declared-tool setup, the
-effective `CARGO_HOME` is the environment value when set, otherwise the
+Entries at the top level are provisioned on every host. Entries inside
+`non_windows` are provisioned only when the host is not Windows; on Windows
+that object is ignored. No tools are skipped by default. Cargo packages
+require exact stable versions. During declared-tool setup, the effective
+`CARGO_HOME` is the environment value when set, otherwise the
 platform user's `.cargo` directory; setup adds its `bin` directory to the
 child `PATH`. Setup checks the installed package version and executable,
 installing a missing version with

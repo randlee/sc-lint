@@ -69,7 +69,7 @@ consumer friction arises.
    sites.
 
 5. **Managed files are templates, not requirements.** `.sc-lint/bootstrap.py`,
-   the managed `Justfile` block and the generated `sc-lint.toml` are a
+   the `Justfile` and the generated `sc-lint.toml` are a
    convenience starting point. A consumer may replace or delete them. Every
    tool is reachable through the `sc-lint` command with an explicit
    `--config`, with the same results.
@@ -93,7 +93,7 @@ consumer friction arises.
   is consistent with it: a site allowance is narrow and explicit.
 - **ADR-012 and REQ-CLI-021.** The required recipe shapes, the `python` /
   `python3` choice and bootstrap-only entry become properties of the
-  managed template (decision 5), not consumer obligations.
+  template (decision 5), not consumer obligations.
 - **Directive grammar** (`docs/sc-lint-directives/requirements.md`). `allow`
   is extended from the boundary scope to PORT-010 (decision 4). The existing
   grammar stays backward compatible.

@@ -1,6 +1,7 @@
 use super::*;
 use crate::render::hex_encode;
 use cargo_metadata::MetadataCommand;
+use sc_lint_analyzer_support::is_supported_target;
 
 mod build;
 mod ingest;
@@ -241,17 +242,6 @@ pub(crate) fn default_rule_defaults() -> &'static RuleDefaults {
     DEFAULTS.get_or_init(|| {
         toml::from_str(DEFAULT_RULES_TOML)
             .expect("embedded sc-lint-boundary default rule config must parse")
-    })
-}
-
-pub(crate) fn is_supported_target(target: &cargo_metadata::Target) -> bool {
-    target.kind.iter().any(|kind| {
-        matches!(
-            kind,
-            cargo_metadata::TargetKind::Lib
-                | cargo_metadata::TargetKind::Bin
-                | cargo_metadata::TargetKind::Example
-        )
     })
 }
 

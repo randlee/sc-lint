@@ -125,7 +125,6 @@ def test_issue136_installer_roundtrip(product_artifacts: ProductArtifacts) -> No
     rendered = tomllib.loads((consumer / "sc-lint.toml").read_text())
     parsed_policy = rendered["tool"]["sc-lint"]["analyzers"]["boundary"]
     assert parsed_policy == expected_policy
-    assert json.loads((consumer / ".sc-lint" / "install.json").read_text())["analyzers"]["boundary"] == expected_policy
 
     rust_parse = run_subprocess(
         [

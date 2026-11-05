@@ -23,7 +23,7 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | Atomic activation failed | Choose a writable install directory and retry. |
 | `SETUP_TOOLS.INSPECTION_UNAVAILABLE` | Dry-run cannot inspect declared tools because the managed helper is unavailable | Run ordinary `just setup` to provision the helper and declared tools, then retry `setup --dry-run`. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
-| `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
+| `CLI.SC_LINT_INTEGRATION_CONFLICT` | `.sc-lint/bootstrap.py` differs from the product asset | Restore `.sc-lint/bootstrap.py` or move it aside, then rerun `sc-lint init --just`; it will not overwrite the file. `sc-lint.toml` and `Justfile` are consumer-owned and never produce this error. |
 | `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more product-managed integration files are missing or are unedited files from a prior release | Run `sc-lint init --just` to create or refresh the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
 | `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, or profile declaration is structurally invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
@@ -79,12 +79,13 @@ retain literal `env_keys`. See [Configuration](./configuration.md) and
 ## Initialization conflicts
 
 `sc-lint init --just` reports
-`CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
-user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap.py`. Missing managed
-files, and unedited managed files from a prior release that init would
-refresh, produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
-conflicting file or reconcile it with [the canonical guide](./just-setup.md),
-then rerun initialization.
+`CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a `.sc-lint/bootstrap.py`
+that differs from the product asset. `sc-lint.toml` and `Justfile` are
+consumer-owned templates: edits to them are preserved and never produce this
+error. Missing managed files, and unedited managed files from a prior release
+that init would refresh, produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check
+mode. Restore or move the bootstrap file, or reconcile it with [the canonical
+guide](./just-setup.md), then rerun initialization.
 
 ## Cargo-shear exception migration
 

@@ -28,6 +28,8 @@ __pycache__
 .sc/
 **/.sc-compose/logs/
 reports/
+# Published test records live under site/reports (served by GitHub Pages).
+!site/reports/
 .claude/projects/
 .claude/scheduled_tasks.lock
 

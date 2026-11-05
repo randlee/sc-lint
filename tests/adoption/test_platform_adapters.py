@@ -155,7 +155,7 @@ def test_portability_binary_reports_clear_failures(
     assert str(error.value).startswith(expected_message)
 
 
-def test_issue372_installer_roundtrip() -> None:
+def test_issue372_installer_preserves_existing_config() -> None:
     consumer = copy_fixture("empty-workspace")
     input_path = input_with_adapters(consumer, ADAPTERS)
     result = run("--input", str(input_path), str(consumer))
@@ -172,11 +172,14 @@ def test_issue372_installer_roundtrip() -> None:
 
     config_path = consumer / "sc-lint.toml"
     config_path.write_text(rendered.replace("Reviewed private transport adapter.", "Locally edited reason."))
-    drift_snapshot = tree_snapshot(consumer)
-    drift = run("--dry-run", "--input", str(input_path), str(consumer))
-    assert drift.returncode == 1, drift.stderr
-    assert "sc-lint.toml" in drift.stdout
-    assert tree_snapshot(consumer) == drift_snapshot
+    consumer_edit = config_path.read_bytes()
+    preview = run("--dry-run", "--input", str(input_path), str(consumer))
+    assert preview.returncode == 0, preview.stdout + preview.stderr
+    assert preview.stdout == ""
+    assert config_path.read_bytes() == consumer_edit
+    repeated = run("--input", str(input_path), str(consumer))
+    assert repeated.returncode == 0, repeated.stderr
+    assert config_path.read_bytes() == consumer_edit
 
 
 @pytest.mark.parametrize(

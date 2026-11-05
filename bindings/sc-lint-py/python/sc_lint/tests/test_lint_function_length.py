@@ -16,9 +16,10 @@ from sc_lint.lint_function_length import remediation_hint
 from sc_lint.lint_function_length import scan_repo
 from sc_lint.lint_function_length import write_baseline
 from sc_lint.python_adapter import AdapterError
+from sc_lint.tests.source_checkout import source_checkout
 
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
+REPO_ROOT = source_checkout(__file__)
 DEMO_PATH = Path("crates/demo/src/lib.rs")
 DEMO_KEY = ("crates/demo/src/lib.rs", "example")
 
@@ -299,7 +300,7 @@ class RemediationHintTests(unittest.TestCase):
 
 
 class RepositoryTests(unittest.TestCase):
-    @unittest.skipUnless((REPO_ROOT / "Cargo.toml").is_file(), "needs the source checkout")
+    @unittest.skipUnless(REPO_ROOT is not None, "needs the source checkout")
     def test_current_tree_passes_the_recorded_baseline(self) -> None:
         evaluation = evaluate(scan_repo(REPO_ROOT), load_baseline(REPO_ROOT))
         self.assertEqual([(v.function.path, v.function.name) for v in evaluation.violations], [])

@@ -343,6 +343,12 @@ specialized backend tools and mixed Rust/Python implementations.
   inspect/install/verify and non-mutating dry-run follow
   [ADR-017, change 6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts)
   (Accepted, Rand, 2026-10-12); lint execution never installs tools.
+  The tools object may also hold a `non_windows` object with the same `cargo`
+  and `rustup_targets` keys; its entries are provisioned and inspected only
+  when the host is not Windows, and are ignored on a Windows host. Absent, it
+  adds no work, and no tool is skipped by default (#865).
+  (Amended for phase-n sprint n-9, PR #866; Accepted — Rand 2026-11-04
+  "i did read and approve".)
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
@@ -355,8 +361,7 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-021`
   The product bootstrap `.sc-lint/bootstrap.py` exposes `setup`, `lint`,
   `test`, `upgrade` and `exec`, requires explicit `--config sc-lint.toml`, and
-  delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
-  as amended. ADR-017 adds bootstrap `exec` through the existing managed
+  delegates to the installed `sc-lint` command. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
   re-entering consumer profile dispatch. Bootstrap lint accepts
   `[--fail-fast] [selector] [host|all|linux|macos|windows]` and requires
@@ -371,18 +376,22 @@ specialized backend tools and mixed Rust/Python implementations.
   [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-022`
-  `sc-lint init --just [--check|--dry-run]` must materialize only the
-  product-owned `sc-lint.toml`, `Justfile` and `.sc-lint/bootstrap.py` files.
-  A current integration is idempotent; `--check` and `--dry-run` do not mutate
-  it. A differing existing managed-path file is a structured conflict, never
-  an overwrite, and a consumer README is outside the command's write set.
-  Exception for prior-release files: comparison ignores line endings (CRLF
-  and LF), and a managed file that matches a known prior-release asset is
-  not a conflict. A matching prior-release `.sc-lint/bootstrap.py` is
-  refreshed with the current asset; a matching prior-release `Justfile` with
-  its old managed header is accepted as current; a generated `sc-lint.toml`
-  that differs only in its well-formed minimum version is preserved and
-  reported as version-only stale. Any other difference is a conflict.
+  `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
+  `sc-lint.toml` and `Justfile` only when they are missing, and materializes
+  the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
+  consumer-owned: an existing file is left exactly as it is, is never a
+  conflict, and is never written. Only `.sc-lint/bootstrap.py` is
+  product-owned: a differing existing bootstrap is a structured conflict
+  (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3), never an overwrite. Exception
+  for the prior-release bootstrap: comparison ignores line endings (CRLF and
+  LF), and a matching prior-release `.sc-lint/bootstrap.py` is refreshed with
+  the current asset. A current integration is idempotent; `--check` and
+  `--dry-run` do not mutate it. A consumer README is outside the command's
+  write set.
+  (Amended for phase-n, PR #858, ADR-022 decisions 1, 2 and 5; Accepted —
+  Rand 2026-11-04 "yes adr/rq approved":
+  sc-lint.toml and Justfile are consumer-owned templates seeded only when
+  absent; only bootstrap.py is product-owned.)
   `--check` reports a file that would be refreshed as
   `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
   lint-085.56 and lint-085.61; Accepted — Rand 2026-11-04
@@ -780,6 +789,13 @@ specialized backend tools and mixed Rust/Python implementations.
   This PR does not change the schema.
 
   (Source: #822 and #784, Phase 0.8.4. Accepted 2026-11-01; delivered in 0.8.4 by the implementation layer stacked above this PR. See [ADR-022](./adr/ADR-022-tools-and-consumer-configuration.md).)
+
+- `REQ-CLI-029`
+  Every shipped binary (`sc-lint`, `sc-lint-boundary`, `sc-lint-portability`,
+  `sc-lint-runtime`) run with no arguments prints its help to stdout and
+  exits 0. Every other usage error keeps exit 2.
+  (Added for phase-n, PR #858, sprint n-4, #782 winget validation; Accepted —
+  Rand 2026-11-04 "yes adr/rq approved".)
 
 ## Contract References
 

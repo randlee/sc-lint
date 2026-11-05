@@ -540,17 +540,7 @@ The product should support both:
   reference. Consumers must be able to invoke product-owned setup, complete
   lint, and upgrade entry points, and the product-owned `sc-lint test` runner,
   without choosing a Cargo package or copying source-repository
-  orchestration. The product-owned
-  installation must create an idempotent `sc-lint.toml`, thin Just
-  integration, and one `.sc-lint/bootstrap.py` helper that runs identically
-  on every platform and returns exit codes unchanged, with non-mutating
-  `--check`/`--dry-run` modes; it must never
-  overwrite a consumer README or user-owned integration file. Consumer `just
-  setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
-  compatibility preflight; lint and test execute complete configured profiles.
-  The consumer repository owns `just test`; sc-lint provides a recommended
-  `test` recipe, which the installer adds only when the consumer has none.
-  (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
+  orchestration.
 
   Accepted CLI amendment (2026-11-01):
   [REQ-CLI-028](./sc-lint/cli-requirements.md#req-cli-028--accepted-2026-11-01)
@@ -559,18 +549,6 @@ The product should support both:
   layer stacked above PR #826. Acceptance receipts:
   Rand 2026-11-01: "I approve conditionally on atm-core acceptance."
   team-lead@atm-dev 2026-11-01 (atm-core): "CONFIRM #826 at 41b6006a for atm-core."
-
-  Supersession (Phase G, ADR-015 Decision 1–2 and 4): the consumer-facing
-  installation mechanism is the adoption kit (`packages/sc-lint-adoption`
-  installed as `plugins/sc-lint` via `install.py`), not a direct consumer
-  invocation of `sc-lint init --just`. `sc-lint init --just` is retained as
-  the product-side generator whose bootstrap output the kit vendors verbatim
-  and which product sprints use for fresh-workspace acceptance. The
-  idempotence and never-overwrite obligations above bind the kit: `--dry-run`
-  drift reports a unified diff and exits 1, a conflict with a user-owned file
-  exits 2, and the kit deletes nothing except an unmodified managed file a
-  release retires (ADR-012). Runtime delivery of the
-  helpers is governed by ADR-016.
 
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified
@@ -582,10 +560,7 @@ The product should support both:
   downgrade a newer compatible installation, and install only into the managed
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
-  policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap.py` asset; it delegates `setup` and `upgrade` to
-  installed `sc-lint` and never copies source-checkout scripts or overwrites a
-  consumer README.
+  policy.
 
 - `REQ-PRODUCT-021`
   Every primary release distribution, including release archives and Homebrew,
@@ -620,8 +595,7 @@ The product should support both:
   the released product interface.
 
 - `REQ-PRODUCT-023`
-  A versioned, reusable, analyzer-agnostic adoption kit must install one
-  drift-detectable consumer end state. Analyzer selection and optional analyzer
+  Analyzer selection and optional analyzer
   policy are declared in `[tool.sc-lint.analyzers]`; profiles select applicable
   analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry carries the common
   keys `enabled`, `reason`, `exclude_rules`, `fail_rules`, `exclude_paths` and
@@ -638,8 +612,7 @@ The product should support both:
   Validated platform pairs cover enclosing module declarations and
   inherited-private items while retaining normal parity checks for unrelated
   and separately Unix-gated public items. Missing optional fields preserve
-  existing behavior. Installation is idempotent and `--dry-run` is non-mutating,
-  reporting drift or a managed-file conflict rather than writing.
+  existing behavior. Installation is idempotent and `--dry-run` is non-mutating.
   (Amended 2026-10-10, Accepted, #201, #202; amended 2026-10-12, Accepted,
   [ADR-017, changes 1 and compatibility](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 

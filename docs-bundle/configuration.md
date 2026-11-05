@@ -112,6 +112,43 @@ group = ["unit", "integration"]
 
 A file uses one form; see [Test selectors](./using-sc-lint.md#test-selectors).
 
+## Optional Python source checks
+
+The wheel also provides two opt-in Python checks for consumer lint steps. They
+read their own top-level tables from `sc-lint.toml` or
+`.just/lint-config.toml`; consumers choose when to invoke them.
+
+`fixed_sleep` checks supported `thread::sleep`, `std::thread::sleep`, and
+`tokio::time::sleep` spellings in Rust test scope. `allowed_paths` is an array
+of exact workspace-relative Rust file paths exempt from the check; an empty
+array allows no files.
+
+```toml
+[fixed_sleep]
+allowed_paths = ["crates/daemon/tests/clock_runtime.rs"]
+```
+
+`token_boundary` checks literal token substrings in production Rust source.
+Test scope is exempt, and `allowed_paths` names exact workspace-relative Rust
+files exempt from token checks. Each `required_positive` entry requires the
+named `symbol` substring to occur in its `path`; missing files and symbols are
+findings.
+
+```toml
+[token_boundary]
+tokens = ["RuntimeObserver::new", "RuntimeSnapshot"]
+allowed_paths = ["crates/runtime-observer/src/lib.rs"]
+
+[[token_boundary.required_positive]]
+path = "crates/runtime-observer/src/lib.rs"
+symbol = "pub struct RuntimeObserver"
+```
+
+The neutral table replaces the former consumer-specific
+`[runtime-observation-boundary]` table. Move `tokens`, `allowed_paths`, and
+each `required_positive` `{ path, symbol }` entry to `[token_boundary]` as
+shown; the keys keep their meanings.
+
 ## Analyzer tables
 
 Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
