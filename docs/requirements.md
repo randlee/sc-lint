@@ -625,22 +625,19 @@ The product should support both:
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
 - `REQ-PRODUCT-025` (Pending — Rand acceptance, ADR-023)
-  A consumer repository is adopted and upgraded only through
-  `sc-lint init --just`; every release channel installs the same verified
-  binary, and every adoption route (CLI, marketplace plugin skill) ends in
-  that command, so all routes produce the same repository state. Every file
-  sc-lint writes into a repository is listed in the ADR-023 file-ownership
-  table with exactly one owner. Consumer-owned files (`sc-lint.toml`, root
-  `Justfile`, `.sc-lint/install.json`, `.github/workflows/sc-lint.yml`) are
-  the only configuration surface: written when missing, never rewritten.
-  Product-owned files are brought to the shipped bytes on every
-  `sc-lint init --just`; one whose content matches no shipped release fails
-  with `CLI.SC_LINT_INTEGRATION_CONFLICT` naming the file and the fix. Retired
-  files (`README.sc-lint.md`, `plugins/sc-lint/**`) are reported for deletion
-  by every `init` and `init --check`; sc-lint never deletes tracked files and
-  never writes a path absent from the table. Each product-owned file has one
-  source in this repository; every other copy is generated and test-checked.
-  The consumer installation, upgrade and adoption guides document the table.
+  sc-lint is installed through a release channel and a repository is adopted
+  and upgraded only through `sc-lint init --just` (upgrade: `just upgrade`).
+  All consumer configuration lives in `sc-lint.toml`, including tool
+  declarations under `[tool.sc-lint.tools]`; sc-lint owns `.sc-lint/` and the
+  adoption skill and agent. Every path sc-lint writes is in the ADR-023
+  ownership table: consumer files are created only when missing and never
+  rewritten; sc-lint-owned files are overwritten with the shipped bytes on every
+  `init`, with no content comparison, digest list or conflict detection.
+  Retired paths are removed by the consumer following the documented migration
+  guide; `init --check` lists retired paths that exist and sc-lint-owned files
+  that differ from the shipped bytes, and fails. sc-lint runs no migration or
+  detection heuristics. Each sc-lint-owned file has one source in this
+  repository; other copies are generated and test-checked.
 
 Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
 persisted installer input may declare exact cargo-tool versions and rustup
