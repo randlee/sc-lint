@@ -1,9 +1,4 @@
-{"sprint": "o-3"}
-{"sprint": "o-15", "depends_on": ["o-3"]}
-{"sprint": "o-16", "depends_on": ["o-15"]}
-{"sprint": "o-11", "depends_on": ["o-16"]}
-{"sprint": "o-12", "depends_on": ["o-11"]}
-{"sprint": "o-4", "depends_on": ["o-12"]}
-{"sprint": "o-5", "depends_on": ["o-4"]}
-{"sprint": "o-17", "depends_on": ["o-5"]}
-{"sprint": "o-18", "depends_on": ["o-17"]}
+{"sprint": "o-15"}
+{"sprint": "o-16"}
+{"sprint": "o-11"}
+{"sprint": "o-12"}
