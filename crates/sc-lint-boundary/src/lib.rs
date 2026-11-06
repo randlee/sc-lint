@@ -350,12 +350,12 @@ struct TargetContext {
     workspace_dependency_roots: BTreeMap<String, CrateId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ItemVisibility {
     Private,
-    Public,
-    Crate,
     Restricted,
+    Crate,
+    Public,
 }
 
 impl ItemVisibility {
@@ -368,13 +368,22 @@ impl ItemVisibility {
         }
     }
 
-    fn rank(label: Option<&str>) -> u8 {
-        match label {
-            Some("private") => 1,
-            Some("restricted") => 2,
-            Some("crate") => 3,
-            Some("public") => 4,
-            _ => 0,
+    fn from_graph(label: Option<&str>) -> Option<Self> {
+        match label? {
+            "private" => Some(Self::Private),
+            "restricted" => Some(Self::Restricted),
+            "crate" => Some(Self::Crate),
+            "public" => Some(Self::Public),
+            _ => None,
+        }
+    }
+
+    fn as_source_str(self) -> &'static str {
+        match self {
+            Self::Private => "private",
+            Self::Restricted => "pub(super)/pub(self)/pub(in path)",
+            Self::Crate => "pub(crate)",
+            Self::Public => "pub",
         }
     }
 }
@@ -397,7 +406,9 @@ impl GraphBuilder {
             .iter_mut()
             .find(|existing| existing.id == node.id)
         {
-            if ItemVisibility::rank(node.visibility) > ItemVisibility::rank(existing.visibility) {
+            if ItemVisibility::from_graph(node.visibility)
+                > ItemVisibility::from_graph(existing.visibility)
+            {
                 *existing = node;
             }
         } else {

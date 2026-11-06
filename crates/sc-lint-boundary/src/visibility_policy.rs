@@ -4,44 +4,13 @@
 use crate::Finding;
 use crate::GraphExport;
 use crate::GraphNode;
+use crate::ItemVisibility as SourceVisibility;
 use crate::OwnerId;
 use crate::RuleId;
 use crate::inventory::BoundaryInventory;
 use crate::inventory::BoundaryRecord;
 use crate::inventory::Constructor;
 use crate::inventory::Visibility;
-
-/// Source visibility, ordered from narrowest to widest. `pub(super)`,
-/// `pub(self)` and `pub(in path)` are `Restricted`, which REQ-SCB-027 counts
-/// as no wider than `pub(crate)`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum SourceVisibility {
-    Private,
-    Restricted,
-    Crate,
-    Public,
-}
-
-impl SourceVisibility {
-    fn from_graph(label: Option<&str>) -> Option<Self> {
-        match label? {
-            "private" => Some(Self::Private),
-            "restricted" => Some(Self::Restricted),
-            "crate" => Some(Self::Crate),
-            "public" => Some(Self::Public),
-            _ => None,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Private => "private",
-            Self::Restricted => "pub(super)/pub(self)/pub(in path)",
-            Self::Crate => "pub(crate)",
-            Self::Public => "pub",
-        }
-    }
-}
 
 /// The widest source visibility a declaration allows, or `None` when the
 /// declaration is not checked.
@@ -229,7 +198,12 @@ fn check_item(
     match node.and_then(|node| SourceVisibility::from_graph(node.visibility)) {
         None => findings.push(finding(record, item, limit.declared, "not found")),
         Some(actual) if actual > limit.widest => {
-            findings.push(finding(record, item, limit.declared, actual.as_str()));
+            findings.push(finding(
+                record,
+                item,
+                limit.declared,
+                actual.as_source_str(),
+            ));
         }
         Some(_) => {}
     }
