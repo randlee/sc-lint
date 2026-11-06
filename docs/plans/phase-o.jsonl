@@ -2,8 +2,7 @@
 {"sprint": "o-3"}
 {"sprint": "o-5"}
 {"sprint": "o-6"}
-{"sprint": "o-7"}
 {"sprint": "o-2", "depends_on": ["o-1"]}
 {"sprint": "o-4", "depends_on": ["o-3"]}
 {"sprint": "o-9"}
-{"sprint": "o-8", "depends_on": ["o-2", "o-4", "o-5", "o-6", "o-7", "o-9"]}
+{"sprint": "o-8", "depends_on": ["o-2", "o-4", "o-5", "o-6", "o-9"]}
