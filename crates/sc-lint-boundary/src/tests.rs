@@ -6905,6 +6905,45 @@ constructor = "none""#,
 }
 
 #[test]
+fn scb_boundary_005_reports_ambiguous_trait_only_library() {
+    let fixture = WorkspaceFixture::new();
+    write_visibility_fixture(
+        &fixture,
+        "pub fn open() {}",
+        r#"type = "Store"
+module = "adapter::roster"
+visibility = "trait_only"
+constructor = "none""#,
+    );
+    fixture.write_workspace_root_with_members(&["crates/store", "crates/one", "crates/two"]);
+    for package in ["one", "two"] {
+        fixture.write_package_manifest(package);
+        let path = fixture.root().join(format!("crates/{package}/Cargo.toml"));
+        let manifest = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(path, format!("{manifest}\n[lib]\nname = \"adapter\"\n")).unwrap();
+        fixture.write_source(package, "lib.rs", "mod roster { pub struct Store; }");
+    }
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+    let findings: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary005)
+        .collect();
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0]
+            .message
+            .contains("ambiguous workspace library crate"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
 fn trait_only_requires_type_and_module_together() {
     for record in ["type = \"Store\"", "module = \"store::roster\""] {
         let fixture = WorkspaceFixture::new();

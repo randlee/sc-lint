@@ -85,12 +85,18 @@ fn in_owner_library<'a>(
 /// declared (visibility recorded) directly in `module_path`.
 fn find_type<'a>(
     graph: &'a GraphExport,
-    record: &'a BoundaryRecord,
+    package: &str,
+    target: &str,
     module_path: &str,
     name: &str,
 ) -> Option<&'a GraphNode> {
-    in_owner_library(graph, record).find(|node| {
-        node.kind == "type"
+    graph.nodes.iter().find(|node| {
+        node.package == package
+            && node
+                .target
+                .as_deref()
+                .is_some_and(|name| name.replace('-', "_") == target.replace('-', "_"))
+            && node.kind == "type"
             && node.label == name
             && node.visibility.is_some()
             && node.module_path.as_deref() == Some(module_path)
@@ -103,7 +109,7 @@ fn find_trait_type<'a>(
     metadata: &cargo_metadata::Metadata,
     module: &str,
     name: &str,
-) -> Option<&'a GraphNode> {
+) -> Result<Option<&'a GraphNode>, &'static str> {
     let (crate_name, rest) = module.split_once("::").unwrap_or((module, ""));
     let module_path = if rest.is_empty() {
         "crate".to_string()
@@ -120,18 +126,13 @@ fn find_trait_type<'a>(
             })
             .map(move |target| (package.name.as_str(), target.name.as_str()))
     });
-    let (package, target) = targets.next()?;
+    let Some((package, target)) = targets.next() else {
+        return Ok(None);
+    };
     if targets.next().is_some() {
-        return None;
+        return Err("ambiguous workspace library crate");
     }
-    graph.nodes.iter().find(|node| {
-        node.package == package
-            && node.target.as_deref() == Some(target)
-            && node.kind == "type"
-            && node.label == name
-            && node.visibility.is_some()
-            && node.module_path.as_deref() == Some(&module_path)
-    })
+    Ok(find_type(graph, package, target, &module_path, name))
 }
 
 /// The inherent associated `fn new` belonging to the resolved type.
@@ -232,15 +233,27 @@ pub(crate) fn analyze_declared_visibility(
         ) else {
             continue;
         };
-        let type_node = if implementation.visibility == Visibility::TraitOnly {
+        let type_result = if implementation.visibility == Visibility::TraitOnly {
             find_trait_type(graph, metadata, module, type_name)
         } else {
-            graph_module_path(record, module)
-                .and_then(|module_path| find_type(graph, record, &module_path, type_name))
+            Ok(graph_module_path(record, module).and_then(|module_path| {
+                find_type(
+                    graph,
+                    record.owner_package.as_ref(),
+                    record.owner_crate_path.as_ref(),
+                    &module_path,
+                    type_name,
+                )
+            }))
         };
+        let type_node = type_result.unwrap_or(None);
         let type_item = format!("type `{module}::{type_name}`");
         if let Some(limit) = type_check {
-            check_item(&mut findings, record, &type_item, limit, type_node);
+            if let Err(reason) = type_result {
+                findings.push(finding(record, &type_item, limit.declared, reason));
+            } else {
+                check_item(&mut findings, record, &type_item, limit, type_node);
+            }
         }
         if let Some(limit) = constructor_check {
             let constructor = type_node.and_then(|node| find_inherent_new(graph, record, node));
