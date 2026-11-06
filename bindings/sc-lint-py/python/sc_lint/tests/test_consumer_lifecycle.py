@@ -84,6 +84,9 @@ class WheelConsumerTests(unittest.TestCase):
             # built from this tree, not a stale managed or PATH install.
             child_env = {key: value for key, value in os.environ.items()
                          if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
+            # The Justfile exports a relative path; the child runs in `consumer`.
+            if child_env.get("SC_LINT_BIN"):
+                child_env["SC_LINT_BIN"] = os.path.abspath(child_env["SC_LINT_BIN"])
             result = subprocess.run(
                 [str(python), "-I", "-m", "sc_lint.run_pytests"], env=child_env,
                 cwd=consumer, capture_output=True, text=True, timeout=180,
