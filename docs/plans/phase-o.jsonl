@@ -1,5 +1,5 @@
 {"sprint": "o-15"}
-{"sprint": "o-16"}
+{"sprint": "o-16", "depends_on": ["o-15"]}
 {"sprint": "o-11", "depends_on": ["o-15", "o-16"]}
 {"sprint": "o-12", "depends_on": ["o-11"]}
 {"sprint": "o-3"}
