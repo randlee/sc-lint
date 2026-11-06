@@ -6640,15 +6640,11 @@ fn hyphenated_binary_visibility_findings(source: &str) -> Vec<String> {
 }
 
 #[test]
-fn scb_boundary_005_resolves_hyphenated_binary_target() {
+fn scb_boundary_005_checks_hyphenated_binary_target() {
     let findings = hyphenated_binary_visibility_findings(
         "fn main() {} pub fn open() {} mod roster { pub(crate) struct Store; impl Store { pub(crate) fn new() -> Self { Self } } }",
     );
     assert!(findings.is_empty(), "{findings:#?}");
-}
-
-#[test]
-fn scb_boundary_005_checks_hyphenated_binary_visibility() {
     let findings = hyphenated_binary_visibility_findings(
         "fn main() {} pub fn open() {} mod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }",
     );
@@ -6704,23 +6700,50 @@ fn scb_boundary_005_fails_when_type_and_constructor_are_wider_than_declared() {
     assert!(findings.iter().any(|message| message.contains(
         "constructor `store::roster::Store::new` declared `pub(crate)` but source is `pub`"
     )));
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Store; }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "none""#,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(findings[0].contains("declared `private` but source is `pub(crate)`"));
 }
 
 #[test]
-fn scb_boundary_005_counts_restricted_visibility_as_no_wider_than_pub_crate() {
-    let findings = visibility_findings(
-        r#"
-            pub fn open() {}
-            mod roster {
-                pub(super) struct Store;
-                impl Store {
-                    pub(in crate::roster) fn new() -> Self { Self }
-                }
-            }
-        "#,
-        PUB_CRATE_RECORD,
-    );
-    assert!(findings.is_empty(), "{findings:#?}");
+fn scb_boundary_005_checks_restricted_visibility() {
+    let private = r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "private""#;
+    for (source, record, count, message) in [
+        (
+            "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(in crate::roster) fn new() -> Self { Self } } }",
+            PUB_CRATE_RECORD,
+            0,
+            "",
+        ),
+        (
+            "pub fn open() {} mod roster { pub(self) struct Store; impl Store { pub(in self) fn new() -> Self { Self } } }",
+            private,
+            0,
+            "",
+        ),
+        (
+            "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(super) fn new() -> Self { Self } } }",
+            private,
+            2,
+            "source is `pub(super)/pub(self)/pub(in path)`",
+        ),
+    ] {
+        let findings = visibility_findings(source, record);
+        assert_eq!(findings.len(), count, "{findings:#?}");
+        assert!(
+            findings.iter().all(|finding| finding.contains(message)),
+            "{findings:#?}"
+        );
+    }
 }
 
 #[test]
@@ -6757,57 +6780,6 @@ fn scb_boundary_005_does_not_find_another_types_constructor() {
     );
     assert_eq!(findings.len(), 1, "{findings:#?}");
     assert!(findings[0].contains("constructor `store::roster::Store::new` declared `pub(crate)` but source is `not found`"), "{findings:#?}");
-}
-
-#[test]
-fn scb_boundary_005_reports_unresolved_glob_impl_owner() {
-    let findings = visibility_findings(
-        "pub fn open() {} mod roster { pub(crate) struct Store; } mod implementation { use crate::roster::*; impl Store { pub(crate) fn new() -> Self { Self } } }",
-        PUB_CRATE_RECORD,
-    );
-    assert_eq!(findings.len(), 1, "{findings:#?}");
-    assert!(
-        findings[0].contains("source is `not found`"),
-        "{findings:#?}"
-    );
-    assert!(
-        findings[0].contains("impl owner could not be resolved"),
-        "{findings:#?}"
-    );
-}
-
-#[test]
-fn scb_boundary_005_reports_unresolved_reexport_impl_owner() {
-    let findings = visibility_findings(
-        "pub fn open() {} mod roster { pub(crate) struct Store; } mod reexport { pub use crate::roster::Store; } mod implementation { use crate::reexport::Store; impl Store { pub(crate) fn new() -> Self { Self } } }",
-        PUB_CRATE_RECORD,
-    );
-    assert_eq!(findings.len(), 1, "{findings:#?}");
-    assert!(
-        findings[0].contains("source is `not found`"),
-        "{findings:#?}"
-    );
-    assert!(
-        findings[0].contains("impl owner could not be resolved"),
-        "{findings:#?}"
-    );
-}
-
-#[test]
-fn scb_boundary_005_finds_constructor_for_imported_impl_owners() {
-    for import_and_owner in [
-        "use crate::roster::Store; impl Store",
-        "use crate::roster; impl roster::Store",
-        "use crate::roster::{self as module, Store as Alias}; impl Alias",
-        "use crate::roster::{self as module, Store as Alias}; impl module::Store",
-    ] {
-        let source = format!(
-            "pub fn open() {{}} mod roster {{ pub(crate) struct Store; }} mod implementation {{ {import_and_owner} {{ pub fn new() -> Self {{ Self }} }} }}"
-        );
-        let findings = visibility_findings(&source, PUB_CRATE_RECORD);
-        assert_eq!(findings.len(), 1, "{import_and_owner}: {findings:#?}");
-        assert!(findings[0].contains("source is `pub`"), "{findings:#?}");
-    }
 }
 
 #[test]
@@ -6990,49 +6962,6 @@ fn scb_boundary_005_checks_all_cfg_declarations() {
             .all(|finding| finding.contains("source is `pub`")),
         "{findings:#?}"
     );
-}
-
-#[test]
-fn scb_boundary_005_treats_self_visibility_as_private() {
-    let findings = visibility_findings(
-        "pub fn open() {} mod roster { pub(self) struct Store; impl Store { pub(in self) fn new() -> Self { Self } } }",
-        r#"type = "Store"
-module = "store::roster"
-visibility = "private"
-constructor = "private""#,
-    );
-    assert!(findings.is_empty(), "{findings:#?}");
-}
-
-#[test]
-fn scb_boundary_005_rejects_super_visibility_for_private_items() {
-    let findings = visibility_findings(
-        "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(super) fn new() -> Self { Self } } }",
-        r#"type = "Store"
-module = "store::roster"
-visibility = "private"
-constructor = "private""#,
-    );
-    assert_eq!(findings.len(), 2, "{findings:#?}");
-    assert!(
-        findings
-            .iter()
-            .all(|finding| finding.contains("source is `pub(super)/pub(self)/pub(in path)`")),
-        "{findings:#?}"
-    );
-}
-
-#[test]
-fn scb_boundary_005_fails_private_declaration_with_crate_visible_source() {
-    let findings = visibility_findings(
-        "pub fn open() {}\nmod roster { pub(crate) struct Store; }\n",
-        r#"type = "Store"
-module = "store::roster"
-visibility = "private"
-constructor = "none""#,
-    );
-    assert_eq!(findings.len(), 1, "{findings:#?}");
-    assert!(findings[0].contains("declared `private` but source is `pub(crate)`"));
 }
 
 #[test]

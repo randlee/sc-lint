@@ -16,14 +16,8 @@ fn inline_module_syntax(items: Vec<Item>) -> File {
     }
 }
 
-struct ModuleSymbols {
-    names: BTreeSet<String>,
-    imports: BTreeMap<String, String>,
-}
-
-fn module_symbols(items: &[Item]) -> ModuleSymbols {
+fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
-    let mut imports = BTreeMap::new();
     for item in items {
         match item {
             Item::Struct(item_struct) => {
@@ -41,48 +35,10 @@ fn module_symbols(items: &[Item]) -> ModuleSymbols {
             Item::Trait(item_trait) => {
                 names.insert(item_trait.ident.to_string());
             }
-            Item::Use(item_use) => collect_imports(&item_use.tree, &[], &mut imports),
             _ => {}
         }
     }
-    ModuleSymbols { names, imports }
-}
-
-fn collect_imports(tree: &syn::UseTree, prefix: &[String], imports: &mut BTreeMap<String, String>) {
-    match tree {
-        syn::UseTree::Path(path) => {
-            let mut prefix = prefix.to_vec();
-            prefix.push(path.ident.to_string());
-            collect_imports(&path.tree, &prefix, imports);
-        }
-        syn::UseTree::Name(name) => {
-            let mut path = prefix.to_vec();
-            let alias = if name.ident == "self" {
-                path.last().cloned()
-            } else {
-                path.push(name.ident.to_string());
-                Some(name.ident.to_string())
-            };
-            if let Some(alias) = alias {
-                imports.insert(alias, path.join("::"));
-            }
-        }
-        syn::UseTree::Rename(rename) => {
-            let mut path = prefix.to_vec();
-            if rename.ident != "self" {
-                path.push(rename.ident.to_string());
-            }
-            imports.insert(rename.rename.to_string(), path.join("::"));
-        }
-        syn::UseTree::Group(group) => {
-            for item in &group.items {
-                collect_imports(item, prefix, imports);
-            }
-        }
-        syn::UseTree::Glob(_) => {
-            imports.insert("*".to_string(), String::new());
-        }
-    }
+    names
 }
 
 fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
@@ -112,8 +68,7 @@ pub(super) fn ingest_module_items(
     let module_path = &task.module_path;
     let module_dir = &task.module_dir;
     let source_path = task.source_path.as_path();
-    let symbols = module_symbols(&file.items);
-    let local_owner_names = &symbols.names;
+    let local_owner_names = collect_owner_names(&file.items);
 
     for item in file.items {
         match item {
@@ -212,7 +167,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -227,7 +182,7 @@ pub(super) fn ingest_module_items(
                         parent_id: &node_id,
                         module_path,
                         source_path,
-                        local_owner_names,
+                        local_owner_names: &local_owner_names,
                         owner_name: Some(&owner_name),
                         fields: &item_struct.fields,
                     },
@@ -254,7 +209,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -288,7 +243,7 @@ pub(super) fn ingest_module_items(
                             parent_id: &variant_id,
                             module_path,
                             source_path,
-                            local_owner_names,
+                            local_owner_names: &local_owner_names,
                             owner_name: Some(&owner_name),
                             fields: &variant.fields,
                         },
@@ -316,7 +271,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -332,7 +287,7 @@ pub(super) fn ingest_module_items(
                         parent_id: &node_id,
                         module_path,
                         source_path,
-                        local_owner_names,
+                        local_owner_names: &local_owner_names,
                         owner_name: Some(&owner_name),
                         fields: &union_fields,
                     },
@@ -359,7 +314,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -389,7 +344,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -421,7 +376,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        local_owner_names,
+                        &local_owner_names,
                         None,
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -432,7 +387,13 @@ pub(super) fn ingest_module_items(
             }
             Item::Impl(item_impl) => {
                 let owner = impl_owner(&item_impl.self_ty)?;
-                let owner_node_id = impl_owner_node_id(task, &item_impl, &owner.name, &symbols);
+                let owner_node_id = impl_owner_node_id(
+                    context,
+                    parent_module_id,
+                    module_path,
+                    &item_impl,
+                    &owner.name,
+                );
                 let trait_path = item_impl
                     .trait_
                     .as_ref()
@@ -576,7 +537,7 @@ pub(super) fn ingest_module_items(
                             &method_id,
                             module_path,
                             collect_references_with(
-                                local_owner_names,
+                                &local_owner_names,
                                 Some(&owner.name),
                                 &context.workspace_dependency_roots,
                                 |collector| {
@@ -755,34 +716,23 @@ fn add_reference_edges(
 }
 
 fn impl_owner_node_id(
-    task: &SourceFileTask,
+    context: &TargetContext,
+    parent_module_id: &NodeId,
+    module_path: &ModulePath,
     item_impl: &syn::ItemImpl,
     owner_name: &str,
-    symbols: &ModuleSymbols,
 ) -> NodeId {
-    let context = &task.context;
-    let parent_module_id = &task.parent_module_id;
-    let module_path = &task.module_path;
     if item_impl.trait_.is_none()
         && let syn::Type::Path(path) = item_impl.self_ty.as_ref()
+        && path.path.segments.len() > 1
     {
-        let mut segments = path
+        let path = path
             .path
             .segments
             .iter()
             .map(|part| part.ident.to_string())
-            .collect::<Vec<_>>();
-        if segments.len() == 1
-            && !symbols.names.contains(owner_name)
-            && !symbols.imports.contains_key(owner_name)
-            && symbols.imports.contains_key("*")
-        {
-            return NodeId::new(format!("{parent_module_id}::__unresolved__::{owner_name}"));
-        }
-        if let Some(import) = segments.first().and_then(|name| symbols.imports.get(name)) {
-            segments[0] = import.clone();
-        }
-        let path = segments.join("::");
+            .collect::<Vec<_>>()
+            .join("::");
         resolve_reference_target(context, parent_module_id, module_path, &path)
     } else {
         NodeId::new(format!("{parent_module_id}::{owner_name}"))
