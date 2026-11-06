@@ -7,9 +7,9 @@ name = "ScLintBoundaryAnalyzer"
 facade = "analyze_workspace"
 
 [implementation]
-type = "analyze_workspace"
+type = "GraphBuilder"
 module = "sc_lint_boundary"
-visibility = "public"
+visibility = "private"
 constructor = "none"
 
 [composition]

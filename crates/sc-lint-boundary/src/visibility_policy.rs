@@ -128,6 +128,43 @@ fn find_type<'a>(
     })
 }
 
+/// Resolve a trait-only implementation against workspace library targets.
+fn find_trait_type<'a>(
+    graph: &'a GraphExport,
+    metadata: &cargo_metadata::Metadata,
+    module: &str,
+    name: &str,
+) -> Option<&'a GraphNode> {
+    let (crate_name, rest) = module.split_once("::").unwrap_or((module, ""));
+    let module_path = if rest.is_empty() {
+        "crate".to_string()
+    } else {
+        format!("crate::{rest}")
+    };
+    let packages = crate::workspace_packages(metadata);
+    let mut targets = packages.iter().flat_map(|package| {
+        package
+            .targets
+            .iter()
+            .filter(move |target| {
+                crate::is_library_target(target) && target.name.replace('-', "_") == crate_name
+            })
+            .map(move |target| (package.name.as_str(), target.name.as_str()))
+    });
+    let (package, target) = targets.next()?;
+    if targets.next().is_some() {
+        return None;
+    }
+    graph.nodes.iter().find(|node| {
+        node.package == package
+            && node.target.as_deref() == Some(target)
+            && node.kind == "type"
+            && node.label == name
+            && node.visibility.is_some()
+            && node.module_path.as_deref() == Some(&module_path)
+    })
+}
+
 /// The inherent associated `fn new` belonging to the resolved type.
 fn find_inherent_new<'a>(
     graph: &'a GraphExport,
@@ -177,12 +214,17 @@ fn check_item(
 pub(crate) fn analyze_declared_visibility(
     graph: &GraphExport,
     inventory: &BoundaryInventory,
+    metadata: &cargo_metadata::Metadata,
 ) -> Vec<Finding> {
     let mut findings = Vec::new();
     for record in &inventory.records {
         let implementation = &record.implementation;
         let type_check = type_limit(&implementation.visibility);
-        let constructor_check = constructor_limit(implementation.constructor.as_ref());
+        let constructor_check = if implementation.visibility == Visibility::TraitOnly {
+            None
+        } else {
+            constructor_limit(implementation.constructor.as_ref())
+        };
         if type_check.is_none() && constructor_check.is_none() {
             continue;
         }
@@ -192,8 +234,12 @@ pub(crate) fn analyze_declared_visibility(
         ) else {
             continue;
         };
-        let type_node = graph_module_path(record, module)
-            .and_then(|module_path| find_type(graph, record, &module_path, type_name));
+        let type_node = if implementation.visibility == Visibility::TraitOnly {
+            find_trait_type(graph, metadata, module, type_name)
+        } else {
+            graph_module_path(record, module)
+                .and_then(|module_path| find_type(graph, record, &module_path, type_name))
+        };
         let type_item = format!("type `{module}::{type_name}`");
         if let Some(limit) = type_check {
             check_item(&mut findings, record, &type_item, limit, type_node);

@@ -428,16 +428,11 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
             }
         }
         types::Visibility::TraitOnly => {
-            if record.implementation.implementation_type.is_some() {
+            if record.implementation.implementation_type.is_some()
+                != record.implementation.module.is_some()
+            {
                 anyhow::bail!(
-                    "boundary `{}` in `{}` must omit implementation.type when visibility is trait_only",
-                    record.boundary_id,
-                    path.display()
-                );
-            }
-            if record.implementation.module.is_some() {
-                anyhow::bail!(
-                    "boundary `{}` in `{}` must omit implementation.module when visibility is trait_only",
+                    "boundary `{}` in `{}` must define both implementation.type and implementation.module, or neither, when visibility is trait_only",
                     record.boundary_id,
                     path.display()
                 );

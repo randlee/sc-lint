@@ -6789,14 +6789,92 @@ constructor = "pub(crate)""#,
 
 #[test]
 fn scb_boundary_005_skips_trait_only_records_which_name_no_type() {
-    // The schema requires trait_only records to omit implementation.type, so
-    // there is no named type to compare.
     let findings = visibility_findings(
         "pub fn open() {}\nmod roster { pub struct Store; }\n",
         r#"visibility = "trait_only"
 constructor = "none""#,
     );
     assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_checks_optional_trait_only_owner_type() {
+    let record = r#"type = "Store"
+module = "store::roster"
+visibility = "trait_only"
+constructor = "none""#;
+    let private = visibility_findings(
+        "pub fn open() {} mod roster { pub(crate) struct Store; }",
+        record,
+    );
+    assert!(private.is_empty(), "{private:#?}");
+    let public = visibility_findings("pub fn open() {} mod roster { pub struct Store; }", record);
+    assert_eq!(public.len(), 1, "{public:#?}");
+    assert!(
+        public[0].contains("declared `trait_only` but source is `pub`"),
+        "{public:#?}"
+    );
+    let missing = visibility_findings("pub fn open() {} mod roster {}", record);
+    assert_eq!(missing.len(), 1, "{missing:#?}");
+    assert!(missing[0].contains("source is `not found`"), "{missing:#?}");
+}
+
+#[test]
+fn scb_boundary_005_checks_trait_only_type_in_another_workspace_library() {
+    for (visibility, expected) in [("pub", 1), ("pub(crate)", 0)] {
+        let fixture = WorkspaceFixture::new();
+        write_visibility_fixture(
+            &fixture,
+            "pub fn open() {}",
+            r#"type = "Store"
+module = "adapter::roster"
+visibility = "trait_only"
+constructor = "none""#,
+        );
+        fixture.write_workspace_root_with_members(&["crates/store", "crates/adapter"]);
+        fixture.write_package_manifest("adapter");
+        fixture.write_source(
+            "adapter",
+            "lib.rs",
+            &format!("mod roster {{ {visibility} struct Store; }}"),
+        );
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Boundaries),
+        })
+        .unwrap();
+        let findings: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbBoundary005)
+            .collect();
+        assert_eq!(findings.len(), expected, "{findings:#?}");
+    }
+}
+
+#[test]
+fn trait_only_requires_type_and_module_together() {
+    for record in ["type = \"Store\"", "module = \"store::roster\""] {
+        let fixture = WorkspaceFixture::new();
+        write_visibility_fixture(
+            &fixture,
+            "pub fn open() {}",
+            &format!("visibility = \"trait_only\"\nconstructor = \"none\"\n{record}"),
+        );
+        let error = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Boundaries),
+        })
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("must define both implementation.type and implementation.module"),
+            "{error:#}"
+        );
+    }
 }
 
 #[test]

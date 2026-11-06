@@ -570,6 +570,7 @@ fn selected_graph_rule_findings(
         findings.extend(visibility_policy::analyze_declared_visibility(
             graph,
             &raw_inventory,
+            metadata,
         ));
     }
     if filter.is_none() {
