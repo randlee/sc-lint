@@ -85,7 +85,10 @@ interpreter-selection policy.
 - Fixture tests that exercise the consumer bootstrap point
   `SC_LINT_WHEEL_DIR` at `.sc-lint/wheels`, so they never reach PyPI; they
   require those wheels. Run `just setup` before a direct `cargo test` in a
-  fresh checkout; the fixture reports the missing prerequisite otherwise.
+  fresh checkout. The Unix generated-consumer fixture fails when they are
+  missing unless explicitly opted out; the other Rust fixtures skip. The
+  Python consumer lifecycle fixtures skip when neither a wheel directory nor
+  `SC_LINT_WHEEL_DIR` is available.
 - Manual build: `maturin build --release -m bindings/sc-lint-py/Cargo.toml`.
 
 ## Version-sync tables
