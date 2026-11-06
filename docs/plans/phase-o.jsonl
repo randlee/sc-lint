@@ -5,4 +5,3 @@
 {"sprint": "o-3"}
 {"sprint": "o-4", "depends_on": ["o-3"]}
 {"sprint": "o-5"}
-{"sprint": "o-9"}
