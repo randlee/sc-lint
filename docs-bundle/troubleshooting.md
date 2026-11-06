@@ -23,6 +23,7 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | Atomic activation failed | Choose a writable install directory and retry. |
 | `SETUP_TOOLS.INSPECTION_UNAVAILABLE` | Dry-run cannot inspect declared tools because the managed helper is unavailable | Run ordinary `just setup` to provision the helper and declared tools, then retry `setup --dry-run`. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
+| `CLI.SC_LINT_INTEGRATION_CONFLICT` | In sc-lint 0.8.6 and earlier, an existing managed bootstrap differs from the shipped asset | For an older release, restore or move the bootstrap before rerunning init. Phase-o retires this conflict in favor of overwriting sc-lint-owned files (pending Rand approval in PR #905). |
 | `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more sc-lint-owned integration files are missing or differ from the shipped bytes | Run `sc-lint init --just` to write the owned files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
 | `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, or profile declaration is structurally invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
