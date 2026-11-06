@@ -365,14 +365,14 @@ Cargo manifest, or analyzer package:
 - `sc-lint init --just` seeds the generated config and Justfile only when each
   is missing. An existing `sc-lint.toml` or `Justfile` is consumer-owned: it is
   left exactly as it is and is never read for drift, rewritten, or reported as a
-  conflict. The bootstrap helper is the only product-owned file. A bootstrap
-  matching a known prior release is refreshed through its target (a temporary
-  file beside the target, fsynced and renamed over it) and the link is kept; a
-  dangling bootstrap link, or a bootstrap that differs from the product asset, is
-  `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
+  conflict. The sc-lint-owned paths in ADR-023 are overwritten with shipped
+  bytes. An owned symlink, including a dangling link, is replaced by a regular
+  file without touching its target. `--check` reports an absent or differing
+  owned file as `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
-  JSON-envelope producer.
+  JSON-envelope producer. (Amended for phase-o, ADR-023; Pending Rand approval
+  in PR #905.)
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in

@@ -379,23 +379,15 @@ specialized backend tools and mixed Rust/Python implementations.
   `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
   `sc-lint.toml` and `Justfile` only when they are missing, and materializes
   the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
-  consumer-owned: an existing file is left exactly as it is, is never a
-  conflict, and is never written. Only `.sc-lint/bootstrap.py` is
-  product-owned: a differing existing bootstrap is a structured conflict
-  (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3), never an overwrite. Exception
-  for the prior-release bootstrap: comparison ignores line endings (CRLF and
-  LF), and a matching prior-release `.sc-lint/bootstrap.py` is refreshed with
-  the current asset. A current integration is idempotent; `--check` and
-  `--dry-run` do not mutate it. A consumer README is outside the command's
-  write set.
-  (Amended for phase-n, PR #858, ADR-022 decisions 1, 2 and 5; Accepted —
-  Rand 2026-11-04 "yes adr/rq approved":
-  sc-lint.toml and Justfile are consumer-owned templates seeded only when
-  absent; only bootstrap.py is product-owned.)
-  `--check` reports a file that would be refreshed as
-  `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
-  lint-085.56 and lint-085.61; Accepted — Rand 2026-11-04
-  ("req-cli-022 approved").)
+  consumer-owned: an existing file is left exactly as it is and is never
+  written. The sc-lint-owned paths in the ADR-023 ownership table are always
+  overwritten with the shipped bytes on ordinary initialization; no conflict
+  or prior-release digest exception applies. An owned path that is a symlink,
+  including a dangling link, is replaced by the shipped regular file without
+  touching its target. `--check` and `--dry-run` do not mutate files; `--check`
+  reports an absent or differing owned file as `CLI.SC_LINT_INTEGRATION_OUTDATED`.
+  A consumer README is outside the command's write set.
+  (Amended for phase-o, ADR-023; Pending Rand approval in PR #905.)
   E.6 owns optional CI workflow generation because it depends on the reusable
   release-verified Action rather than a source-checkout fallback.
 
