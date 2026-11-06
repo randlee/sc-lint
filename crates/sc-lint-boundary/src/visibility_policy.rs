@@ -103,10 +103,13 @@ fn in_owner_library<'a>(
 ) -> impl Iterator<Item = &'a GraphNode> + 'a {
     let package = record.owner_package.as_ref();
     let target = record.owner_crate_path.as_ref();
-    graph
-        .nodes
-        .iter()
-        .filter(move |node| node.package == package && node.target.as_deref() == Some(target))
+    graph.nodes.iter().filter(move |node| {
+        node.package == package
+            && node
+                .target
+                .as_deref()
+                .is_some_and(|name| name.replace('-', "_") == target)
+    })
 }
 
 /// The declared type node: a struct, enum, union or type alias named `name`

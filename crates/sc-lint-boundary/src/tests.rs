@@ -6587,6 +6587,80 @@ module = "store::roster"
 visibility = "pub(crate)"
 constructor = "pub(crate)""#;
 
+fn hyphenated_binary_visibility_findings(source: &str) -> Vec<String> {
+    let fixture = WorkspaceFixture::new();
+    write_visibility_fixture(
+        &fixture,
+        source,
+        &PUB_CRATE_RECORD.replace("store::roster", "store_service::roster"),
+    );
+    let package_path = fixture.root().join("crates/store/Cargo.toml");
+    let manifest = std::fs::read_to_string(&package_path).unwrap();
+    std::fs::write(
+        &package_path,
+        manifest.replace("name = \"store\"", "name = \"store-service\""),
+    )
+    .unwrap();
+    std::fs::rename(
+        fixture.root().join("crates/store/src/lib.rs"),
+        fixture.root().join("crates/store/src/main.rs"),
+    )
+    .unwrap();
+    let record_path = fixture.root().join("boundaries/store/roster.toml");
+    let record = std::fs::read_to_string(&record_path).unwrap();
+    std::fs::write(
+        &record_path,
+        record
+            .replace(
+                "owner_package = \"store\"",
+                "owner_package = \"store-service\"",
+            )
+            .replace(
+                "owner_crate_path = \"store\"",
+                "owner_crate_path = \"store_service\"",
+            ),
+    )
+    .unwrap();
+    std::fs::rename(
+        fixture.root().join("boundaries/store"),
+        fixture.root().join("boundaries/store-service"),
+    )
+    .unwrap();
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap()
+    .findings
+    .into_iter()
+    .filter(|finding| finding.rule_id == RuleId::ScbBoundary005)
+    .map(|finding| finding.message)
+    .collect()
+}
+
+#[test]
+fn scb_boundary_005_resolves_hyphenated_binary_target() {
+    let findings = hyphenated_binary_visibility_findings(
+        "fn main() {} pub fn open() {} mod roster { pub(crate) struct Store; impl Store { pub(crate) fn new() -> Self { Self } } }",
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_checks_hyphenated_binary_visibility() {
+    let findings = hyphenated_binary_visibility_findings(
+        "fn main() {} pub fn open() {} mod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }",
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.contains("source is `pub`")),
+        "{findings:#?}"
+    );
+}
+
 #[test]
 fn scb_boundary_005_passes_when_source_matches_declared_visibility() {
     let findings = visibility_findings(
