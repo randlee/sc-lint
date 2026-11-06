@@ -6800,6 +6800,31 @@ constructor = "none""#,
 }
 
 #[test]
+fn scb_boundary_005_checks_all_cfg_declarations() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                #[cfg(windows)] pub(crate) struct Store;
+                #[cfg(unix)] pub struct Store;
+                impl Store {
+                    #[cfg(windows)] pub(crate) fn new() -> Self { Self }
+                    #[cfg(unix)] pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.contains("source is `pub`")),
+        "{findings:#?}"
+    );
+}
+
+#[test]
 fn scb_boundary_005_treats_self_visibility_as_private() {
     let findings = visibility_findings(
         "pub fn open() {} mod roster { pub(self) struct Store; impl Store { pub(in self) fn new() -> Self { Self } } }",

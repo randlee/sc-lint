@@ -367,6 +367,16 @@ impl ItemVisibility {
             Self::Restricted => "restricted",
         }
     }
+
+    fn rank(label: Option<&str>) -> u8 {
+        match label {
+            Some("private") => 1,
+            Some("restricted") => 2,
+            Some("crate") => 3,
+            Some("public") => 4,
+            _ => 0,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -382,7 +392,15 @@ impl GraphBuilder {
             !node.package.is_empty(),
             "graph nodes must carry a non-empty package name"
         );
-        if !self.nodes.iter().any(|existing| existing.id == node.id) {
+        if let Some(existing) = self
+            .nodes
+            .iter_mut()
+            .find(|existing| existing.id == node.id)
+        {
+            if ItemVisibility::rank(node.visibility) > ItemVisibility::rank(existing.visibility) {
+                *existing = node;
+            }
+        } else {
             self.nodes.push(node);
         }
     }
