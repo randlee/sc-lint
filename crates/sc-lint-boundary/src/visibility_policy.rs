@@ -181,6 +181,30 @@ fn find_inherent_new<'a>(
         .max_by_key(|node| SourceVisibility::from_graph(node.visibility))
 }
 
+fn has_unresolved_constructor(
+    graph: &GraphExport,
+    record: &BoundaryRecord,
+    type_name: &str,
+) -> bool {
+    let suffix = format!("::{type_name}::new");
+    in_owner_library(graph, record).any(|method| {
+        method.kind == "method"
+            && method.impl_kind == Some(crate::ImplKind::Inherent)
+            && method.id.as_str().ends_with(&suffix)
+            && method
+                .id
+                .as_str()
+                .strip_suffix("::new")
+                .is_some_and(|owner| {
+                    in_owner_library(graph, record).any(|node| {
+                        node.id.as_str() == owner
+                            && node.kind == "type"
+                            && node.visibility.is_none()
+                    })
+                })
+    })
+}
+
 fn finding(record: &BoundaryRecord, item: &str, declared: &str, actual: &str) -> Finding {
     Finding {
         rule_id: RuleId::ScbBoundary005,
@@ -253,6 +277,14 @@ pub(crate) fn analyze_declared_visibility(
                 limit,
                 constructor,
             );
+            if constructor.is_none()
+                && has_unresolved_constructor(graph, record, type_name)
+                && let Some(finding) = findings.last_mut()
+            {
+                finding
+                    .message
+                    .push_str("\nAn inherent impl owner could not be resolved.");
+            }
         }
     }
     findings.sort_by(|left, right| left.message.cmp(&right.message));

@@ -16,8 +16,9 @@ fn inline_module_syntax(items: Vec<Item>) -> File {
     }
 }
 
-fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
+fn module_symbols(items: &[Item]) -> (BTreeSet<String>, BTreeMap<String, String>) {
     let mut names = BTreeSet::new();
+    let mut imports = BTreeMap::new();
     for item in items {
         match item {
             Item::Struct(item_struct) => {
@@ -35,10 +36,48 @@ fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
             Item::Trait(item_trait) => {
                 names.insert(item_trait.ident.to_string());
             }
+            Item::Use(item_use) => collect_imports(&item_use.tree, &[], &mut imports),
             _ => {}
         }
     }
-    names
+    (names, imports)
+}
+
+fn collect_imports(tree: &syn::UseTree, prefix: &[String], imports: &mut BTreeMap<String, String>) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            let mut prefix = prefix.to_vec();
+            prefix.push(path.ident.to_string());
+            collect_imports(&path.tree, &prefix, imports);
+        }
+        syn::UseTree::Name(name) => {
+            let mut path = prefix.to_vec();
+            let alias = if name.ident == "self" {
+                path.last().cloned()
+            } else {
+                path.push(name.ident.to_string());
+                Some(name.ident.to_string())
+            };
+            if let Some(alias) = alias {
+                imports.insert(alias, path.join("::"));
+            }
+        }
+        syn::UseTree::Rename(rename) => {
+            let mut path = prefix.to_vec();
+            if rename.ident != "self" {
+                path.push(rename.ident.to_string());
+            }
+            imports.insert(rename.rename.to_string(), path.join("::"));
+        }
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_imports(item, prefix, imports);
+            }
+        }
+        syn::UseTree::Glob(_) => {
+            imports.insert("*".to_string(), String::new());
+        }
+    }
 }
 
 fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
@@ -68,7 +107,7 @@ pub(super) fn ingest_module_items(
     let module_path = &task.module_path;
     let module_dir = &task.module_dir;
     let source_path = task.source_path.as_path();
-    let local_owner_names = collect_owner_names(&file.items);
+    let (local_owner_names, imports) = module_symbols(&file.items);
 
     for item in file.items {
         match item {
@@ -388,7 +427,7 @@ pub(super) fn ingest_module_items(
             Item::Impl(item_impl) => {
                 let owner = impl_owner(&item_impl.self_ty)?;
                 #[rustfmt::skip]
-                let owner_node_id = impl_owner_node_id(context, parent_module_id, module_path, &item_impl, &owner.name);
+                let owner_node_id = impl_owner_node_id(context, task, &item_impl, &owner.name, &imports, &local_owner_names);
                 let trait_path = item_impl
                     .trait_
                     .as_ref()
@@ -712,22 +751,34 @@ fn add_reference_edges(
 
 fn impl_owner_node_id(
     context: &TargetContext,
-    parent_module_id: &NodeId,
-    module_path: &ModulePath,
+    task: &SourceFileTask,
     item_impl: &syn::ItemImpl,
     owner_name: &str,
+    imports: &BTreeMap<String, String>,
+    local_owner_names: &BTreeSet<String>,
 ) -> NodeId {
+    let parent_module_id = &task.parent_module_id;
+    let module_path = &task.module_path;
     if item_impl.trait_.is_none()
         && let syn::Type::Path(path) = item_impl.self_ty.as_ref()
-        && path.path.segments.len() > 1
     {
-        let path = path
+        let mut segments = path
             .path
             .segments
             .iter()
             .map(|part| part.ident.to_string())
-            .collect::<Vec<_>>()
-            .join("::");
+            .collect::<Vec<_>>();
+        if segments.len() == 1
+            && !local_owner_names.contains(owner_name)
+            && !imports.contains_key(owner_name)
+            && imports.contains_key("*")
+        {
+            return NodeId::new(format!("{parent_module_id}::__unresolved__::{owner_name}"));
+        }
+        if let Some(import) = segments.first().and_then(|name| imports.get(name)) {
+            segments[0] = import.clone();
+        }
+        let path = segments.join("::");
         resolve_reference_target(context, parent_module_id, module_path, &path)
     } else {
         NodeId::new(format!("{parent_module_id}::{owner_name}"))

@@ -6760,6 +6760,57 @@ fn scb_boundary_005_does_not_find_another_types_constructor() {
 }
 
 #[test]
+fn scb_boundary_005_reports_unresolved_glob_impl_owner() {
+    let findings = visibility_findings(
+        "pub fn open() {} mod roster { pub(crate) struct Store; } mod implementation { use crate::roster::*; impl Store { pub(crate) fn new() -> Self { Self } } }",
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0].contains("source is `not found`"),
+        "{findings:#?}"
+    );
+    assert!(
+        findings[0].contains("impl owner could not be resolved"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_reports_unresolved_reexport_impl_owner() {
+    let findings = visibility_findings(
+        "pub fn open() {} mod roster { pub(crate) struct Store; } mod reexport { pub use crate::roster::Store; } mod implementation { use crate::reexport::Store; impl Store { pub(crate) fn new() -> Self { Self } } }",
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0].contains("source is `not found`"),
+        "{findings:#?}"
+    );
+    assert!(
+        findings[0].contains("impl owner could not be resolved"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_finds_constructor_for_imported_impl_owners() {
+    for import_and_owner in [
+        "use crate::roster::Store; impl Store",
+        "use crate::roster; impl roster::Store",
+        "use crate::roster::{self as module, Store as Alias}; impl Alias",
+        "use crate::roster::{self as module, Store as Alias}; impl module::Store",
+    ] {
+        let source = format!(
+            "pub fn open() {{}} mod roster {{ pub(crate) struct Store; }} mod implementation {{ {import_and_owner} {{ pub fn new() -> Self {{ Self }} }} }}"
+        );
+        let findings = visibility_findings(&source, PUB_CRATE_RECORD);
+        assert_eq!(findings.len(), 1, "{import_and_owner}: {findings:#?}");
+        assert!(findings[0].contains("source is `pub`"), "{findings:#?}");
+    }
+}
+
+#[test]
 fn scb_boundary_005_finds_constructor_in_an_impl_in_another_module() {
     let findings = visibility_findings(
         r#"
