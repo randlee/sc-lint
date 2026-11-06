@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-023 |
-| Status | Pending — Rand acceptance required before sprints o-1 and o-2 are dispatched |
+| Status | Pending — Rand acceptance required before sprints o-15, o-16, o-11 and o-12 are dispatched |
 | Deciders | Rand |
 | Related | ADR-012, ADR-015 (vendored-kit fallback superseded), ADR-016, ADR-017 (tool declarations move), ADR-022; REQ-PRODUCT-019, -020, -021, -022, -024, REQ-PRODUCT-025 (new); #862, #903, #835 |
 
@@ -105,10 +105,9 @@ exists".
 | sc-lint helper copies under `.just/` (`run_lint.py`, `lint_common.py`, `check_version_sync.py`, `.sc-lint-runtime-version`, …) and scripts that download, copy or build them | helpers come from the wheel (REQ-PRODUCT-024) | nothing |
 | `[[tool.sc-lint.lint]]` / `[[tool.sc-lint.test]]` rows and consumer tests that call any retired path | they call files that no longer exist | delete the row, or point it at `sc-lint.toml` |
 
-`sc-lint init --just --check` lists each retired path that exists (a plain
-existence test against this table) and each sc-lint-owned file that differs
-from the shipped bytes, and exits non-zero with the migration-guide reference.
-It never decides anything; the consumer follows the guide.
+`sc-lint init --just --check` exits non-zero when an sc-lint-owned file
+differs from the shipped bytes. It does not search for retired paths; the
+migration guide lists them and the consumer removes them.
 
 ### 4. Version pins
 
@@ -120,10 +119,16 @@ are the consumer's concern (#835) and are not read or checked by sc-lint.
 
 ### 5. One source per sc-lint-owned file
 
-Each sc-lint-owned file has exactly one source in this repository; any other
-copy (for example the kit's `bootstrap.py`) is generated from it and checked
-by a test. The kit's `install.py`, its templates and the vendored
-`setup-sc-lint` action are removed.
+Each sc-lint-owned file has exactly one source in this repository, embedded
+in the binary. No other copy exists: the kit's copies, `install.py`, its
+templates and the vendored `setup-sc-lint` action are removed.
+
+### 6. Consumer canary before every publish
+
+Release preflight installs the release candidate and runs `just setup`,
+`just lint` and `just test` in atm-core, sc-compose and sc-observability; any
+failure blocks the release. A change that breaks a consumer ships only with its
+migration step in `upgrade.md`, in the same PR.
 
 ## Migration guide (shipped as `docs-bundle/upgrade.md`, "Migrating to 0.8.7")
 
@@ -141,14 +146,10 @@ every repository, in order:
 6. Run `sc-lint init --just --check`, then `just setup`, `just lint`,
    `just test`. All pass.
 
-Verified starting points the guide covers explicitly:
-
-| Repository | Specific actions |
-| --- | --- |
-| atm-core | move `tools` to `sc-lint.toml`; delete `plugins/sc-lint/`, `README.sc-lint.md`, `.sc-lint/install.json`, `.sc-lint/installed.json`; delete the `kit-drift-*` lint rows and remove them from `lint_profiles.ci`; repoint the five `.just/tests` that read `install.json`; `init` overwrites the old `bootstrap.py` (no local edits) |
-| sc-compose | delete `.github/actions/setup-sc-lint/`, `scripts/materialize_sc_lint_runtime.py` and its test, the `ensure-lint-runtime` recipe and `.just/` helper copies; run `init`; repoint `setup-lint-toolchain`, `ci.yml`, `release-preflight.yml` at `randlee/sc-lint@v1`; raise `minimum_version` from 0.4.0 |
-| sc-observability | create `sc-lint.toml` (`init` does); add the import line to `justfile`; delete `.github/actions/setup-sc-lint/`, `sc-lint-source-preflight.yml`, `setup_sc_lint_source.py`, `verify_sc_lint_source_receipt.py` and tests, and `sc_lint_source_revision` from its release inputs; repoint `setup-lint-toolchain` at `randlee/sc-lint@v1` |
-| sc-lint | dogfoods the same contract: `sc-lint.toml`, `Justfile`, `.sc-lint/` from `init`; no retired paths |
+The guide has one short subsection each for atm-core (0.8.4 kit adoption),
+sc-compose (0.4.0, repo-local action and `.just/` helper copies) and
+sc-observability (0.4.0 or source build, lowercase `justfile`) naming the files
+each removes; sc-lint follows the same contract.
 
 ## Consequences
 
@@ -157,12 +158,9 @@ Verified starting points the guide covers explicitly:
 - `ci.*` and `justfile.windows_shell` stop being settings: they only shaped
   files the consumer now owns (no settings that do nothing).
 - `bootstrap.py` and `sc_lint.setup_tools` read tools from `sc-lint.toml`.
-- Consumers that skip the guide keep working until a retired file breaks; `init --check` names every leftover.
+- Consumers that skip the guide keep working until a retired file breaks; the guide lists every leftover and `init --check` catches stale sc-lint-owned files.
 
 ## Verification
 
-Fixtures shaped like each verified starting point (atm-core 0.8.4,
-sc-compose 0.4.0, sc-observability 0.4.0, sc-lint) follow the guide steps;
-afterwards sc-lint-owned files equal the shipped bytes, consumer-owned files
-are unchanged except the documented edits, `init --check` passes, and
-`just setup`, `just lint`, `just test` pass.
+The consumer canary (decision 6). For 0.8.7 it runs against each consumer's
+migration PR; the release waits until all three pass.

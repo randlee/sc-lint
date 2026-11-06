@@ -1,12 +1,8 @@
 {"sprint": "o-15"}
 {"sprint": "o-16"}
+{"sprint": "o-11", "depends_on": ["o-15", "o-16"]}
+{"sprint": "o-12", "depends_on": ["o-11"]}
 {"sprint": "o-3"}
+{"sprint": "o-4", "depends_on": ["o-3"]}
 {"sprint": "o-5"}
 {"sprint": "o-9"}
-{"sprint": "o-10", "depends_on": ["o-16"]}
-{"sprint": "o-11", "depends_on": ["o-15", "o-10"]}
-{"sprint": "o-12", "depends_on": ["o-11"]}
-{"sprint": "o-13", "depends_on": ["o-12"]}
-{"sprint": "o-14", "depends_on": ["o-13"]}
-{"sprint": "o-4", "depends_on": ["o-3"]}
-{"sprint": "o-8", "depends_on": ["o-4", "o-5", "o-9", "o-14"]}

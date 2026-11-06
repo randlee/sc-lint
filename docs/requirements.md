@@ -634,10 +634,10 @@ The product should support both:
   rewritten; sc-lint-owned files are overwritten with the shipped bytes on every
   `init`, with no content comparison, digest list or conflict detection.
   Retired paths are removed by the consumer following the documented migration
-  guide; `init --check` lists retired paths that exist and sc-lint-owned files
-  that differ from the shipped bytes, and fails. sc-lint runs no migration or
-  detection heuristics. Each sc-lint-owned file has one source in this
-  repository; other copies are generated and test-checked.
+  guide; `init --check` fails when an sc-lint-owned file differs from the
+  shipped bytes. sc-lint runs no migration or detection heuristics. Each
+  sc-lint-owned file has exactly one source in this repository, and no other
+  copy exists.
 
 Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
 persisted installer input may declare exact cargo-tool versions and rustup
