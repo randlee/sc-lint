@@ -16,7 +16,12 @@ fn inline_module_syntax(items: Vec<Item>) -> File {
     }
 }
 
-fn module_symbols(items: &[Item]) -> (BTreeSet<String>, BTreeMap<String, String>) {
+struct ModuleSymbols {
+    names: BTreeSet<String>,
+    imports: BTreeMap<String, String>,
+}
+
+fn module_symbols(items: &[Item]) -> ModuleSymbols {
     let mut names = BTreeSet::new();
     let mut imports = BTreeMap::new();
     for item in items {
@@ -40,7 +45,7 @@ fn module_symbols(items: &[Item]) -> (BTreeSet<String>, BTreeMap<String, String>
             _ => {}
         }
     }
-    (names, imports)
+    ModuleSymbols { names, imports }
 }
 
 fn collect_imports(tree: &syn::UseTree, prefix: &[String], imports: &mut BTreeMap<String, String>) {
@@ -107,7 +112,8 @@ pub(super) fn ingest_module_items(
     let module_path = &task.module_path;
     let module_dir = &task.module_dir;
     let source_path = task.source_path.as_path();
-    let (local_owner_names, imports) = module_symbols(&file.items);
+    let symbols = module_symbols(&file.items);
+    let local_owner_names = &symbols.names;
 
     for item in file.items {
         match item {
@@ -206,7 +212,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -221,7 +227,7 @@ pub(super) fn ingest_module_items(
                         parent_id: &node_id,
                         module_path,
                         source_path,
-                        local_owner_names: &local_owner_names,
+                        local_owner_names,
                         owner_name: Some(&owner_name),
                         fields: &item_struct.fields,
                     },
@@ -248,7 +254,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -282,7 +288,7 @@ pub(super) fn ingest_module_items(
                             parent_id: &variant_id,
                             module_path,
                             source_path,
-                            local_owner_names: &local_owner_names,
+                            local_owner_names,
                             owner_name: Some(&owner_name),
                             fields: &variant.fields,
                         },
@@ -310,7 +316,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -326,7 +332,7 @@ pub(super) fn ingest_module_items(
                         parent_id: &node_id,
                         module_path,
                         source_path,
-                        local_owner_names: &local_owner_names,
+                        local_owner_names,
                         owner_name: Some(&owner_name),
                         fields: &union_fields,
                     },
@@ -353,7 +359,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -383,7 +389,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         Some(&owner_name),
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -415,7 +421,7 @@ pub(super) fn ingest_module_items(
                     &node_id,
                     module_path,
                     collect_references_with(
-                        &local_owner_names,
+                        local_owner_names,
                         None,
                         &context.workspace_dependency_roots,
                         |collector| {
@@ -426,8 +432,7 @@ pub(super) fn ingest_module_items(
             }
             Item::Impl(item_impl) => {
                 let owner = impl_owner(&item_impl.self_ty)?;
-                #[rustfmt::skip]
-                let owner_node_id = impl_owner_node_id(context, task, &item_impl, &owner.name, &imports, &local_owner_names);
+                let owner_node_id = impl_owner_node_id(task, &item_impl, &owner.name, &symbols);
                 let trait_path = item_impl
                     .trait_
                     .as_ref()
@@ -571,7 +576,7 @@ pub(super) fn ingest_module_items(
                             &method_id,
                             module_path,
                             collect_references_with(
-                                &local_owner_names,
+                                local_owner_names,
                                 Some(&owner.name),
                                 &context.workspace_dependency_roots,
                                 |collector| {
@@ -750,13 +755,12 @@ fn add_reference_edges(
 }
 
 fn impl_owner_node_id(
-    context: &TargetContext,
     task: &SourceFileTask,
     item_impl: &syn::ItemImpl,
     owner_name: &str,
-    imports: &BTreeMap<String, String>,
-    local_owner_names: &BTreeSet<String>,
+    symbols: &ModuleSymbols,
 ) -> NodeId {
+    let context = &task.context;
     let parent_module_id = &task.parent_module_id;
     let module_path = &task.module_path;
     if item_impl.trait_.is_none()
@@ -769,13 +773,13 @@ fn impl_owner_node_id(
             .map(|part| part.ident.to_string())
             .collect::<Vec<_>>();
         if segments.len() == 1
-            && !local_owner_names.contains(owner_name)
-            && !imports.contains_key(owner_name)
-            && imports.contains_key("*")
+            && !symbols.names.contains(owner_name)
+            && !symbols.imports.contains_key(owner_name)
+            && symbols.imports.contains_key("*")
         {
             return NodeId::new(format!("{parent_module_id}::__unresolved__::{owner_name}"));
         }
-        if let Some(import) = segments.first().and_then(|name| imports.get(name)) {
+        if let Some(import) = segments.first().and_then(|name| symbols.imports.get(name)) {
             segments[0] = import.clone();
         }
         let path = segments.join("::");
