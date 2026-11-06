@@ -6800,6 +6800,36 @@ constructor = "none""#,
 }
 
 #[test]
+fn scb_boundary_005_treats_self_visibility_as_private() {
+    let findings = visibility_findings(
+        "pub fn open() {} mod roster { pub(self) struct Store; impl Store { pub(in self) fn new() -> Self { Self } } }",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "private""#,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_rejects_super_visibility_for_private_items() {
+    let findings = visibility_findings(
+        "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(super) fn new() -> Self { Self } } }",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "private""#,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.contains("source is `pub(super)/pub(self)/pub(in path)`")),
+        "{findings:#?}"
+    );
+}
+
+#[test]
 fn scb_boundary_005_fails_private_declaration_with_crate_visible_source() {
     let findings = visibility_findings(
         "pub fn open() {}\nmod roster { pub(crate) struct Store; }\n",

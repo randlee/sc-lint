@@ -48,6 +48,8 @@ fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
         syn::Visibility::Restricted(restricted) => {
             if restricted.path.is_ident("crate") {
                 ItemVisibility::Crate
+            } else if restricted.path.is_ident("self") {
+                ItemVisibility::Private
             } else {
                 ItemVisibility::Restricted
             }
