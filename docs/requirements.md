@@ -601,7 +601,7 @@ The product should support both:
   boundary accepts optional manifest dependency allowlists, global dependency
   ownership and manifest section rules. Each analyzer reads only its own table.
   Unknown analyzer-level keys, unknown rule names and malformed values are
-  rejected by the analyzer (exit 3) and by the kit installer. Optional manifest
+  rejected by the analyzer (exit 3). Optional manifest
   records retain upstream nested value shapes and ignored unknown nested keys;
   an absent or empty family adds no checks, while a present empty dependency
   allowlist allows none. Per-rule path exclusions filter findings using paths
@@ -612,6 +612,8 @@ The product should support both:
   existing behavior. Installation is idempotent and `--dry-run` is non-mutating.
   (Amended 2026-10-10, Accepted, #201, #202; amended 2026-10-12, Accepted,
   [ADR-017, changes 1 and compatibility](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
+  (Kit-installer reference removed for phase-o, ADR-023; Pending Rand approval
+  in PR #905.)
 
 - `REQ-PRODUCT-024`
   The version-matched `sc-lint` wheel delivers every consumer-run helper and
