@@ -202,6 +202,17 @@ Clarifications to ADR-020 decision 12 (l-9):
 5. Because `[version_sync]` is now resolved per table, a repo without that table (an empty `[version_sync]` suffices) fails the check, including the built-in `version` plan step, with `config.table_missing`. sc-lint's own `.just/lint-config.toml` adds `[version_sync.python]` with `cargo_lock = true`.
 6. `lint_common.load_lint_config` stays a permanently-deprecated shim; l-9 does not edit lint_common.py.
 
+### Phase o (0.8.7, #783) — Pending Rand acceptance
+Amendment to decision 12 and its l-9 clarification 1: a new stable `check`
+id, `python.dependency_specifier`. For every pyproject listed in
+`[version_sync.python].python_manifests`, each requirement in
+`[project].dependencies` and `[project].optional-dependencies` that names the
+`[project].name` of a listed pyproject must admit the workspace version,
+evaluated with `packaging` (`Requirement`, `SpecifierSet.contains(...,
+prereleases=True)`); otherwise a finding with `expected` the workspace version
+and `actual` the specifier. The check is on whenever `python_manifests` is
+non-empty; there is no switch. The sc-lint wheel depends on `packaging`.
+
 ### Sprint l-10 (#647, added at the user's direction after the sprint designs above; governed by REQ-CLI-025)
 1. The cargo-shear wrapper treats a path reported in `unlinked_files` as consumed, and not a finding, when a `.pass("<glob>")` or `.compile_fail("<glob>")` call with a string-literal glob in a Rust file of the same package resolves to a regular file at that path, relative to the package directory. No configuration key is added. Consumed takes precedence over `allowed_unlinked_files` and produces no downgrade line. Ordinary unlinked-source detection is unchanged.
 2. Only plain and raw string literals are interpreted. Non-literal, empty, absolute, drive-letter, backslash and `..` globs are skipped, and a glob Python cannot evaluate is skipped without error; those fixtures stay reported. Matching is textual, so a comment or string that names a harness call can hide an unlinked report only for a path cargo-shear already reported and that the glob resolves to (accepted over-approximation, documented).
