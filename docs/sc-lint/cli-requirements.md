@@ -387,7 +387,8 @@ specialized backend tools and mixed Rust/Python implementations.
   or prior-release digest exception applies. An owned path that is a symlink,
   including a dangling link, is replaced by the shipped regular file without
   touching its target. `--check` and `--dry-run` do not mutate files; `--check`
-  reports an absent or differing owned file as `CLI.SC_LINT_INTEGRATION_OUTDATED`.
+  reports an absent, symlinked, or differing owned file as
+  `CLI.SC_LINT_INTEGRATION_OUTDATED`.
   A consumer README is outside the command's write set.
   (Amended for phase-o, ADR-023; Pending Rand approval in PR #905.)
   E.6 owns optional CI workflow generation because it depends on the reusable

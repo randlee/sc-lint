@@ -25,8 +25,8 @@ Human output starts with `init: <status>`:
 Non-empty file lists follow, one line each, in this order: `Created:` (or
 `Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
 `--dry-run`) and `Preserved:`. A refreshed sc-lint-owned file appears under
-`Refreshed:` (`Would refresh:` for `--dry-run`). `--check` reports an absent or
-differing owned file as outdated. `sc-lint.toml` and `Justfile` are
+`Refreshed:` (`Would refresh:` for `--dry-run`). `--check` reports an absent,
+symlinked, or differing owned file as outdated. `sc-lint.toml` and `Justfile` are
 consumer-owned: an existing file is preserved exactly as it is. For example:
 
 ```text

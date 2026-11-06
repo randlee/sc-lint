@@ -368,7 +368,8 @@ Cargo manifest, or analyzer package:
   conflict. The sc-lint-owned paths in ADR-023 are overwritten with shipped
   bytes. An owned symlink, including a dangling link, is replaced by a regular
   file without touching its target. `--check` reports an absent or differing
-  owned file as `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
+  owned file, including an owned symlink, as
+  `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer. (Amended for phase-o, ADR-023; Pending Rand approval
