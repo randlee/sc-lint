@@ -46,7 +46,7 @@ family names `cycles`, `boundaries`, `internal-only`, `forbid-external-impls`,
 | `SCB-BOUNDARY-002` | boundaries, internal-only | A `boundary.internal_only` item referenced from outside its module. |
 | `SCB-BOUNDARY-003` | boundaries, forbid-external-impls | An impl of a `boundary.forbid_external_impls` trait from another module. |
 | `SCB-BOUNDARY-004` | boundaries, dependencies | An invalid boundary inventory record or field. |
-| `SCB-BOUNDARY-005` | boundaries | A record's `[implementation]` type or its inherent `fn new` whose source visibility is wider than declared, or is not found. |
+| `SCB-BOUNDARY-005` | boundaries | A record's `[implementation]` type or its inherent `fn new` whose source visibility is wider than declared, or is not found. Finding kind: `declared_visibility_mismatch`. |
 | `SCB-CALLER-001` | boundaries | A restricted symbol called by a caller not on its approved-caller list. |
 | `SCB-DEPENDENCY-001` | dependencies | A direct workspace-package dependency the owner's record does not allow. |
 | `SCB-DEPENDENCY-002` | dependencies | A direct dependent the target's record does not allow. |
