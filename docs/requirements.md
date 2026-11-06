@@ -32,13 +32,10 @@ Crate-local requirement and architecture traceability:
 For release `0.2.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
 
-For Phase G, ADR-015 supersedes the `sc-lint init --just` consumer installation
-mechanism in `REQ-PRODUCT-019`: the versioned adoption kit
-(`packages/sc-lint-adoption`, `install.py` driven by `install.json`) is the sole
-generic adoption path, and ADR-016 fixes its runtime delivery as a Python wheel
-with no Rust configuration logic. `REQ-PRODUCT-019` obligations on the
-installed end state are unchanged; see the supersession note under that
-requirement.
+For Phase G, ADR-015 made the versioned adoption kit the generic adoption
+path. ADR-023 supersedes that install path with `sc-lint init --just` and the
+ownership contract in `REQ-PRODUCT-025`; ADR-016 continues to govern runtime
+delivery. (Amended for phase-o, ADR-023; Pending Rand approval in PR #905.)
 
 Phase K's accepted ADR-017 amendments describe delivered contracts, not new
 product defaults: analyzer `exclude_paths_by_rule`, explicit portability
@@ -639,12 +636,14 @@ The product should support both:
   sc-lint-owned file has exactly one source in this repository, and no other
   copy exists.
 
-Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
-persisted installer input may declare exact cargo-tool versions and rustup
-targets for ordinary bootstrap setup, while direct binary setup retains its
-meaning and lint never installs tools. The managed-wheel helper owns
+Phase K's Accepted ADR-017 extends existing adoption and CLI contracts:
+consumer configuration may declare exact cargo-tool versions and rustup
+targets for ordinary bootstrap setup. ADR-023 moves those declarations from
+the installer input to `sc-lint.toml`; direct binary setup retains its meaning
+and lint never installs tools. The managed-wheel helper owns
 inspection, installation and verification; absent declarations add no work.
-This is an amendment to those contracts, not a new product default.
+This is an amendment to those contracts, not a new product default. (Amended
+for phase-o, ADR-023; Pending Rand approval in PR #905.)
 
 ## Current Detailed Requirement Areas
 
