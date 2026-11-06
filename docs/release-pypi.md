@@ -90,7 +90,7 @@ python3 -m venv /tmp/clean && /tmp/clean/bin/pip install --find-links dist sc-li
 ```
 
 To exercise the adoption bootstrap offline, put the wheel and its
-`codespell` dependency in one directory and run
+`codespell` and `packaging` dependencies in one directory and run
 `SC_LINT_WHEEL_DIR=<dir> .sc-lint/bootstrap test --config sc-lint.toml`; it
 provisions `.sc-lint/venv` with `--no-index`. `bootstrap setup` also fetches
 the GitHub Release archive for the same version, so it only works after that
