@@ -111,11 +111,21 @@ class ConsumerLifecycleTests(unittest.TestCase):
         )
         cls._wheel_environment.start()
         binary_name = "sc-lint.exe" if os.name == "nt" else "sc-lint"
-        cls.product_binary = ROOT / "target" / "debug" / binary_name
+        binary = os.environ.get("SC_LINT_BIN")
+        if binary:
+            cls.product_binary = Path(binary)
+            if not cls.product_binary.is_absolute():
+                cls.product_binary = ROOT / cls.product_binary
+        else:
+            target_dir = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
+            if not target_dir.is_absolute():
+                target_dir = ROOT / target_dir
+            cls.product_binary = target_dir / "debug" / binary_name
+        binary_dir = cls.product_binary.parent
         cls.release_binaries = [
             cls.product_binary,
             *(
-                ROOT / "target" / "debug" / f"{name}{'.exe' if os.name == 'nt' else ''}"
+                binary_dir / f"{name}{'.exe' if os.name == 'nt' else ''}"
                 for name in (
                     "sc-lint-boundary",
                     "sc-lint-portability",
