@@ -14,8 +14,9 @@ All notable changes to sc-lint are documented here.
 - Version sync reports `python.dependency_specifier` when a project listed in
   `[version_sync.python].python_manifests` depends on another listed project
   with a specifier that does not admit the workspace version, such as a stale
-  `atm-graft>=1.4,<1.5` after a bump. The wheel now depends on `packaging`
-  (#783).
+  `atm-graft>=1.4,<1.5` after a bump; `expected` is the workspace version and
+  `actual` the specifier. The wheel now depends on `packaging` (#783, ADR-020
+  phase o amendment).
 
 ### Removed
 

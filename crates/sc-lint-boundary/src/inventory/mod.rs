@@ -270,7 +270,9 @@ fn parse_boundary_record(path: &Path) -> Result<types::RawBoundaryRecord> {
             path.display()
         );
     }
-    toml::from_str(&text).with_context(|| format!("failed to parse TOML file `{}`", path.display()))
+    toml::Value::Table(table)
+        .try_into()
+        .with_context(|| format!("failed to parse TOML file `{}`", path.display()))
 }
 
 fn parse_toml_file<T>(path: &Path) -> Result<T>

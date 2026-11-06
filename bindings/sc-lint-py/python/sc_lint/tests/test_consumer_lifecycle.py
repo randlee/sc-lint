@@ -80,8 +80,10 @@ class WheelConsumerTests(unittest.TestCase):
             )
             self.assertFalse((consumer / "scripts").exists())
             self.assertFalse((consumer / "release").exists())
+            # Keep SC_LINT_BIN: the wheel's pytests must run against the binary
+            # built from this tree, not a stale managed or PATH install.
             child_env = {key: value for key, value in os.environ.items()
-                         if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_BIN", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
+                         if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
             result = subprocess.run(
                 [str(python), "-I", "-m", "sc_lint.run_pytests"], env=child_env,
                 cwd=consumer, capture_output=True, text=True, timeout=180,

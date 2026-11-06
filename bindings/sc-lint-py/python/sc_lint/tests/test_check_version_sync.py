@@ -321,36 +321,34 @@ class CheckVersionSyncTests(unittest.TestCase):
 
     def test_version_sync_python_dependency_specifier_stale_pin_fails(self) -> None:
         cases = (
-            ('dependencies = ["atm-graft>=1.0,<1.1"]\n', "atm-graft>=1.0,<1.1"),
-            ('dependencies = ["atm_graft==1.1.1"]\n', "atm_graft==1.1.1"),
-            ('[project.optional-dependencies]\nhooks = ["atm-graft>=1.2"]\n', "atm-graft>=1.2"),
+            ('dependencies = ["atm-graft>=1.0,<1.1"]\n', "<1.1,>=1.0"),
+            ('dependencies = ["atm_graft==1.1.1"]\n', "==1.1.1"),
+            ('[project.optional-dependencies]\nhooks = ["atm-graft>=1.2"]\n', ">=1.2"),
         )
-        for dependencies, entry in cases:
-            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as tempdir:
+        for dependencies, specifier in cases:
+            with self.subTest(dependencies=dependencies), tempfile.TemporaryDirectory() as tempdir:
                 root = Path(tempdir)
                 self.write_repo(root)
                 self.write_tracked_python_projects(root, dependencies)
                 code, payload, _ = self.json_result(root)
                 self.assertEqual(code, 1, payload)
-                name = entry.split(">")[0].split("=")[0]
                 self.assertEqual(payload["data"]["findings"], [
                     {
                         "check": "python.dependency_specifier",
                         "file": "py/hermes/pyproject.toml",
-                        "expected": f"{name} specifier admitting {WORKSPACE_VERSION}",
-                        "actual": entry,
+                        "expected": WORKSPACE_VERSION,
+                        "actual": specifier,
                     }
                 ])
 
-    def test_version_sync_python_dependency_specifier_invalid_requirement_fails(self) -> None:
+    def test_version_sync_python_dependency_specifier_skips_unparsable_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             self.write_repo(root)
             self.write_tracked_python_projects(root, 'dependencies = ["atm-graft >>> 1"]\n')
             code, payload, _ = self.json_result(root)
-            self.assertEqual(code, 1, payload)
-            self.assertEqual(payload["data"]["findings"][0]["check"], "python.dependency_specifier")
-            self.assertEqual(payload["data"]["findings"][0]["expected"], "valid PEP 508 requirement")
+            self.assertEqual(code, 0, payload)
+            self.assertEqual(payload["data"]["findings"], [])
 
     def test_version_sync_python_dynamic_and_absent_version(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

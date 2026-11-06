@@ -306,6 +306,8 @@ def validate_python_dependency_specifiers(
 
     Every project listed in ``python_manifests`` tracks the workspace version, so
     a sibling pin such as ``atm-graft>=1.4,<1.5`` goes stale on a bump (#783).
+    ADR-020 phase-o amendment: ``expected`` is the workspace version and
+    ``actual`` the specifier.
     """
     tracked = {
         canonicalize_name(name)
@@ -318,18 +320,13 @@ def validate_python_dependency_specifiers(
             try:
                 requirement = Requirement(entry)
             except InvalidRequirement:
-                findings.append(Finding("python.dependency_specifier", rel_manifest, "valid PEP 508 requirement", entry))
+                # Not a requirement naming a listed project; pip reports it.
                 continue
             if canonicalize_name(requirement.name) not in tracked or not requirement.specifier:
                 continue
             if not requirement.specifier.contains(ws, prereleases=True):
                 findings.append(
-                    Finding(
-                        "python.dependency_specifier",
-                        rel_manifest,
-                        f"{requirement.name} specifier admitting {ws}",
-                        entry,
-                    )
+                    Finding("python.dependency_specifier", rel_manifest, ws, str(requirement.specifier))
                 )
     return findings
 

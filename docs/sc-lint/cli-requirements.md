@@ -51,6 +51,9 @@ specialized backend tools and mixed Rust/Python implementations.
   It also supports atm-core's `[version_sync.winget]` and
   `[version_sync.release_wiring]` subsections (Amended phase L, #137; Accepted —
   Rand, 2026-10-27).
+  A requirement in a listed pyproject that names another listed project must
+  admit the workspace version (`python.dependency_specifier`; ADR-020 phase o
+  amendment, #783).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.

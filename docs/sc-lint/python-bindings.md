@@ -39,7 +39,7 @@ and installs `sc-lint==<minimum_version>` into it:
   `upgrade --check` for a non-mutating compatibility probe.
 - `SC_LINT_WHEEL_DIR=<dir>` installs offline with
   `pip install --no-index --find-links <dir>`; the directory must also hold
-  the wheel's dependencies (currently `codespell`).
+  the wheel's dependencies (currently `codespell` and `packaging`).
 - `lint`, `test`, and `upgrade` provision the venv on demand, so a fresh
   checkout only needs `just lint`.
 
@@ -109,6 +109,7 @@ The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
 | `cargo_lock` | A workspace package is absent from or mismatched in `Cargo.lock`. |
 | `python.version` | A listed static Python project version differs from the workspace version. |
 | `python.manifest_missing` | A listed Python manifest does not exist. |
+| `python.dependency_specifier` | A listed project's requirement on another listed project does not admit the workspace version; `expected` is the workspace version and `actual` the specifier. |
 | `winget.manifest_glob` | The configured glob matched no Winget manifests. |
 | `winget.package_version` | A Winget `PackageVersion` field differs from the workspace version. |
 | `winget.manifest_version` | A Winget `ManifestVersion` field differs from the workspace version. |
@@ -130,7 +131,7 @@ workspace files are configuration errors without a stable code.
 | Key | Type and default | Behavior |
 | --- | --- | --- |
 | `cargo_lock` | Boolean, default `true` | Checks workspace package versions in `Cargo.lock`; `false` disables the check. A missing lockfile is recorded in `data.skipped` as `{check: "cargo_lock", file: "Cargo.lock", reason: "missing"}`. |
-| `python_manifests` | Array of repo-relative paths, default `[]` | Each listed `pyproject.toml` must have a static `[project].version` equal to the workspace version. Dynamic, absent, or non-string versions are reported as `python.version`; a missing file is `python.manifest_missing`. A `[project].dependencies` or `[project.optional-dependencies]` entry naming another listed project (PEP 503 normalized) whose version specifier does not admit the workspace version, or an entry that is not a valid PEP 508 requirement, is reported as `python.dependency_specifier` (#783). |
+| `python_manifests` | Array of repo-relative paths, default `[]` | Each listed `pyproject.toml` must have a static `[project].version` equal to the workspace version. Dynamic, absent, or non-string versions are reported as `python.version`; a missing file is `python.manifest_missing`. A `[project].dependencies` or `[project.optional-dependencies]` entry naming another listed project whose version specifier does not admit the workspace version is reported as `python.dependency_specifier` (#783). |
 
 `[version_sync.winget]` and `[version_sync.release_wiring]` are disabled by
 default with `enabled = false`. The Winget table accepts `enabled`,
