@@ -135,3 +135,6 @@ From a source checkout, run the complete repository gates:
 just lint
 just test
 ```
+
+Before running `cargo test` directly in a fresh checkout, run `just setup` to
+build the local wheels required by the consumer fixture.

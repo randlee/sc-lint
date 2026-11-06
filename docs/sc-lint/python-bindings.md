@@ -84,7 +84,8 @@ interpreter-selection policy.
   workspace version change). Both directories are git-ignored.
 - Fixture tests that exercise the consumer bootstrap point
   `SC_LINT_WHEEL_DIR` at `.sc-lint/wheels`, so they never reach PyPI; they
-  skip with a `just setup` hint when the wheels are absent.
+  require those wheels. Run `just setup` before a direct `cargo test` in a
+  fresh checkout; the fixture reports the missing prerequisite otherwise.
 - Manual build: `maturin build --release -m bindings/sc-lint-py/Cargo.toml`.
 
 ## Version-sync tables
