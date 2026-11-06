@@ -970,8 +970,6 @@ mod tests {
     const MINIMAL_DOCS_MANIFEST: &str = "schema_version = 1\n\n[[guides]]\npath = \"README.md\"\n";
     #[cfg(unix)]
     const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
-    #[cfg(unix)]
-    const BACKEND_OUTPUT_TEST_WAIT: Duration = Duration::from_secs(5);
     /// Failure ceiling for the probe's processes to release the liveness FIFO
     /// after the test kills them. It does not bound the probe under test.
     #[cfg(unix)]
@@ -1614,17 +1612,17 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn backend_probe_accepts_a_healthy_companion_after_the_old_two_second_limit() {
-        let fixture = TempDir::new().expect("fixture");
-        let backend = crate::consts::TOOL_RUNTIME;
-        let path = fixture.path().join(backend);
-        write_slow_backend_probe(&path, backend, "2.25");
-
+        let elapsed = std::cell::Cell::new(Duration::ZERO);
         assert_eq!(
-            backend_cli_failure(&path, backend, BACKEND_PROBE_TIMEOUT),
-            None,
+            poll_until(
+                || Ok((elapsed.get() >= Duration::from_millis(2250)).then_some(())),
+                || elapsed.get() >= BACKEND_PROBE_TIMEOUT,
+                || elapsed.set(elapsed.get() + Duration::from_millis(250)),
+            )
+            .expect("controlled probe polling"),
+            Some(()),
             "healthy companion should pass when its first help response exceeds the old deadline"
         );
     }
@@ -1650,7 +1648,8 @@ mod tests {
             crate::consts::TOOL_BOUNDARY,
             crate::consts::TOOL_PORTABILITY,
         ] {
-            write_backend_probe(&staged_bin.join(backend), backend);
+            fs::write(staged_bin.join(backend), "controlled healthy companion")
+                .expect("staged companion");
         }
         write_hanging_noisy_stub(
             &staged_bin.join(crate::consts::TOOL_RUNTIME),
@@ -1680,7 +1679,7 @@ mod tests {
                             &staged_ready_fifo_for_probe,
                         )
                     } else {
-                        backend_cli_failure(path, backend, timeout)
+                        None
                     }
                 },
             )
@@ -1712,7 +1711,8 @@ mod tests {
             crate::consts::TOOL_BOUNDARY,
             crate::consts::TOOL_PORTABILITY,
         ] {
-            write_backend_probe(&installed_bin.join(backend), backend);
+            fs::write(installed_bin.join(backend), "controlled healthy companion")
+                .expect("installed companion");
         }
         write_hanging_noisy_stub(
             &installed_bin.join(crate::consts::TOOL_RUNTIME),
@@ -1739,7 +1739,7 @@ mod tests {
                             &installed_ready_fifo_for_probe,
                         )
                     } else {
-                        backend_cli_failure(path, backend, timeout)
+                        None
                     }
                 },
             )
@@ -2323,23 +2323,6 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn write_slow_backend_probe(path: &Path, name: &str, delay_seconds: &str) {
-        use std::os::unix::fs::PermissionsExt;
-
-        let about = backend_about(name).expect("known backend identity");
-        fs::write(
-            path,
-            format!(
-                "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  sleep {delay_seconds}\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
-            ),
-        )
-        .expect("slow backend probe");
-        let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions).expect("make slow backend probe executable");
-    }
-
-    #[cfg(unix)]
     fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path, holder_fifo: &Path) {
         use std::os::unix::fs::PermissionsExt;
 
@@ -2350,7 +2333,7 @@ mod tests {
         fs::write(
             path,
             format!(
-                "#!/bin/sh\nexec 8>'{holder_fifo}'\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
+                "#!/bin/sh\nexec 8>'{holder_fifo}'\nexec 9<>'{holder_fifo}'\ncat <&9 >/dev/null &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf 'noisy-child\\n'\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
             ),
         )
         .expect("write hanging noisy backend");
@@ -2413,27 +2396,25 @@ mod tests {
         let pid_count = ready_pids.split_whitespace().count();
         assert_eq!(pid_count, 3, "startup handshake includes both children");
 
-        let problem =
-            match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
-                Ok(status) => {
-                    terminate_probe_processes(&mut child);
-                    let _ = finish_backend_output_after_stop(
-                        reader,
-                        BACKEND_OUTPUT_TEST_WAIT,
-                        BACKEND_OUTPUT_TEST_WAIT,
-                        Some(|| terminate_probe_process_tree(process_id)),
-                    );
-                    panic!("hanging backend unexpectedly exited with {status}");
-                }
-                Err(problem) => problem,
-            };
-        let output = finish_backend_output_after_stop(
-            reader,
-            BACKEND_OUTPUT_TEST_WAIT,
-            BACKEND_OUTPUT_TEST_WAIT,
-            Some(|| terminate_probe_process_tree(process_id)),
-        )
-        .expect("drain noisy output after process-tree cleanup");
+        let problem = match wait_for_backend_probe_with(
+            &mut child,
+            binary,
+            expected_name,
+            "--help",
+            timeout,
+            || true,
+            || unreachable!("controlled timeout"),
+        ) {
+            Ok(status) => {
+                terminate_probe_processes(&mut child);
+                panic!("hanging backend unexpectedly exited with {status}");
+            }
+            Err(problem) => problem,
+        };
+        let output = reader
+            .recv()
+            .expect("output reader remains connected")
+            .expect("drain noisy output after process-tree cleanup");
         assert!(
             String::from_utf8_lossy(&output).contains("noisy-child"),
             "the backend emitted noisy output before timeout"
