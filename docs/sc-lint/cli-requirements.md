@@ -338,8 +338,8 @@ specialized backend tools and mixed Rust/Python implementations.
   itself cannot be verified, the command must report a distinct recovery error
   identifying the manual backup location. This direct binary setup contract is
   unchanged by consumer tool provisioning: ordinary bootstrap setup invokes
-  the managed-wheel Python helper using the persisted `.sc-lint/install.json`
-  tools object. Exact cargo versions and rustup targets, CARGO_HOME handling,
+  the managed-wheel Python helper using `[tool.sc-lint.tools]` in the selected
+  `sc-lint.toml`. Exact cargo versions and rustup targets, CARGO_HOME handling,
   inspect/install/verify and non-mutating dry-run follow
   [ADR-017, change 6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts)
   (Accepted, Rand, 2026-10-12); lint execution never installs tools.
@@ -349,6 +349,8 @@ specialized backend tools and mixed Rust/Python implementations.
   adds no work, and no tool is skipped by default (#865).
   (Amended for phase-n sprint n-9, PR #866; Accepted — Rand 2026-11-04
   "i did read and approve".)
+  (Tool declaration source amended for phase-o, ADR-023; Pending Rand approval
+  in PR #905.)
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
@@ -425,12 +427,14 @@ specialized backend tools and mixed Rust/Python implementations.
   ordering is deterministic and does not depend on step timing. Consumer test
   profiles support named command and group selectors, `default`, environment,
   working-directory and platform settings, and forwarded command arguments.
-  Limitations: selectors are not declared in `install.json`; `default` is one
-  selector name, a call accepts one selector, selector descriptions and
-  `requires` are not supported, and installer-side selector validation is not
-  added. See [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
+  Selectors are declared in `sc-lint.toml`; `default` is one selector name, a
+  call accepts one selector, selector descriptions and
+  `requires` are not supported. See
+  [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
+  (Selector configuration source amended for phase-o, ADR-023; Pending Rand
+  approval in PR #905.)
 
 - `REQ-CLI-024`
   `sc-lint docs` must discover the installed offline documentation bundle
