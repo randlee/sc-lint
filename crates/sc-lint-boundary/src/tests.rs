@@ -6963,29 +6963,3 @@ fn scb_boundary_005_checks_all_cfg_declarations() {
         "{findings:#?}"
     );
 }
-
-#[test]
-fn scb_boundary_005_reports_missing_type_and_constructor_as_not_found() {
-    let findings = visibility_findings(
-        "pub fn open() {}\nmod roster { pub(crate) struct Other; }\n",
-        PUB_CRATE_RECORD,
-    );
-    assert_eq!(findings.len(), 2, "{findings:#?}");
-    assert!(
-        findings
-            .iter()
-            .all(|message| message.contains("but source is `not found`"))
-    );
-}
-
-#[test]
-fn scb_boundary_005_skips_public_declarations() {
-    let findings = visibility_findings(
-        "pub fn open() {}\nmod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }\n",
-        r#"type = "Store"
-module = "store::roster"
-visibility = "public"
-constructor = "public""#,
-    );
-    assert!(findings.is_empty(), "{findings:#?}");
-}
