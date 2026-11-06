@@ -16,7 +16,7 @@ Human output starts with `init: <status>`:
 
 | Status | Meaning |
 | --- | --- |
-| `current` | Nothing needs writing. |
+| `current` | A non-mutating check found no drift. |
 | `created` | Only missing files were written. |
 | `updated` | At least one existing sc-lint-owned file was refreshed, with or without missing files created. |
 | `would_create` | `--dry-run`: only missing files would be written. |
