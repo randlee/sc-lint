@@ -247,6 +247,7 @@ fn catalog_lists_every_rule_id() {
         ScbBoundary002,
         ScbBoundary003,
         ScbBoundary004,
+        ScbBoundary005,
         ScbCaller001,
         ScbDependency001,
         ScbDependency002,
@@ -263,9 +264,9 @@ fn catalog_lists_every_rule_id() {
     for id in every {
         match id {
             ScbCycle001 | ScbCycle002 | ScbCycle003 | ScbBoundary001 | ScbBoundary002
-            | ScbBoundary003 | ScbBoundary004 | ScbCaller001 | ScbDependency001
-            | ScbDependency002 | ScbDependency003 | ScbDependency004 | ScbFeature001
-            | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
+            | ScbBoundary003 | ScbBoundary004 | ScbBoundary005 | ScbCaller001
+            | ScbDependency001 | ScbDependency002 | ScbDependency003 | ScbDependency004
+            | ScbFeature001 | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
             | ScbManifest005 | ScbManifest006 => {}
         }
     }
@@ -4965,10 +4966,6 @@ impl WorkspaceFixture {
                     allowed_test_double_paths = []
                     forbidden_test_bypasses = []
 
-                    [enforcement]
-                    lint_rules = []
-                    review_gates = []
-
                     [status]
                     state = "concrete_landed"
                 "#,
@@ -5059,10 +5056,6 @@ impl WorkspaceFixture {
                     allowed_test_double_paths = []
                     forbidden_test_bypasses = []
 
-                    [enforcement]
-                    lint_rules = []
-                    review_gates = []
-
                     [status]
                     state = "concrete_landed"
                 "#,
@@ -5131,10 +5124,6 @@ fn write_named_caller_boundary_record(fixture: &WorkspaceFixture, approved_entri
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
 
-                [enforcement]
-                lint_rules = ["SCB-CALLER-001"]
-                review_gates = ["approved_named_callers"]
-
                 [status]
                 state = "concrete_landed"
             "#
@@ -5200,10 +5189,6 @@ fn write_policy_record(
                 [testing]
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
-
-                [enforcement]
-                lint_rules = []
-                review_gates = []
 
                 [status]
                 state = "{state}"
@@ -6530,4 +6515,215 @@ fn issue385_boundary_manifest_paths() {
     );
     assert_eq!(findings.len(), 2);
     assert_eq!(status, ReportStatus::Fail);
+}
+
+// SCB-BOUNDARY-005: declared type and constructor visibility (REQ-SCB-027, #861).
+
+fn write_visibility_fixture(fixture: &WorkspaceFixture, source: &str, implementation: &str) {
+    fixture.write_workspace_root_with_members(&["crates/store"]);
+    fixture.write_package_manifest("store");
+    fixture.write_source("store", "lib.rs", source);
+    fixture.write(
+        "boundaries/planning.toml",
+        "[planning]\ncurrent_sprint = \"O.1\"\n",
+    );
+    fixture.write(
+        "boundaries/store/roster.toml",
+        &format!(
+            r#"
+boundary_id = "BOUNDARY-Roster"
+owner_package = "store"
+owner_crate_path = "store"
+name = "Roster"
+
+[public]
+facade = "open"
+
+[implementation]
+{implementation}
+
+[composition]
+roots = ["open"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"
+"#
+        ),
+    );
+}
+
+fn visibility_findings(source: &str, implementation: &str) -> Vec<String> {
+    let fixture = WorkspaceFixture::new();
+    write_visibility_fixture(&fixture, source, implementation);
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+    report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary005)
+        .map(|finding| finding.message.clone())
+        .collect()
+}
+
+const PUB_CRATE_RECORD: &str = r#"type = "Store"
+module = "store::roster"
+visibility = "pub(crate)"
+constructor = "pub(crate)""#;
+
+#[test]
+fn scb_boundary_005_passes_when_source_matches_declared_visibility() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+                impl Store {
+                    pub(crate) fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_fails_when_type_and_constructor_are_wider_than_declared() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub struct Store;
+                impl Store {
+                    pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|message| message.contains("roster.toml"))
+    );
+    assert!(findings.iter().any(|message| {
+        message.contains("type `store::roster::Store` declared `pub(crate)` but source is `pub`")
+    }));
+    assert!(findings.iter().any(|message| message.contains(
+        "constructor `store::roster::Store::new` declared `pub(crate)` but source is `pub`"
+    )));
+}
+
+#[test]
+fn scb_boundary_005_counts_restricted_visibility_as_no_wider_than_pub_crate() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(super) struct Store;
+                impl Store {
+                    pub(in crate::roster) fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_finds_constructor_in_an_impl_in_another_module() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+            }
+            mod roster_impl {
+                impl crate::roster::Store {
+                    pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        r#"type = "Store"
+module = "store::roster"
+visibility = "pub(crate)"
+constructor = "pub(crate)""#,
+    );
+    // The impl names the type by path, so its `new` is attributed to `Store`.
+    assert!(
+        findings.iter().any(|message| message.contains(
+            "constructor `store::roster::Store::new` declared `pub(crate)` but source is `pub`"
+        )),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_skips_trait_only_records_which_name_no_type() {
+    // The schema requires trait_only records to omit implementation.type, so
+    // there is no named type to compare.
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub struct Store; }\n",
+        r#"visibility = "trait_only"
+constructor = "none""#,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_fails_private_declaration_with_crate_visible_source() {
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Store; }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "none""#,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(findings[0].contains("declared `private` but source is `pub(crate)`"));
+}
+
+#[test]
+fn scb_boundary_005_reports_missing_type_and_constructor_as_not_found() {
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Other; }\n",
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|message| message.contains("but source is `not found`"))
+    );
+}
+
+#[test]
+fn scb_boundary_005_skips_public_declarations() {
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "public"
+constructor = "public""#,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
 }

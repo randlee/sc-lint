@@ -72,9 +72,5 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-ANALYZER-SUPPORT-ISOLATION"]
-review_gates = ["rule_neutral_support_only", "no_cross_analyzer_dependencies", "generated_catalog_matches_rust", "installer_has_no_rule_constants"]
-
 [status]
 state = "concrete_landed"

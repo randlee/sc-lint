@@ -57,9 +57,5 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"

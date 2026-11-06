@@ -287,6 +287,71 @@ class CheckVersionSyncTests(unittest.TestCase):
                 {"check": "python.version", "file": "py/pyproject.toml", "expected": WORKSPACE_VERSION, "actual": "1.1.3"}
             ])
 
+    def write_tracked_python_projects(self, root: Path, hermes_dependencies: str) -> None:
+        graft = root / "py" / "graft" / "pyproject.toml"
+        hermes = root / "py" / "hermes" / "pyproject.toml"
+        graft.parent.mkdir(parents=True)
+        hermes.parent.mkdir(parents=True)
+        graft.write_text('[project]\nname = "atm-graft"\nversion = "1.1.2"\n', encoding="utf-8")
+        hermes.write_text(
+            f'[project]\nname = "hermes-atm"\nversion = "1.1.2"\n{hermes_dependencies}',
+            encoding="utf-8",
+        )
+        self.write_config(
+            root,
+            '[version_sync.python]\npython_manifests = ["py/graft/pyproject.toml", "py/hermes/pyproject.toml"]\n',
+        )
+
+    def test_version_sync_python_dependency_specifier_admits_workspace_version(self) -> None:
+        cases = (
+            'dependencies = ["atm-graft>=1.1,<1.2"]\n',
+            'dependencies = ["atm-graft==1.1.2"]\n',
+            'dependencies = ["Atm_Graft~=1.1.0"]\n',
+            'dependencies = ["atm-graft"]\n',
+            'dependencies = ["requests>=2,<3"]\n',
+        )
+        for dependencies in cases:
+            with self.subTest(dependencies=dependencies), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                self.write_repo(root)
+                self.write_tracked_python_projects(root, dependencies)
+                code, payload, _ = self.json_result(root)
+                self.assertEqual(code, 0, payload)
+                self.assertEqual(payload["data"]["findings"], [])
+
+    def test_version_sync_python_dependency_specifier_stale_pin_fails(self) -> None:
+        cases = (
+            ('dependencies = ["atm-graft>=1.0,<1.1"]\n', "atm-graft>=1.0,<1.1"),
+            ('dependencies = ["atm_graft==1.1.1"]\n', "atm_graft==1.1.1"),
+            ('[project.optional-dependencies]\nhooks = ["atm-graft>=1.2"]\n', "atm-graft>=1.2"),
+        )
+        for dependencies, entry in cases:
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                self.write_repo(root)
+                self.write_tracked_python_projects(root, dependencies)
+                code, payload, _ = self.json_result(root)
+                self.assertEqual(code, 1, payload)
+                name = entry.split(">")[0].split("=")[0]
+                self.assertEqual(payload["data"]["findings"], [
+                    {
+                        "check": "python.dependency_specifier",
+                        "file": "py/hermes/pyproject.toml",
+                        "expected": f"{name} specifier admitting {WORKSPACE_VERSION}",
+                        "actual": entry,
+                    }
+                ])
+
+    def test_version_sync_python_dependency_specifier_invalid_requirement_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_repo(root)
+            self.write_tracked_python_projects(root, 'dependencies = ["atm-graft >>> 1"]\n')
+            code, payload, _ = self.json_result(root)
+            self.assertEqual(code, 1, payload)
+            self.assertEqual(payload["data"]["findings"][0]["check"], "python.dependency_specifier")
+            self.assertEqual(payload["data"]["findings"][0]["expected"], "valid PEP 508 requirement")
+
     def test_version_sync_python_dynamic_and_absent_version(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)

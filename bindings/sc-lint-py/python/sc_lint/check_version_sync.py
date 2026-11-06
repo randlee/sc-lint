@@ -9,6 +9,10 @@ from sc_lint import _toml
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from packaging.requirements import InvalidRequirement
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
 from sc_lint.lint_common import ConfigError
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import resolve_table
@@ -255,6 +259,7 @@ def validate_python_manifests(
 ) -> tuple[bool, list[Finding]]:
     _cargo_lock_enabled, python_manifests = python_settings(config)
     findings: list[Finding] = []
+    manifests: list[tuple[str, dict[str, Any]]] = []
     for manifest_name in python_manifests:
         manifest_path = repo_relative(root, manifest_name, "python.python_manifests")
         rel_manifest = manifest_path.relative_to(root.resolve()).as_posix()
@@ -274,7 +279,59 @@ def validate_python_manifests(
             actual = "invalid"
         if actual != ws:
             findings.append(Finding("python.version", rel_manifest, ws, actual))
+        manifests.append((rel_manifest, project))
+    findings.extend(validate_python_dependency_specifiers(manifests, ws))
     return bool(python_manifests), findings
+
+
+def _project_requirements(project: dict[str, Any]) -> list[str]:
+    entries: list[str] = []
+    dependencies = project.get("dependencies", [])
+    if isinstance(dependencies, list):
+        entries.extend(entry for entry in dependencies if isinstance(entry, str))
+    optional = project.get("optional-dependencies", {})
+    if isinstance(optional, dict):
+        for group in optional.values():
+            if isinstance(group, list):
+                entries.extend(entry for entry in group if isinstance(entry, str))
+    return entries
+
+
+def validate_python_dependency_specifiers(
+    manifests: list[tuple[str, dict[str, Any]]],
+    ws: str,
+) -> list[Finding]:
+    """Fail when a configured Python project's dependency on another configured
+    project has a version specifier that does not admit the workspace version.
+
+    Every project listed in ``python_manifests`` tracks the workspace version, so
+    a sibling pin such as ``atm-graft>=1.4,<1.5`` goes stale on a bump (#783).
+    """
+    tracked = {
+        canonicalize_name(name)
+        for _, project in manifests
+        if isinstance(name := project.get("name"), str)
+    }
+    findings: list[Finding] = []
+    for rel_manifest, project in manifests:
+        for entry in _project_requirements(project):
+            try:
+                requirement = Requirement(entry)
+            except InvalidRequirement:
+                findings.append(Finding("python.dependency_specifier", rel_manifest, "valid PEP 508 requirement", entry))
+                continue
+            if canonicalize_name(requirement.name) not in tracked or not requirement.specifier:
+                continue
+            if not requirement.specifier.contains(ws, prereleases=True):
+                findings.append(
+                    Finding(
+                        "python.dependency_specifier",
+                        rel_manifest,
+                        f"{requirement.name} specifier admitting {ws}",
+                        entry,
+                    )
+                )
+    return findings
 
 
 def _enabled(table: dict[str, Any], table_name: str) -> bool:

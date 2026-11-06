@@ -43,6 +43,7 @@ Rule IDs include:
 - `SCB-MANIFEST-005`
 - `SCB-MANIFEST-006`
 - `SCB-BOUNDARY-004`
+- `SCB-BOUNDARY-005`
 
 Rule filters accept individual rule IDs and these kebab-case family names:
 

@@ -80,7 +80,7 @@ checks graph cycles, source boundaries, dependency policy, features, and
 manifests. Its rules are:
 
 - `SCB-CYCLE-001`–`SCB-CYCLE-003`
-- `SCB-BOUNDARY-001`–`SCB-BOUNDARY-004`
+- `SCB-BOUNDARY-001`–`SCB-BOUNDARY-005`
 - `SCB-CALLER-001`
 - `SCB-DEPENDENCY-001`–`SCB-DEPENDENCY-004`
 - `SCB-FEATURE-001`

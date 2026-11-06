@@ -53,6 +53,7 @@ mod render;
 mod rule_catalog;
 #[cfg(test)]
 mod tests;
+mod visibility_policy;
 
 use rule_catalog::rule;
 
@@ -546,9 +547,11 @@ fn selected_graph_rule_findings(
         findings.extend(analysis::analyze_forbid_external_impls(graph));
     }
     if rule_selected(filter, &[Boundaries]) {
-        findings.extend(analysis::analyze_named_callers(
+        let raw_inventory = inventory.as_raw_inventory();
+        findings.extend(analysis::analyze_named_callers(graph, &raw_inventory));
+        findings.extend(visibility_policy::analyze_declared_visibility(
             graph,
-            &inventory.as_raw_inventory(),
+            &raw_inventory,
         ));
     }
     if filter.is_none() {

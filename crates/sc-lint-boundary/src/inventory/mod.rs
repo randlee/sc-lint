@@ -23,7 +23,9 @@ pub(crate) use semantic::validate_inventory;
 pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
+pub(crate) use types::Constructor;
 pub(crate) use types::ReferenceScope;
+pub(crate) use types::Visibility;
 
 /// Resolves boundary inventory package references to canonical Cargo package names.
 ///
@@ -171,7 +173,7 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
     let mut seen_boundary_ids = BTreeMap::<types::BoundaryId, PathBuf>::new();
 
     for path in boundary_paths {
-        let raw_record: types::RawBoundaryRecord = parse_toml_file(&path)?;
+        let raw_record = parse_boundary_record(&path)?;
         let mut record = types::BoundaryRecord::try_from(raw_record).with_context(|| {
             format!(
                 "failed to validate dependency policy in `{}`",
@@ -252,6 +254,23 @@ fn collect_boundary_files(
         }
     }
     Ok(())
+}
+
+/// Section removed from the boundary record schema by REQ-SCB-026.
+const REMOVED_ENFORCEMENT_SECTION: &str = "enforcement";
+
+fn parse_boundary_record(path: &Path) -> Result<types::RawBoundaryRecord> {
+    let text = fs::read_to_string(path)
+        .with_context(|| format!("failed to read TOML file `{}`", path.display()))?;
+    let table: toml::Table = toml::from_str(&text)
+        .with_context(|| format!("failed to parse TOML file `{}`", path.display()))?;
+    if table.contains_key(REMOVED_ENFORCEMENT_SECTION) {
+        anyhow::bail!(
+            "boundary record `{}` declares an `[enforcement]` section; the section has been removed from the boundary schema (REQ-SCB-026) and must be deleted from the record",
+            path.display()
+        );
+    }
+    toml::from_str(&text).with_context(|| format!("failed to parse TOML file `{}`", path.display()))
 }
 
 fn parse_toml_file<T>(path: &Path) -> Result<T>

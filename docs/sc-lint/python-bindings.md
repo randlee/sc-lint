@@ -130,7 +130,7 @@ workspace files are configuration errors without a stable code.
 | Key | Type and default | Behavior |
 | --- | --- | --- |
 | `cargo_lock` | Boolean, default `true` | Checks workspace package versions in `Cargo.lock`; `false` disables the check. A missing lockfile is recorded in `data.skipped` as `{check: "cargo_lock", file: "Cargo.lock", reason: "missing"}`. |
-| `python_manifests` | Array of repo-relative paths, default `[]` | Each listed `pyproject.toml` must have a static `[project].version` equal to the workspace version. Dynamic, absent, or non-string versions are reported as `python.version`; a missing file is `python.manifest_missing`. |
+| `python_manifests` | Array of repo-relative paths, default `[]` | Each listed `pyproject.toml` must have a static `[project].version` equal to the workspace version. Dynamic, absent, or non-string versions are reported as `python.version`; a missing file is `python.manifest_missing`. A `[project].dependencies` or `[project.optional-dependencies]` entry naming another listed project (PEP 503 normalized) whose version specifier does not admit the workspace version, or an entry that is not a valid PEP 508 requirement, is reported as `python.dependency_specifier` (#783). |
 
 `[version_sync.winget]` and `[version_sync.release_wiring]` are disabled by
 default with `enabled = false`. The Winget table accepts `enabled`,
