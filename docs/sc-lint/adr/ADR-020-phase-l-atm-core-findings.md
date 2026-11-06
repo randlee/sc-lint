@@ -202,7 +202,7 @@ Clarifications to ADR-020 decision 12 (l-9):
 5. Because `[version_sync]` is now resolved per table, a repo without that table (an empty `[version_sync]` suffices) fails the check, including the built-in `version` plan step, with `config.table_missing`. sc-lint's own `.just/lint-config.toml` adds `[version_sync.python]` with `cargo_lock = true`.
 6. `lint_common.load_lint_config` stays a permanently-deprecated shim; l-9 does not edit lint_common.py.
 
-### Phase o (0.8.7, #783) — Pending Rand acceptance
+### Phase o (0.8.7, #783) — Accepted by Rand, 2026-11-06
 Amendment to decision 12 and its l-9 clarification 1: a new stable `check`
 id, `python.dependency_specifier`. For every pyproject listed in
 `[version_sync.python].python_manifests`, each requirement in

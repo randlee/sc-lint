@@ -624,7 +624,7 @@ The product should support both:
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
-- `REQ-PRODUCT-025` (Pending — Rand acceptance, ADR-023)
+- `REQ-PRODUCT-025` (Accepted — Rand, 2026-11-06, ADR-023)
   sc-lint is installed through a release channel and a repository is adopted
   and upgraded only through `sc-lint init --just` (upgrade: `just upgrade`).
   All consumer configuration lives in `sc-lint.toml`, including tool

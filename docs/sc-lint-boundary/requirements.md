@@ -203,13 +203,13 @@ Plan authority: `lint-l-8`.
   (Accepted 2026-10-16,
   [ADR-019, decision 2](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
 
-- `REQ-SCB-026` (Pending — Rand acceptance; Rand 2026-11-05 on #860: "we
+- `REQ-SCB-026` (Accepted — Rand, 2026-11-06; Rand 2026-11-05 on #860: "we
   should NOT have labels that do nothing")
   A boundary record has no `[enforcement]` section. A record that declares one
   fails inventory loading with a fatal diagnostic naming the file and stating
   that the section is removed and must be deleted.
 
-- `REQ-SCB-027` (Pending — Rand acceptance; #861)
+- `REQ-SCB-027` (Accepted — Rand, 2026-11-06; #861)
   `SCB-BOUNDARY-005` compares each boundary record's declared
   `[implementation]` visibility with the source. For a record whose
   `visibility` is `pub(crate)` or `private`, the named `type` in `module` fails

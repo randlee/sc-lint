@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-023 |
-| Status | Pending — Rand acceptance required before sprints o-15, o-16, o-11 and o-12 are dispatched |
+| Status | Accepted — Rand, 2026-11-06 ("Accept all five") |
 | Deciders | Rand |
 | Related | ADR-012, ADR-015 (vendored-kit fallback superseded), ADR-016, ADR-017 (tool declarations move), ADR-022; REQ-PRODUCT-019, -020, -021, -022, -024, REQ-PRODUCT-025 (new); #862, #903, #835 |
 
