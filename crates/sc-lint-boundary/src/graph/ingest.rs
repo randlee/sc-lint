@@ -385,8 +385,8 @@ pub(super) fn ingest_module_items(
             }
             Item::Impl(item_impl) => {
                 let owner = impl_owner(&item_impl.self_ty)?;
-                let owner_name = &owner.name;
-                let owner_node_id = NodeId::new(format!("{parent_module_id}::{owner_name}"));
+                #[rustfmt::skip]
+                let owner_node_id = impl_owner_node_id(context, parent_module_id, module_path, &item_impl, &owner.name);
                 let trait_path = item_impl
                     .trait_
                     .as_ref()
@@ -399,7 +399,7 @@ pub(super) fn ingest_module_items(
                 let owner_label = if owner.is_reference {
                     &owner.self_type
                 } else {
-                    owner_name
+                    &owner.name
                 };
 
                 if owner.is_reference {
@@ -414,7 +414,7 @@ pub(super) fn ingest_module_items(
                     builder.add_node(GraphNode {
                         id: owner_node_id.clone(),
                         kind: NodeKind::Type.as_str(),
-                        label: owner_name.to_string(),
+                        label: owner.name.to_string(),
                         visibility: None,
                         package: context.package_name.clone(),
                         target: Some(context.target_name.clone()),
@@ -531,7 +531,7 @@ pub(super) fn ingest_module_items(
                             module_path,
                             collect_references_with(
                                 &local_owner_names,
-                                Some(owner_name),
+                                Some(&owner.name),
                                 &context.workspace_dependency_roots,
                                 |collector| {
                                     collector.set_impl_self_type(&item_impl.self_ty);
@@ -705,6 +705,30 @@ fn add_reference_edges(
             target_node_id.clone(),
         );
         builder.add_edge(EdgeKind::References, source_node_id.clone(), target_node_id);
+    }
+}
+
+fn impl_owner_node_id(
+    context: &TargetContext,
+    parent_module_id: &NodeId,
+    module_path: &ModulePath,
+    item_impl: &syn::ItemImpl,
+    owner_name: &str,
+) -> NodeId {
+    if item_impl.trait_.is_none()
+        && let syn::Type::Path(path) = item_impl.self_ty.as_ref()
+        && path.path.segments.len() > 1
+    {
+        let path = path
+            .path
+            .segments
+            .iter()
+            .map(|part| part.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+        resolve_reference_target(context, parent_module_id, module_path, &path)
+    } else {
+        NodeId::new(format!("{parent_module_id}::{owner_name}"))
     }
 }
 

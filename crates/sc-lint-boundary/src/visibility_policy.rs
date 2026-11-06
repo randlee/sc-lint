@@ -125,21 +125,18 @@ fn find_type<'a>(
     })
 }
 
-/// The inherent associated `fn new` of `type_name` in the owner library. An
-/// inherent impl may sit in a different module from the type, so every
-/// inherent `new` declared on a type with that name is considered and the
-/// widest one is returned.
+/// The inherent associated `fn new` belonging to the resolved type.
 fn find_inherent_new<'a>(
     graph: &'a GraphExport,
     record: &'a BoundaryRecord,
-    type_name: &str,
+    type_node: &GraphNode,
 ) -> Option<&'a GraphNode> {
-    let suffix = format!("::{type_name}::new");
+    let method_id = format!("{}::new", type_node.id);
     in_owner_library(graph, record)
         .filter(|node| {
             node.kind == "method"
                 && node.impl_kind == Some(crate::ImplKind::Inherent)
-                && node.id.as_str().ends_with(&suffix)
+                && node.id.as_str() == method_id
         })
         .max_by_key(|node| SourceVisibility::from_graph(node.visibility))
 }
@@ -199,7 +196,7 @@ pub(crate) fn analyze_declared_visibility(
             check_item(&mut findings, record, &type_item, limit, type_node);
         }
         if let Some(limit) = constructor_check {
-            let constructor = type_node.and_then(|_| find_inherent_new(graph, record, type_name));
+            let constructor = type_node.and_then(|node| find_inherent_new(graph, record, node));
             check_item(
                 &mut findings,
                 record,

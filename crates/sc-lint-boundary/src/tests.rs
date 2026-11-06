@@ -6650,6 +6650,42 @@ fn scb_boundary_005_counts_restricted_visibility_as_no_wider_than_pub_crate() {
 }
 
 #[test]
+fn scb_boundary_005_distinguishes_constructors_of_same_named_types() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+                impl Store { pub(crate) fn new() -> Self { Self } }
+            }
+            mod other {
+                pub struct Store;
+                impl Store { pub fn new() -> Self { Self } }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_does_not_find_another_types_constructor() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster { pub(crate) struct Store; }
+            mod other {
+                pub(crate) struct Store;
+                impl Store { pub(crate) fn new() -> Self { Self } }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(findings[0].contains("constructor `store::roster::Store::new` declared `pub(crate)` but source is `not found`"), "{findings:#?}");
+}
+
+#[test]
 fn scb_boundary_005_finds_constructor_in_an_impl_in_another_module() {
     let findings = visibility_findings(
         r#"
