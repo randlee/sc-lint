@@ -195,12 +195,23 @@ Clarifications for decision 10 (`backend_payload_drift`) and REQ-PRODUCT-002DA (
 
 ### Sprint l-9
 Clarifications to ADR-020 decision 12 (l-9):
-1. The stable finding `check` ids of `sc_lint.check_version_sync` are: `crate_version`, `internal_path_dep`, `cargo_lock`, `python.version`, `python.manifest_missing`, `winget.manifest_glob`, `winget.package_version`, `winget.manifest_version`, `winget.installer_url`, `winget.missing_field`, `release_wiring.file_missing`, `release_wiring.fragment`, `release_docs.version`, `release_docs.files`. A finding has exactly `check`, `file`, `expected`, `actual`. The two `release_docs.*` ids were added in 0.8.5 (lint-085.50) for the opt-in `[version_sync.release_docs]` table; existing ids are unchanged.
+1. The stable finding `check` ids of `sc_lint.check_version_sync` are: `crate_version`, `internal_path_dep`, `cargo_lock`, `python.version`, `python.manifest_missing`, `python.dependency_specifier`, `winget.manifest_glob`, `winget.package_version`, `winget.manifest_version`, `winget.installer_url`, `winget.missing_field`, `release_wiring.file_missing`, `release_wiring.fragment`, `release_docs.version`, `release_docs.files`. A finding has exactly `check`, `file`, `expected`, `actual`. The two `release_docs.*` ids were added in 0.8.5 (lint-085.50) for the opt-in `[version_sync.release_docs]` table; existing ids are unchanged.
 2. `--json` uses the Python adapter envelope; `data` is `{ok, findings[], skipped[], workspace_version}`. With findings the envelope `ok` stays true, `data.ok` is false and the exit code is 1. Exit codes: 0 clean, 1 findings or unexpected error, 3 config error.
 3. Config failures of the check other than a missing table (unreadable or unparsable Cargo.toml, Cargo.lock or listed pyproject, missing workspace version, no member manifests, non-array `python_manifests`, non-bool `cargo_lock`, non-table subtables, absolute or `..` paths in `python_manifests`, `manifest_glob` or `file`) are errors of kind `config` without a `code`; they are not stable codes and decision 10's table is unchanged. Only a missing `[version_sync]` table carries `config.table_missing`.
 4. A listed pyproject whose `[project].version` is `dynamic` yields a `python.version` finding with actual `dynamic`; absent yields `absent`; a non-string yields `invalid`. A listed but missing pyproject yields `python.manifest_missing`. A missing `Cargo.lock` is reported in `data.skipped[]` as `{check: "cargo_lock", file: "Cargo.lock", reason: "missing"}` and `cargo_lock = false` omits both the check and the entry.
 5. Because `[version_sync]` is now resolved per table, a repo without that table (an empty `[version_sync]` suffices) fails the check, including the built-in `version` plan step, with `config.table_missing`. sc-lint's own `.just/lint-config.toml` adds `[version_sync.python]` with `cargo_lock = true`.
 6. `lint_common.load_lint_config` stays a permanently-deprecated shim; l-9 does not edit lint_common.py.
+
+### Phase o (0.8.7, #783) — Accepted by Rand, 2026-11-06
+Amendment to decision 12 and its l-9 clarification 1: a new stable `check`
+id, `python.dependency_specifier`. For every pyproject listed in
+`[version_sync.python].python_manifests`, each requirement in
+`[project].dependencies` and `[project].optional-dependencies` that names the
+`[project].name` of a listed pyproject must admit the workspace version,
+evaluated with `packaging` (`Requirement`, `SpecifierSet.contains(...,
+prereleases=True)`); otherwise a finding with `expected` the workspace version
+and `actual` the specifier. The check is on whenever `python_manifests` is
+non-empty; there is no switch. The sc-lint wheel depends on `packaging`.
 
 ### Sprint l-10 (#647, added at the user's direction after the sprint designs above; governed by REQ-CLI-025)
 1. The cargo-shear wrapper treats a path reported in `unlinked_files` as consumed, and not a finding, when a `.pass("<glob>")` or `.compile_fail("<glob>")` call with a string-literal glob in a Rust file of the same package resolves to a regular file at that path, relative to the package directory. No configuration key is added. Consumed takes precedence over `allowed_unlinked_files` and produces no downgrade line. Ordinary unlinked-source detection is unchanged.
