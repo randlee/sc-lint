@@ -3,5 +3,5 @@
 {"sprint": "p-4", "depends_on": ["p-3"]}
 {"sprint": "p-5", "depends_on": ["p-4"]}
 {"sprint": "p-6", "depends_on": ["p-3"]}
-{"sprint": "p-7", "depends_on": ["p-5"]}
+{"sprint": "p-7", "depends_on": ["p-5", "p-6"]}
 {"sprint": "p-8", "depends_on": ["p-6", "p-7"]}
