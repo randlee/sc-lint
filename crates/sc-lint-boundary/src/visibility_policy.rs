@@ -66,19 +66,19 @@ fn graph_module_path(record: &BoundaryRecord, module: &str) -> Option<String> {
         .map(|rest| format!("crate::{rest}"))
 }
 
+fn normalize_target_name(target: &str) -> String {
+    target.replace('-', "_")
+}
+
 fn in_owner_library<'a>(
     graph: &'a GraphExport,
-    record: &'a BoundaryRecord,
+    package: &'a str,
+    target: &'a str,
 ) -> impl Iterator<Item = &'a GraphNode> + 'a {
-    let package = record.owner_package.as_ref();
-    let target = record.owner_crate_path.as_ref();
-    graph.nodes.iter().filter(move |node| {
-        node.package == package
-            && node
-                .target
-                .as_deref()
-                .is_some_and(|name| name.replace('-', "_") == target)
-    })
+    graph
+        .nodes
+        .iter()
+        .filter(move |node| node.package == package && node.target.as_deref() == Some(target))
 }
 
 /// The declared type node: a struct, enum, union or type alias named `name`
@@ -90,12 +90,13 @@ fn find_type<'a>(
     module_path: &str,
     name: &str,
 ) -> Option<&'a GraphNode> {
+    let target = normalize_target_name(target);
     graph.nodes.iter().find(|node| {
         node.package == package
             && node
                 .target
                 .as_deref()
-                .is_some_and(|name| name.replace('-', "_") == target.replace('-', "_"))
+                .is_some_and(|node_target| normalize_target_name(node_target) == target)
             && node.kind == "type"
             && node.label == name
             && node.visibility.is_some()
@@ -138,17 +139,20 @@ fn find_trait_type<'a>(
 /// The inherent associated `fn new` belonging to the resolved type.
 fn find_inherent_new<'a>(
     graph: &'a GraphExport,
-    record: &'a BoundaryRecord,
-    type_node: &GraphNode,
+    type_node: &'a GraphNode,
 ) -> Option<&'a GraphNode> {
     let method_id = format!("{}::new", type_node.id);
-    in_owner_library(graph, record)
-        .filter(|node| {
-            node.kind == "method"
-                && node.impl_kind == Some(crate::ImplKind::Inherent)
-                && node.id.as_str() == method_id
-        })
-        .max_by_key(|node| SourceVisibility::from_graph(node.visibility))
+    in_owner_library(
+        graph,
+        type_node.package.as_str(),
+        type_node.target.as_deref()?,
+    )
+    .filter(|node| {
+        node.kind == "method"
+            && node.impl_kind == Some(crate::ImplKind::Inherent)
+            && node.id.as_str() == method_id
+    })
+    .max_by_key(|node| SourceVisibility::from_graph(node.visibility))
 }
 
 fn finding(record: &BoundaryRecord, item: &str, declared: &str, actual: &str) -> Finding {
@@ -232,7 +236,7 @@ pub(crate) fn analyze_declared_visibility(
             }
         }
         if let Some(limit) = constructor_check {
-            let constructor = type_node.and_then(|node| find_inherent_new(graph, record, node));
+            let constructor = type_node.and_then(|node| find_inherent_new(graph, node));
             check_item(
                 &mut findings,
                 record,
