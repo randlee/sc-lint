@@ -2,6 +2,29 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Added
+
+- `SCB-BOUNDARY-005` compares each boundary record's declared
+  `[implementation]` type and constructor visibility with the source and fails
+  when the source is wider than declared or the item is not found
+  (REQ-SCB-027, #861). Repositories with an explicit `fail_rules` list must add
+  the rule to make it gating.
+- Version sync reports `python.dependency_specifier` when a project listed in
+  `[version_sync.python].python_manifests` depends on another listed project
+  with a specifier that does not admit the workspace version, such as a stale
+  `atm-graft>=1.4,<1.5` after a bump; `expected` is the workspace version and
+  `actual` the specifier. The wheel now depends on `packaging` (#783, ADR-020
+  phase o amendment).
+
+### Removed
+
+- **Breaking:** the boundary record `[enforcement]` section
+  (`lint_rules`, `review_gates`) is removed; no check ever read it. A record
+  that still declares it fails to load with a diagnostic naming the file.
+  Delete the section from every boundary record (REQ-SCB-026, #860).
+
 ## [0.8.6]
 
 This release closes GitHub issues #851, #849, #862, #863, #132, #134, #138,

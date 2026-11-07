@@ -15,8 +15,9 @@ python -m pip install sc-lint
 ```
 
 The Python package includes the native extension and the `sc_lint` Python
-package. Its `codespell>=2.2` dependency supports the repository spell-check
-helper; the package does not expose a `sc-lint` console script.
+package. Its runtime dependencies are `codespell>=2.2` for the repository
+spell-check helper and `packaging>=22` for Python dependency checks. The
+package does not expose a `sc-lint` console script.
 
 ## Python API
 

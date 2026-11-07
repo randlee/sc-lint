@@ -80,8 +80,13 @@ class WheelConsumerTests(unittest.TestCase):
             )
             self.assertFalse((consumer / "scripts").exists())
             self.assertFalse((consumer / "release").exists())
+            # Keep SC_LINT_BIN: the wheel's pytests must run against the binary
+            # built from this tree, not a stale managed or PATH install.
             child_env = {key: value for key, value in os.environ.items()
-                         if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_BIN", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
+                         if key not in {"PYTHONPATH", "PYTHONHOME", "SC_LINT_SOURCE_ROOT", "SC_LINT_INSTALL_DIR"}}
+            # The Justfile exports a relative path; the child runs in `consumer`.
+            if child_env.get("SC_LINT_BIN"):
+                child_env["SC_LINT_BIN"] = os.path.abspath(child_env["SC_LINT_BIN"])
             result = subprocess.run(
                 [str(python), "-I", "-m", "sc_lint.run_pytests"], env=child_env,
                 cwd=consumer, capture_output=True, text=True, timeout=180,
@@ -106,11 +111,22 @@ class ConsumerLifecycleTests(unittest.TestCase):
         )
         cls._wheel_environment.start()
         binary_name = "sc-lint.exe" if os.name == "nt" else "sc-lint"
-        cls.product_binary = ROOT / "target" / "debug" / binary_name
+        binary = os.environ.get("SC_LINT_BIN")
+        if binary:
+            cls.product_binary = Path(binary)
+            if not cls.product_binary.is_absolute():
+                cls.product_binary = ROOT / cls.product_binary
+        else:
+            # Direct pytest runs lack just's SC_LINT_BIN; honor cargo's target override.
+            target_dir = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
+            if not target_dir.is_absolute():
+                target_dir = ROOT / target_dir
+            cls.product_binary = target_dir / "debug" / binary_name
+        binary_dir = cls.product_binary.parent
         cls.release_binaries = [
             cls.product_binary,
             *(
-                ROOT / "target" / "debug" / f"{name}{'.exe' if os.name == 'nt' else ''}"
+                binary_dir / f"{name}{'.exe' if os.name == 'nt' else ''}"
                 for name in (
                     "sc-lint-boundary",
                     "sc-lint-portability",

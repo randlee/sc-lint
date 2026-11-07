@@ -3247,7 +3247,7 @@ homepage = "https://example.invalid/sc-lint"
         self.write(
             &format!("boundaries/{owner_package}/boundary.toml"),
             &format!(
-                "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
+                "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[status]\nstate = \"concrete_landed\"\n",
                 owner_crate_path,
                 owner_package,
             ),
@@ -3269,7 +3269,7 @@ homepage = "https://example.invalid/sc-lint"
         self.write(
             &format!("boundaries/{boundary_directory}/boundary.toml"),
             &format!(
-                "boundary_id = \"BOUNDARY-App\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{owner_crate_path}\"\nname = \"App\"\n\n[public]\nfacade = \"App\"\n\n[implementation]\ntype = \"App\"\nmodule = \"{owner_crate_path}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"App\"]\n\n[dependencies]\nallowed_dependents = []\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n"
+                "boundary_id = \"BOUNDARY-App\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{owner_crate_path}\"\nname = \"App\"\n\n[public]\nfacade = \"App\"\n\n[implementation]\ntype = \"App\"\nmodule = \"{owner_crate_path}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"App\"]\n\n[dependencies]\nallowed_dependents = []\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[status]\nstate = \"concrete_landed\"\n"
             ),
         );
     }
