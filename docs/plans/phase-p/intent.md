@@ -1,4 +1,4 @@
-# Intent: phase-p
+# Intent: phase-p (0.8.7)
 
 ## Purpose
 
