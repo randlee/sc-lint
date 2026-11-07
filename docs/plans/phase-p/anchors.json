@@ -514,6 +514,20 @@
           "item": "lint-p-8",
           "reason": "The three migration guides are p-5's deliverable; p-8 consumes them.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:42:17+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "The 0.8.7 migration guides are p-5 scope (p-5 owns ANC-006); p-4 removes the kit installer and copies, and the breaks they cause are listed in p-5's guides.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:43:29+00:00",
+          "event": "excluded",
+          "item": "lint-p-3",
+          "reason": "The 0.8.7 migration guides are p-5 scope (p-5 satisfied ANC-006); p-3 implements init, and p-5 guides reproduce its path lists.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -524,6 +538,14 @@
         {
           "item": "lint-p-8",
           "reason": "The three migration guides are p-5's deliverable; p-8 consumes them."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "The 0.8.7 migration guides are p-5 scope (p-5 owns ANC-006); p-4 removes the kit installer and copies, and the breaks they cause are listed in p-5's guides."
+        },
+        {
+          "item": "lint-p-3",
+          "reason": "The 0.8.7 migration guides are p-5 scope (p-5 satisfied ANC-006); p-3 implements init, and p-5 guides reproduce its path lists."
         }
       ]
     },
@@ -659,6 +681,27 @@
           "item": "lint-p-8",
           "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008).",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:43:37+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-4 deletes installer copies in this repo.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:44:14+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-2 moves tool declarations into sc-lint.toml.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:44:56+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-6 writes the canary workflow and configuration.md.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -673,6 +716,18 @@
         {
           "item": "lint-p-8",
           "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008)."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-4 deletes installer copies in this repo."
+        },
+        {
+          "item": "lint-p-2",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-2 moves tool declarations into sc-lint.toml."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "Classifying prior failed upgrade branches is in the p-5 migration guides (p-5 satisfied ANC-008); p-6 writes the canary workflow and configuration.md."
         }
       ]
     },
@@ -761,6 +816,13 @@
           "item": "lint-p-2",
           "reason": "p-2 only bumps the workspace version so later candidates report 0.8.7; the recorded consumer upgrade run is p-7's deliverable.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:42:17+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "Running the upgrade in unpushed atm-core and sc-compose worktrees is p-7 scope; p-4 changes only this repo.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -783,6 +845,10 @@
         {
           "item": "lint-p-2",
           "reason": "p-2 only bumps the workspace version so later candidates report 0.8.7; the recorded consumer upgrade run is p-7's deliverable."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "Running the upgrade in unpushed atm-core and sc-compose worktrees is p-7 scope; p-4 changes only this repo."
         }
       ]
     },
@@ -856,6 +922,13 @@
           "item": "lint-p-2",
           "reason": "p-2 only bumps the workspace version; the publish gate on consumer just setup/lint/test is p-8's release sequence.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:42:17+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "The consumer canary gating publish is p-6 (workflow) and p-8 (release) scope; p-4's gate is this repo's just lint and just test.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -874,6 +947,10 @@
         {
           "item": "lint-p-2",
           "reason": "p-2 only bumps the workspace version; the publish gate on consumer just setup/lint/test is p-8's release sequence."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "The consumer canary gating publish is p-6 (workflow) and p-8 (release) scope; p-4's gate is this repo's just lint and just test."
         }
       ]
     },
@@ -955,6 +1032,13 @@
           "item": "lint-p-8",
           "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011).",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:43:18+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "Deleting install.py and every other installer copy is p-4 scope (p-4 satisfied ANC-011); p-2 only regenerates this repo bootstrap through init --just.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -973,6 +1057,10 @@
         {
           "item": "lint-p-8",
           "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011)."
+        },
+        {
+          "item": "lint-p-2",
+          "reason": "Deleting install.py and every other installer copy is p-4 scope (p-4 satisfied ANC-011); p-2 only regenerates this repo bootstrap through init --just."
         }
       ]
     },
@@ -1039,6 +1127,13 @@
           "item": "lint-p-5",
           "reason": "Fixed-path-list behaviour of init is p-3 scope (p-3 satisfied ANC-012); p-5 writes guides with fixed per-consumer lists.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T09:42:17+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "init acting only on fixed path lists, with no guessing, is p-3 scope (p-3 owns ANC-012); p-4 only removes installer copies.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -1053,6 +1148,10 @@
         {
           "item": "lint-p-5",
           "reason": "Fixed-path-list behaviour of init is p-3 scope (p-3 satisfied ANC-012); p-5 writes guides with fixed per-consumer lists."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "init acting only on fixed path lists, with no guessing, is p-3 scope (p-3 owns ANC-012); p-4 only removes installer copies."
         }
       ]
     },
