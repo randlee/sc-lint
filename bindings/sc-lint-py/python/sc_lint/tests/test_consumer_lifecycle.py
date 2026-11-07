@@ -117,6 +117,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             if not cls.product_binary.is_absolute():
                 cls.product_binary = ROOT / cls.product_binary
         else:
+            # Direct pytest runs lack just's SC_LINT_BIN; honor cargo's target override.
             target_dir = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
             if not target_dir.is_absolute():
                 target_dir = ROOT / target_dir

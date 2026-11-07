@@ -76,6 +76,7 @@ _lint-spell:
 _lint-pytests:
     {{python_cmd}} -m sc_lint.run_pytests
 
+# Consumer fixtures must not inherit CARGO_TARGET_DIR: their own cargo builds use local targets.
 [private]
 _source-repo-pytests:
     {{python_cmd}} -c "import os, runpy; os.environ.pop('CARGO_TARGET_DIR', None); runpy.run_module('pytest', run_name='__main__')" -q bindings/sc-lint-py/python/sc_lint/tests/test_consumer_contract.py bindings/sc-lint-py/python/sc_lint/tests/test_consumer_lifecycle.py bindings/sc-lint-py/python/sc_lint/tests/test_orchestration_contracts.py bindings/sc-lint-py/python/sc_lint/tests/test_release_artifacts.py .claude/skills/closing-triage/scripts/test_query_open_findings.py .claude/skills/graph-orchestration/scripts/test_validate_findings.py .claude/skills/triaging-findings/tests/test_check_dependencies.py .claude/skills/triaging-findings/tests/test_triage_record_template.py .claude/skills/triaging-findings/tests/test_qa_triage_prompt.py .github/scripts/tests packages/sc-lint-adoption/tests .just/tests/test_script_test_gate.py .just/tests/test_prerelease_tag.py .just/tests/test_team_lead_roster_check.py .just/tests/test_lint_boundaries_rust_parity.py tests/adr tests/adoption/test_skill_assets.py tests/docs/test_action_docs.py

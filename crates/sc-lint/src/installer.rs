@@ -567,14 +567,14 @@ fn docs_bundle_complete(path: &Path) -> bool {
 }
 
 fn payload_validation_issue(entries: &[PayloadEntry]) -> Option<String> {
-    payload_validation_issue_with_timeout(entries, BACKEND_PROBE_TIMEOUT)
+    payload_validation_issue_with_default_probe(entries, backend_cli_failure)
 }
 
-fn payload_validation_issue_with_timeout(
+fn payload_validation_issue_with_default_probe(
     entries: &[PayloadEntry],
-    probe_timeout: Duration,
+    probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
 ) -> Option<String> {
-    payload_validation_issue_with_probe(entries, probe_timeout, backend_cli_failure)
+    payload_validation_issue_with_probe(entries, BACKEND_PROBE_TIMEOUT, probe)
 }
 
 fn payload_validation_issue_with_probe(
@@ -622,14 +622,14 @@ pub(crate) fn managed_payload_complete(binary: &Path) -> bool {
 }
 
 fn managed_payload_validation_issue(binary: &Path) -> Option<String> {
-    managed_payload_validation_issue_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
+    managed_payload_validation_issue_with_default_probe(binary, backend_cli_failure)
 }
 
-fn managed_payload_validation_issue_with_timeout(
+fn managed_payload_validation_issue_with_default_probe(
     binary: &Path,
-    probe_timeout: Duration,
+    probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
 ) -> Option<String> {
-    managed_payload_validation_issue_with_probe(binary, probe_timeout, backend_cli_failure)
+    managed_payload_validation_issue_with_probe(binary, BACKEND_PROBE_TIMEOUT, probe)
 }
 
 fn managed_payload_validation_issue_with_probe(
@@ -1613,18 +1613,38 @@ mod tests {
     }
 
     #[test]
-    fn backend_probe_accepts_a_healthy_companion_after_the_old_two_second_limit() {
-        let elapsed = std::cell::Cell::new(Duration::ZERO);
+    fn default_payload_probes_receive_the_production_timeout() {
+        assert!(BACKEND_PROBE_TIMEOUT > Duration::from_secs(2));
+        let fixture = TempDir::new().expect("fixture");
+        let backend = if cfg!(windows) {
+            format!("{}.exe", MANAGED_BACKENDS[0])
+        } else {
+            MANAGED_BACKENDS[0].to_string()
+        };
+        let path = fixture.path().join(backend);
+        let entries = [PayloadEntry {
+            source: path.clone(),
+            target: path,
+        }];
+        let mut calls = 0;
+        let mut probe = |_: &Path, _: &str, timeout: Duration| {
+            assert_eq!(timeout, BACKEND_PROBE_TIMEOUT);
+            calls += 1;
+            Some("controlled probe result".to_string())
+        };
         assert_eq!(
-            poll_until(
-                || Ok((elapsed.get() >= Duration::from_millis(2250)).then_some(())),
-                || elapsed.get() >= BACKEND_PROBE_TIMEOUT,
-                || elapsed.set(elapsed.get() + Duration::from_millis(250)),
-            )
-            .expect("controlled probe polling"),
-            Some(()),
-            "healthy companion should pass when its first help response exceeds the old deadline"
+            payload_validation_issue_with_default_probe(&entries, &mut probe).as_deref(),
+            Some("controlled probe result")
         );
+        assert_eq!(
+            managed_payload_validation_issue_with_default_probe(
+                &fixture.path().join("sc-lint"),
+                &mut probe
+            )
+            .as_deref(),
+            Some("controlled probe result")
+        );
+        assert_eq!(calls, 2);
     }
 
     #[cfg(unix)]
