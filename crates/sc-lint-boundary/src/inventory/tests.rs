@@ -59,10 +59,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -339,10 +335,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = []
-review_gates = []
 
 [status]
 state = "concrete_landed"
@@ -685,9 +677,30 @@ fn rejects_planning_metadata_with_malformed_current_sprint() {
 }
 
 #[test]
+fn rejects_removed_enforcement_section_naming_the_record() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "[status]",
+            "[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]",
+        )
+    });
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("[enforcement] is a load error")
+    );
+    assert!(error.contains("boundary-analyzer.toml"), "{error}");
+    assert!(error.contains("`[enforcement]` section"), "{error}");
+    assert!(error.contains("REQ-SCB-026"), "{error}");
+    assert!(error.contains("must be deleted"), "{error}");
+}
+
+#[test]
 fn rejects_unknown_fields_in_all_boundary_tables() {
     type UnknownFieldCase = (&'static str, Box<dyn Fn(String) -> String>);
-    let cases: [UnknownFieldCase; 9] = [
+    let cases: [UnknownFieldCase; 8] = [
         (
             "unexpected_public",
             Box::new(|contents| {
@@ -727,15 +740,6 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
                 contents.replace(
                     "forbidden_test_bypasses = []",
                     "forbidden_test_bypasses = []\nunexpected_testing = true",
-                )
-            }),
-        ),
-        (
-            "unexpected_enforcement",
-            Box::new(|contents| {
-                contents.replace(
-                    "review_gates = [\"no_proc_macro_dependency\"]",
-                    "review_gates = [\"no_proc_macro_dependency\"]\nunexpected_enforcement = true",
                 )
             }),
         ),
@@ -901,10 +905,6 @@ notes = ["Documented contract."]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = []
-review_gates = []
-
 [status]
 state = "active"
 notes = ["Live."]
@@ -943,10 +943,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = []
-review_gates = []
-
 [status]
 state = "retired"
 "#,
@@ -983,10 +979,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = []
-review_gates = []
 
 [status]
 state = "unix_implemented_windows_pending"
@@ -1031,10 +1023,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = []
-review_gates = []
 
 [status]
 state = "concrete_landed"
@@ -1082,10 +1070,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
 
 [status]
 state = "concrete_landed"
@@ -1138,10 +1122,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1187,10 +1167,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
 
 [status]
 state = "concrete_landed"
@@ -1306,10 +1282,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1359,10 +1331,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1410,10 +1378,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
 
 [status]
 state = "concrete_landed"
@@ -1465,10 +1429,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1513,10 +1473,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = []
-review_gates = []
 
 [status]
 state = "concrete_landed"
@@ -1598,10 +1554,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = []
-review_gates = []
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1653,10 +1605,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
 
 [status]
 state = "concrete_landed"
@@ -1714,10 +1662,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1770,10 +1714,6 @@ forbidden = []
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
-
 [status]
 state = "concrete_landed"
 "#,
@@ -1820,10 +1760,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = []
-review_gates = []
 
 [status]
 state = "concrete_landed"

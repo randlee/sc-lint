@@ -53,6 +53,7 @@ mod render;
 mod rule_catalog;
 #[cfg(test)]
 mod tests;
+mod visibility_policy;
 
 use rule_catalog::rule;
 
@@ -349,12 +350,12 @@ struct TargetContext {
     workspace_dependency_roots: BTreeMap<String, CrateId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ItemVisibility {
     Private,
-    Public,
-    Crate,
     Restricted,
+    Crate,
+    Public,
 }
 
 impl ItemVisibility {
@@ -364,6 +365,25 @@ impl ItemVisibility {
             Self::Public => "public",
             Self::Crate => "crate",
             Self::Restricted => "restricted",
+        }
+    }
+
+    fn from_graph(label: Option<&str>) -> Option<Self> {
+        match label? {
+            "private" => Some(Self::Private),
+            "restricted" => Some(Self::Restricted),
+            "crate" => Some(Self::Crate),
+            "public" => Some(Self::Public),
+            _ => None,
+        }
+    }
+
+    fn as_source_str(self) -> &'static str {
+        match self {
+            Self::Private => "private",
+            Self::Restricted => "pub(super)/pub(self)/pub(in path)",
+            Self::Crate => "pub(crate)",
+            Self::Public => "pub",
         }
     }
 }
@@ -381,7 +401,17 @@ impl GraphBuilder {
             !node.package.is_empty(),
             "graph nodes must carry a non-empty package name"
         );
-        if !self.nodes.iter().any(|existing| existing.id == node.id) {
+        if let Some(existing) = self
+            .nodes
+            .iter_mut()
+            .find(|existing| existing.id == node.id)
+        {
+            if ItemVisibility::from_graph(node.visibility)
+                > ItemVisibility::from_graph(existing.visibility)
+            {
+                *existing = node;
+            }
+        } else {
             self.nodes.push(node);
         }
     }
@@ -546,9 +576,12 @@ fn selected_graph_rule_findings(
         findings.extend(analysis::analyze_forbid_external_impls(graph));
     }
     if rule_selected(filter, &[Boundaries]) {
-        findings.extend(analysis::analyze_named_callers(
+        let raw_inventory = inventory.as_raw_inventory();
+        findings.extend(analysis::analyze_named_callers(graph, &raw_inventory));
+        findings.extend(visibility_policy::analyze_declared_visibility(
             graph,
-            &inventory.as_raw_inventory(),
+            &raw_inventory,
+            metadata,
         ));
     }
     if filter.is_none() {

@@ -188,8 +188,10 @@ Recommended approach:
 - deserialize TOML into that existing model
 - only add schema changes where TOML materially improves the representation
 - for contract-owner records with `implementation.visibility = "trait_only"`,
-  absent `implementation.type` and `implementation.module` must be interpreted
-  as null rather than represented as empty-string sentinels
+  `implementation.type` and `implementation.module` may both be omitted or
+  both name an implementing type in any workspace library crate; omitted
+  values are null, not empty-string sentinels. A named type is checked for
+  public visibility.
 
 Additional recommendation:
 

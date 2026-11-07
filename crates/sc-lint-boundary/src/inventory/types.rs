@@ -431,7 +431,6 @@ pub(crate) struct RawBoundaryRecord {
     pub(crate) references: ReferencesSection,
     pub(crate) contracts: Option<ContractsSection>,
     pub(crate) testing: TestingSection,
-    pub(crate) enforcement: EnforcementSection,
     pub(crate) status: StatusSection,
     #[serde(default, rename = "extensions")]
     _extensions: Option<toml::Table>,
@@ -453,7 +452,6 @@ pub(crate) struct BoundaryRecord {
     pub(crate) references: ReferencesSection,
     pub(crate) contracts: Option<ContractsSection>,
     pub(crate) testing: TestingSection,
-    pub(crate) enforcement: EnforcementSection,
     pub(crate) status: StatusSection,
 }
 
@@ -523,13 +521,6 @@ pub(crate) struct ContractsSection {
 pub(crate) struct TestingSection {
     pub(crate) allowed_test_double_paths: Vec<String>,
     pub(crate) forbidden_test_bypasses: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct EnforcementSection {
-    pub(crate) lint_rules: Vec<String>,
-    pub(crate) review_gates: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
