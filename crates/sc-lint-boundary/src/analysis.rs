@@ -420,6 +420,7 @@ pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
             | RuleId::ScbBoundary002
             | RuleId::ScbBoundary003
             | RuleId::ScbBoundary004
+            | RuleId::ScbBoundary005
             | RuleId::ScbCaller001
             | RuleId::ScbDependency001
             | RuleId::ScbDependency002

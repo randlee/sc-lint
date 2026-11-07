@@ -416,6 +416,7 @@ Current intended distribution is:
   - boundary declarations and attribute-driven boundary policy
   - current owned extensions:
     - `SCB-CALLER-001` named-caller allowlist enforcement
+    - `SCB-BOUNDARY-005` implementation type and constructor visibility checks
     - `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` direct workspace
       package-edge policy, including stale configured permissions
     - dedicated operator-visible `dependencies` rule filter, separate from

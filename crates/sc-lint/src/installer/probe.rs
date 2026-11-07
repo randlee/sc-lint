@@ -188,27 +188,56 @@ pub(super) fn wait_for_backend_probe(
     timeout: Duration,
 ) -> Result<std::process::ExitStatus, String> {
     let deadline = Instant::now() + timeout;
+    wait_for_backend_probe_with(
+        child,
+        binary,
+        expected_name,
+        argument,
+        timeout,
+        || Instant::now() >= deadline,
+        || thread::sleep(BACKEND_PROBE_POLL_INTERVAL),
+    )
+}
+
+pub(super) fn wait_for_backend_probe_with(
+    child: &mut Child,
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
+    timeout: Duration,
+    expired: impl FnMut() -> bool,
+    pause: impl FnMut(),
+) -> Result<std::process::ExitStatus, String> {
+    match poll_until(|| child.try_wait(), expired, pause) {
+        Ok(Some(status)) => Ok(status),
+        Ok(None) => {
+            terminate_probe_processes(child);
+            Err(format!(
+                "backend companion `{expected_name}` at `{}` timed out after {} ms during its `{argument}` probe; process-tree cleanup was attempted",
+                binary.display(),
+                timeout.as_millis()
+            ))
+        }
+        Err(error) => {
+            terminate_probe_processes(child);
+            Err(format!(
+                "could not wait for backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ))
+        }
+    }
+}
+
+pub(super) fn poll_until<T>(
+    mut poll: impl FnMut() -> io::Result<Option<T>>,
+    mut expired: impl FnMut() -> bool,
+    mut pause: impl FnMut(),
+) -> io::Result<Option<T>> {
     loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status),
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
-            }
-            Ok(None) => {
-                terminate_probe_processes(child);
-                return Err(format!(
-                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `{argument}` probe; process-tree cleanup was attempted",
-                    binary.display(),
-                    timeout.as_millis()
-                ));
-            }
-            Err(error) => {
-                terminate_probe_processes(child);
-                return Err(format!(
-                    "could not wait for backend companion `{expected_name}` at `{}`: {error}",
-                    binary.display()
-                ));
-            }
+        match poll()? {
+            Some(status) => return Ok(Some(status)),
+            None if expired() => return Ok(None),
+            None => pause(),
         }
     }
 }
@@ -459,6 +488,19 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    fn probe_polling_reports_controlled_expiry() {
+        let ticks = std::cell::Cell::new(0);
+        let result = poll_until(
+            || Ok::<_, io::Error>(None::<()>),
+            || ticks.get() == 3,
+            || ticks.set(ticks.get() + 1),
+        )
+        .expect("controlled poll");
+        assert_eq!(result, None);
+        assert_eq!(ticks.get(), 3);
+    }
 
     #[test]
     fn missing_version_probe_returns_typed_start_failure_to_caller() {

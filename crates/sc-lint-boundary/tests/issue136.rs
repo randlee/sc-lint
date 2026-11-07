@@ -1133,10 +1133,6 @@ impl Fixture {
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
 
-                [enforcement]
-                lint_rules = []
-                review_gates = []
-
                 [status]
                 state = "{}"
             "#,
@@ -1208,10 +1204,6 @@ impl Fixture {
                 [testing]
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
-
-                [enforcement]
-                lint_rules = []
-                review_gates = []
 
                 [status]
                 state = "{state}"
