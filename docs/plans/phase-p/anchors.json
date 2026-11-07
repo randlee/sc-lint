@@ -80,6 +80,13 @@
           "item": "lint-p-7",
           "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001).",
           "replaced": false
+        },
+        {
+          "at": "2026-11-07T10:00:42+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "Which paths init writes or deletes, and their ADR-023 table entries, is p-3 scope (p-3 satisfied ANC-001); p-8 runs the release sequence.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -102,6 +109,10 @@
         {
           "item": "lint-p-7",
           "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001)."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "Which paths init writes or deletes, and their ADR-023 table entries, is p-3 scope (p-3 satisfied ANC-001); p-8 runs the release sequence."
         }
       ]
     },
