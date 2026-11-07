@@ -1,5 +1,5 @@
 ---
-version: 0.9.1
+version: 0.9.2
 ---
 
 # Development-review workflow
@@ -10,4 +10,4 @@ Read `references/development-gate.md` and `references/triage-and-iteration.md`. 
 
 ### E. Report
 
-Reports quote the user's own words back (`references/report-format.md`). Post the markdown from `report --run <run> --format md` as a comment on the judged bead (`bd comment <id> --file <report.md>`) or on the PR. Posting happens in the main session; agents never write to beads.
+Reports quote the user's own words back (`references/report-format.md`). Post the markdown from `report --run <run> --format md` as a comment on the judged bead (`bd comment <id> --file <report.md>`) or on the PR. Posting happens in the main session; the gate agents never write to beads.

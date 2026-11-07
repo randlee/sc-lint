@@ -1,5 +1,5 @@
 ---
-version: 0.9.1
+version: 0.9.2
 ---
 
 # Planning-review workflow
@@ -28,4 +28,4 @@ python3 "$S" coverage --runs "$P/anchor-runs" --gate plan --anchors "$A" --forma
 
 ### E. Report
 
-Reports quote the user's own words back (`references/report-format.md`). Post the markdown from `report --run <run> --format md` as a comment on the judged bead (using the selected tracker adapter) or on the PR. Posting happens in the main session; agents never write to beads.
+Reports quote the user's own words back (`references/report-format.md`). Post the markdown from `report --run <run> --format md` as a comment on the judged bead (using the selected tracker adapter) or on the PR. Posting happens in the main session; the gate agents never write to beads.
