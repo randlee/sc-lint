@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-012 |
-| Status | Accepted |
+| Status | Accepted; decision 3 amended 2026-11-07, approved by Rand (ADR-023) |
 | Approved by | Rand, 2026-10-16 |
 | Date | 2026-08-11, revised 2026-10-16 |
 | Deciders | Rand |
@@ -34,8 +34,8 @@ one test suite.
    unchanged. When the interpreter is missing, the shell's command-not-found
    failure is reported before the bootstrap runs; an interpreter older than
    3.9 makes the bootstrap stop with `CLI.SC_LINT_PYTHON_UNAVAILABLE`.
-3. `--check` and `--dry-run` are non-mutating. Re-running a current
-   integration is idempotent.
+3. `--dry-run` is non-mutating. Re-running a current integration is
+   idempotent. (`--check` removed by ADR-023 amendment 2026-11-07.)
 4. Source-maintainer recipes stay in this repository's root `Justfile`.
    Source versus consumer behavior is selected by the generated integration,
    never inferred from a directory name, Cargo manifest or package.

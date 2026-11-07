@@ -136,11 +136,11 @@ Deterministic check to pair with the development gate: each branch named in the 
 
 ## ANC-009
 
-Anchor: A phase-o sprint must run the documented upgrade with the 0.8.7 candidate in unpushed worktrees of atm-core `integrate/phase-bg` and sc-compose `integrate/phase-v` and record `just setup`, `just lint`, `just test` results.
+Anchor: A phase-p sprint must run the documented upgrade with the 0.8.7 candidate in unpushed worktrees of atm-core `integrate/phase-bg` and sc-compose `integrate/phase-v` and record `just setup`, `just lint`, `just test` results.
 
 > you can run the upgrade on a /sc-git-worktree on the atm-core and sc-compose repos (off the branch I specified).
 
-Said by Rand, phase-o planning, Flint session b1876c4f; locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-07. Status: locked. Version 1.
+Said by Rand, phase-o planning, Flint session b1876c4f; locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-07. Status: locked. Version 2.
 
 Summary: Real upgrade run in consumer worktrees
 
@@ -164,11 +164,11 @@ Deterministic check to pair with the development gate: the publish job depends o
 
 ## ANC-011
 
-Anchor: After phase-o, `sc-lint init --just` is the only code that writes sc-lint files into a consumer repository; `install.py` and every other installer copy are deleted.
+Anchor: After phase-p, `sc-lint init --just` is the only code that writes sc-lint files into a consumer repository; `install.py` and every other installer copy are deleted.
 
 > we can not leave stale scripts to support one method and not the other.
 
-Said by Rand, phase-o planning; Rand's direction recorded verbatim in ADR-023 (2026-11-05); locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-05. Status: locked. Version 1.
+Said by Rand, phase-o planning; Rand's direction recorded verbatim in ADR-023 (2026-11-05); locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-05. Status: locked. Version 2.
 
 Summary: One write path into consumers
 
@@ -206,28 +206,28 @@ Deterministic check to pair with the development gate: every ADR-023 ownership a
 
 ## ANC-014
 
-Anchor: Phase-o must delete more lines than it adds across `bootstrap.py`, `consumer_integration.rs`, `setup_tools.py` and `packages/sc-lint-adoption/`.
+Anchor: Phase-p must delete more lines than it adds across `bootstrap.py`, `consumer_integration.rs`, `setup_tools.py` and `packages/sc-lint-adoption/`.
 
 > I do NOT want a lot of code to install sc-lint.
 
-Said by Rand, phase-o epic provenance (Rand 2026-11-05); locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-05. Status: locked. Version 1.
+Said by Rand, phase-o epic provenance (Rand 2026-11-05); locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-05. Status: locked. Version 2.
 
 Summary: Less install code
 
-Scope: every phase-o sprint that touches the install path
+Scope: every phase-p sprint that touches the install path
 
-Deterministic check to pair with the development gate: git diff --shortstat origin/develop...integrate/phase-o -- <those paths> shows deletions > insertions
+Deterministic check to pair with the development gate: git diff --shortstat origin/develop...integrate/phase-p -- <those paths> shows deletions > insertions
 
 ## ANC-015
 
-Anchor: Every phase-o sprint bead must list numbered steps that each name a file path and its exact change.
+Anchor: Every phase-p sprint bead must list numbered steps that each name a file path and its exact change.
 
 > For now, I want specific tasks written up w/ code details (low on prose) so two agents would do the same thing if prompted.
 
-Said by Rand, phase-o planning, Flint session b1876c4f; locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-07. Status: locked. Version 1.
+Said by Rand, phase-o planning, Flint session b1876c4f; locked by Rand 2026-11-07 ('anchors are locked'), 2026-11-07. Status: locked. Version 2.
 
 Summary: Beads are numbered file-level steps
 
-Scope: every phase-o sprint bead
+Scope: every phase-p sprint bead
 
 Deterministic check to pair with the development gate: each sprint bead has a numbered step list; every step names a path

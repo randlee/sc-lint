@@ -279,7 +279,7 @@
       "id": "ANC-009",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "A phase-o sprint must run the documented upgrade with the 0.8.7 candidate in unpushed worktrees of atm-core `integrate/phase-bg` and sc-compose `integrate/phase-v` and record `just setup`, `just lint`, `just test` results.",
+      "statement": "A phase-p sprint must run the documented upgrade with the 0.8.7 candidate in unpushed worktrees of atm-core `integrate/phase-bg` and sc-compose `integrate/phase-v` and record `just setup`, `just lint`, `just test` results.",
       "quote": "you can run the upgrade on a /sc-git-worktree on the atm-core and sc-compose repos (off the branch I specified).",
       "kind": "directive",
       "stated_by": "Rand",
@@ -293,7 +293,7 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -306,6 +306,14 @@
           "at": "2026-11-07T02:34:55+00:00",
           "event": "created",
           "status": "locked"
+        },
+        {
+          "at": "2026-11-07T03:32:50+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "A phase-o sprint must run the documented upgrade with the 0.8.7 candidate in unpushed worktrees of atm-core `integrate/phase-bg` and sc-compose `integrate/phase-v` and record `just setup`, `just lint`, `just test` results."
         }
       ]
     },
@@ -347,7 +355,7 @@
       "id": "ANC-011",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "After phase-o, `sc-lint init --just` is the only code that writes sc-lint files into a consumer repository; `install.py` and every other installer copy are deleted.",
+      "statement": "After phase-p, `sc-lint init --just` is the only code that writes sc-lint files into a consumer repository; `install.py` and every other installer copy are deleted.",
       "quote": "we can not leave stale scripts to support one method and not the other.",
       "kind": "directive",
       "stated_by": "Rand",
@@ -361,7 +369,7 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -374,6 +382,14 @@
           "at": "2026-11-07T02:34:55+00:00",
           "event": "created",
           "status": "locked"
+        },
+        {
+          "at": "2026-11-07T03:32:50+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "After phase-o, `sc-lint init --just` is the only code that writes sc-lint files into a consumer repository; `install.py` and every other installer copy are deleted."
         }
       ]
     },
@@ -449,21 +465,21 @@
       "id": "ANC-014",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Phase-o must delete more lines than it adds across `bootstrap.py`, `consumer_integration.rs`, `setup_tools.py` and `packages/sc-lint-adoption/`.",
+      "statement": "Phase-p must delete more lines than it adds across `bootstrap.py`, `consumer_integration.rs`, `setup_tools.py` and `packages/sc-lint-adoption/`.",
       "quote": "I do NOT want a lot of code to install sc-lint.",
       "kind": "structural",
       "stated_by": "Rand",
       "stated_at": "2026-11-05",
       "context": "phase-o epic provenance (Rand 2026-11-05); locked by Rand 2026-11-07 ('anchors are locked')",
       "summary": "Less install code",
-      "scope": "every phase-o sprint that touches the install path",
-      "deterministic_check": "git diff --shortstat origin/develop...integrate/phase-o -- <those paths> shows deletions > insertions",
+      "scope": "every phase-p sprint that touches the install path",
+      "deterministic_check": "git diff --shortstat origin/develop...integrate/phase-p -- <those paths> shows deletions > insertions",
       "fixtures": {
         "pass": [],
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -476,6 +492,16 @@
           "at": "2026-11-07T02:34:56+00:00",
           "event": "created",
           "status": "locked"
+        },
+        {
+          "at": "2026-11-07T03:32:50+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "scope",
+            "deterministic_check"
+          ],
+          "previous_statement": "Phase-o must delete more lines than it adds across `bootstrap.py`, `consumer_integration.rs`, `setup_tools.py` and `packages/sc-lint-adoption/`."
         }
       ]
     },
@@ -483,21 +509,21 @@
       "id": "ANC-015",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Every phase-o sprint bead must list numbered steps that each name a file path and its exact change.",
+      "statement": "Every phase-p sprint bead must list numbered steps that each name a file path and its exact change.",
       "quote": "For now, I want specific tasks written up w/ code details (low on prose) so two agents would do the same thing if prompted.",
       "kind": "structural",
       "stated_by": "Rand",
       "stated_at": "2026-11-07",
       "context": "phase-o planning, Flint session b1876c4f; locked by Rand 2026-11-07 ('anchors are locked')",
       "summary": "Beads are numbered file-level steps",
-      "scope": "every phase-o sprint bead",
+      "scope": "every phase-p sprint bead",
       "deterministic_check": "each sprint bead has a numbered step list; every step names a path",
       "fixtures": {
         "pass": [],
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -510,6 +536,15 @@
           "at": "2026-11-07T02:34:56+00:00",
           "event": "created",
           "status": "locked"
+        },
+        {
+          "at": "2026-11-07T03:32:51+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "scope"
+          ],
+          "previous_statement": "Every phase-o sprint bead must list numbered steps that each name a file path and its exact change."
         }
       ]
     }

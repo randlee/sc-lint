@@ -1,3 +1,5 @@
+Applied in the lint-p-1 commit "plan(phase-p): apply approved ADR-023/REQ-PRODUCT-025/ADR-012 amendment (lint-p-1); anchor fixes" (approved by Rand 2026-11-07).
+
 # DRAFT: ADR-023 / REQ-PRODUCT-025 / ADR-012 amendment for phase-p
 
 Status: **draft, awaiting Rand's approval.** Nothing below is applied yet. Each change cites the anchor (`anchors.md`) that drives it.

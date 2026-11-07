@@ -623,20 +623,20 @@ The product should support both:
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
-- `REQ-PRODUCT-025` (Accepted — Rand, 2026-11-06, ADR-023)
-  sc-lint is installed through a release channel and a repository is adopted
+- `REQ-PRODUCT-025` (Accepted — Rand, 2026-11-06, ADR-023; amended
+  2026-11-07, approved by Rand)
+  sc-lint is installed through a release channel, and a repository is adopted
   and upgraded only through `sc-lint init --just` (upgrade: `just upgrade`).
-  All consumer configuration lives in `sc-lint.toml`, including tool
-  declarations under `[tool.sc-lint.tools]`; sc-lint owns `.sc-lint/` and the
-  adoption skill and agent. Every path sc-lint writes is in the ADR-023
-  ownership table: consumer files are created only when missing and never
-  rewritten; sc-lint-owned files are overwritten with the shipped bytes on every
-  `init`, with no content comparison, digest list or conflict detection.
-  Retired paths are removed by the consumer following the documented migration
-  guide; `init --check` fails when an sc-lint-owned file differs from the
-  shipped bytes. sc-lint runs no migration or detection heuristics. Each
-  sc-lint-owned file has exactly one source in this repository, and no other
-  copy exists.
+  All consumer configuration lives in `sc-lint.toml`, including
+  `[tool.sc-lint.tools]`; sc-lint owns `.sc-lint/` and the adoption skill and
+  agent. Every path sc-lint writes or deletes is in the ADR-023 ownership and
+  retired-path tables. Consumer files are created only when missing and never
+  rewritten. sc-lint-owned files are overwritten with the shipped bytes on
+  every `init`, with no content comparison, digest list, conflict detection or
+  `--check` mode. `init` deletes the fixed retired paths ADR-023 marks `init`;
+  the consumer removes the other leftovers following its migration guide.
+  sc-lint runs no detection heuristics. Each sc-lint-owned file has exactly one
+  source in this repository.
 
 Phase K's Accepted ADR-017 extends existing adoption and CLI contracts:
 consumer configuration may declare exact cargo-tool versions and rustup
