@@ -75,7 +75,7 @@ Facts verified 2026-11-05 at sc-lint `develop` and in each consumer:
 ### 2. File ownership
 
 **Your data goes in `sc-lint.toml`. sc-lint owns `.sc-lint/`.** Every path
-sc-lint touches is in this table; sc-lint never writes any other path.
+sc-lint touches is in this table; sc-lint never writes any other path, and deletes only the retired paths in §3.
 
 | Path | Owner | What `sc-lint init --just` does |
 | --- | --- | --- |
