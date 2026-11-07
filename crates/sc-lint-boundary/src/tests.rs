@@ -6675,6 +6675,15 @@ fn scb_boundary_005_passes_when_source_matches_declared_visibility() {
         false,
     );
     assert!(findings.is_empty(), "{findings:#?}");
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "public"
+constructor = "public""#,
+        false,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
 }
 
 #[test]
@@ -6787,6 +6796,18 @@ fn scb_boundary_005_does_not_find_another_types_constructor() {
     );
     assert_eq!(findings.len(), 1, "{findings:#?}");
     assert!(findings[0].contains("constructor `store::roster::Store::new` declared `pub(crate)` but source is `not found`"), "{findings:#?}");
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Other; }\n",
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|message| message.contains("but source is `not found`")),
+        "{findings:#?}"
+    );
 }
 
 #[test]
