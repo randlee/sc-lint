@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "success",
     "canceled",
     "aborted_by",
@@ -13,6 +14,9 @@
     "metadata"
   ],
   "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
     "success": {
       "type": "boolean"
     },
@@ -644,12 +648,14 @@
         },
         "gate": {
           "enum": [
+            "testability",
             "planning",
             "development"
           ]
         },
         "disposition": {
           "enum": [
+            "anchor_defect",
             "plan_violation",
             "question_defect"
           ]
@@ -669,7 +675,10 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "sealed_question_set": {
-          "$ref": "#/$defs/sealedQuestionSet"
+          "oneOf": [
+            {"$ref": "#/$defs/sealedQuestionSet"},
+            {"$ref": "#/$defs/rubricQuestionSet"}
+          ]
         },
         "candidate_rankings": {
           "type": "array"
@@ -705,6 +714,21 @@
         }
       },
       "allOf": [
+        {
+          "if": {"properties": {"gate": {"const": "testability"}}},
+          "then": {"properties": {
+            "sealed_question_set": {"$ref": "#/$defs/rubricQuestionSet"},
+            "disposition": {"enum": ["anchor_defect", "question_defect"]}
+          }},
+          "else": {"properties": {
+            "sealed_question_set": {"$ref": "#/$defs/sealedQuestionSet"},
+            "disposition": {"enum": ["plan_violation", "question_defect"]}
+          }}
+        },
+        {
+          "if": {"properties": {"disposition": {"const": "anchor_defect"}}},
+          "then": {"properties": {"question_action": {"const": "unchanged"}}}
+        },
         {
           "if": {
             "properties": {
@@ -861,6 +885,13 @@
     },
     "tuningEvent": {
       "type": "object",
+      "if": {
+        "anyOf": [
+          {"properties": {"event_index": {"minimum": 2}}},
+          {"properties": {"event": {"const": "protocol_re_evaluated"}}}
+        ]
+      },
+      "then": {"properties": {"supersedes": {"type": "object"}}},
       "additionalProperties": false,
       "required": [
         "event_index",
@@ -928,7 +959,7 @@
             },
             "anchor_id": {
               "type": "string",
-              "pattern": "^ANC-[0-9]{3}$"
+              "minLength": 1
             },
             "anchor_version": {
               "type": [
@@ -1059,7 +1090,7 @@
           }
         },
         "supersedes": {
-          "type": "object",
+          "type": ["object", "null"],
           "additionalProperties": false,
           "required": [
             "protocol_version",
