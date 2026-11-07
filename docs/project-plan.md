@@ -133,10 +133,18 @@ Active follow-on after the completed Phase `C` line:
 
 The scheduled sprint plans are:
 
-- `phase-o` (0.8.7)
+- `phase-o` (bug fixes; no release of its own, 0.8.7 ships with phase-p)
   - one install and upgrade path (ADR-023), consumer canary before publish,
     boundary #860/#861, version-sync #783
   - plan in beads: root `lint-phase-o`, index `docs/plans/phase-o.jsonl`
+
+- `phase-p` (0.8.7)
+  - sc-lint file-ownership contract (ADR-023 as amended): init overwrites
+    sc-lint-owned files, creates consumer files only if missing, deletes
+    retired paths; one install source; per-consumer migration guides;
+    consumer canary gates publish
+  - plan in beads: root `lint-phase-p`, index `docs/plans/phase-p.jsonl`
+    (branch `integrate/phase-p`)
 
 - `lint-spx.1`
   - Beads-backed ATM task-assignment orchestration

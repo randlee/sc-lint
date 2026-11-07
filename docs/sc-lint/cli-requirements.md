@@ -381,7 +381,7 @@ specialized backend tools and mixed Rust/Python implementations.
   [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-022`
-  `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
+  `sc-lint init --just [--dry-run]` seeds the consumer templates
   `sc-lint.toml` and `Justfile` only when they are missing, and materializes
   the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
   consumer-owned: an existing file is left exactly as it is and is never
@@ -389,9 +389,9 @@ specialized backend tools and mixed Rust/Python implementations.
   overwritten with the shipped bytes on ordinary initialization; no conflict
   or prior-release digest exception applies. An owned path that is a symlink,
   including a dangling link, is replaced by the shipped regular file without
-  touching its target. `--check` and `--dry-run` do not mutate files; `--check`
-  reports an absent, symlinked, or differing owned file as
-  `CLI.SC_LINT_INTEGRATION_OUTDATED`.
+  touching its target. `--dry-run` does not mutate files. There is no
+  `--check` mode; the consumer reviews what `init` changed in its commit or
+  pull-request diff.
   A consumer README is outside the command's write set.
   (Amended for phase-o, ADR-023; Pending Rand approval in PR #905.)
   E.6 owns optional CI workflow generation because it depends on the reusable

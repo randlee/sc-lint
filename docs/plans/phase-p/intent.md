@@ -11,8 +11,8 @@ Establish a firm file-ownership contract between sc-lint and its consumers, so t
 ## Success
 
 - Every path sc-lint writes in a consumer is either sc-lint-owned (always overwritten), consumer-owned (created only if missing, never edited) or retired (deleted by `sc-lint init --just`).
-- Before 0.8.7 ships, each consumer (atm-core, sc-compose, sc-observability) has a migration guide naming every break and its fix.
-- 0.8.7 publishes only after the candidate passes `just setup`, `just lint` and `just test` in real consumers.
+- Before 0.8.7 ships, each consumer (atm-core, sc-compose, sc-observability) has a migration guide naming every break and its fix; sc-runtime and wyvern also get guides (Rand 2026-11-07).
+- 0.8.7 publishes only after the candidate passes `just setup`, `just lint` and `just test` in atm-core and sc-compose (ANC-010) and in a project generated from sc-runtime scaffolding (Rand 2026-11-07: "I expect 90% of new sc-lint consumers will be based on sc-runtime scaffolding"; ADR-023 §6 change pending in `ADR-023-plugin-amendment-DRAFT.md`, gate `lint-bg1s`).
 - The install path is smaller after phase-p than before.
 
 ## Out of scope
