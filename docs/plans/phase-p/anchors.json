@@ -45,6 +45,63 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "p-2 moves tool declarations to sc-lint.toml; which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "p-4 deletes installer copies and kit tests; it does not change which paths init writes (p-3 owns ANC-001).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001); p-6 documents them under ANC-013, which it satisfies.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-2",
+          "reason": "p-2 moves tool declarations to sc-lint.toml; which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001)."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "p-4 deletes installer copies and kit tests; it does not change which paths init writes (p-3 owns ANC-001)."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001); p-6 documents them under ANC-013, which it satisfies."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001)."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "Which paths init writes or deletes is p-3's scope (p-3 satisfied ANC-001)."
         }
       ]
     },
@@ -90,6 +147,63 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "p-2 does not change how init writes owned files; p-3 implements write-without-compare (p-3 satisfied ANC-002).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "p-4 does not change init's write path; write-without-compare is p-3 (p-3 satisfied ANC-002).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "p-6 builds the canary workflow and docs; init's write-without-compare behaviour is p-3 (p-3 satisfied ANC-002).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "init's write-without-compare behaviour is p-3's scope (p-3 satisfied ANC-002).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "init's write-without-compare behaviour is p-3's scope (p-3 satisfied ANC-002).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-2",
+          "reason": "p-2 does not change how init writes owned files; p-3 implements write-without-compare (p-3 satisfied ANC-002)."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "p-4 does not change init's write path; write-without-compare is p-3 (p-3 satisfied ANC-002)."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "p-6 builds the canary workflow and docs; init's write-without-compare behaviour is p-3 (p-3 satisfied ANC-002)."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "init's write-without-compare behaviour is p-3's scope (p-3 satisfied ANC-002)."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "init's write-without-compare behaviour is p-3's scope (p-3 satisfied ANC-002)."
         }
       ]
     },
@@ -180,6 +294,63 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004); p-2 only stops reading install.json.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-2",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004); p-2 only stops reading install.json."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004)."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004)."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004)."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "Retired-path deletion by init is p-3's scope (p-3 satisfied ANC-004)."
         }
       ]
     },
@@ -225,6 +396,41 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005); p-2 touches setup_tools, not init modes.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-2",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005); p-2 touches setup_tools, not init modes."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005)."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "Removing init --check is p-3's scope (p-3 satisfied ANC-005)."
         }
       ]
     },
@@ -270,6 +476,30 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "Writing the three migration guides is p-5's deliverable (ANC-006); p-7 runs them and updates them with results.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:52:48+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "The three migration guides are p-5's deliverable; p-8 consumes them.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-7",
+          "reason": "Writing the three migration guides is p-5's deliverable (ANC-006); p-7 runs them and updates them with results."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "The three migration guides are p-5's deliverable; p-8 consumes them."
         }
       ]
     },
@@ -315,6 +545,30 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "path@sha citations in the guides are p-5's deliverable (p-5 satisfied ANC-007).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:52:48+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "path@sha citations in the guides are p-5's deliverable (p-5 satisfied ANC-007).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-7",
+          "reason": "path@sha citations in the guides are p-5's deliverable (p-5 satisfied ANC-007)."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "path@sha citations in the guides are p-5's deliverable (p-5 satisfied ANC-007)."
         }
       ]
     },
@@ -360,6 +614,41 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-3",
+          "reason": "Failed-branch classification is in the migration guides written by p-5.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:52:48+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-3",
+          "reason": "Failed-branch classification is in the migration guides written by p-5."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008)."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "Failed-branch classification is p-5's deliverable (p-5 satisfied ANC-008)."
         }
       ]
     },
@@ -413,6 +702,52 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-3",
+          "reason": "The consumer upgrade run with the candidate is p-6/p-7 canary work.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "The recorded upgrade run in unpushed atm-core/sc-compose worktrees is p-7's deliverable; p-6 adds the repo-owned canary workflow.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "The recorded upgrade run in unpushed consumer worktrees is p-7's deliverable; p-5 writes the guides.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:52:48+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "The recorded upgrade run in unpushed worktrees is p-7's deliverable.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-3",
+          "reason": "The consumer upgrade run with the candidate is p-6/p-7 canary work."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "The recorded upgrade run in unpushed atm-core/sc-compose worktrees is p-7's deliverable; p-6 adds the repo-owned canary workflow."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "The recorded upgrade run in unpushed consumer worktrees is p-7's deliverable; p-5 writes the guides."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "The recorded upgrade run in unpushed worktrees is p-7's deliverable."
         }
       ]
     },
@@ -458,6 +793,41 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-3",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-3",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "The publish gate on consumer just setup/lint/test is p-8's release sequence."
         }
       ]
     },
@@ -511,6 +881,52 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Deleting install.py and other installer copies is p-4's scope; p-6 only removes kit references from docs.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:52:48+00:00",
+          "event": "excluded",
+          "item": "lint-p-8",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-6",
+          "reason": "Deleting install.py and other installer copies is p-4's scope; p-6 only removes kit references from docs."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011)."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011)."
+        },
+        {
+          "item": "lint-p-8",
+          "reason": "Deleting install.py and other installer copies is p-4's scope (p-4 satisfied ANC-011)."
         }
       ]
     },
@@ -556,6 +972,30 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-2",
+          "reason": "Fixed-path-list behaviour of init is p-3's scope (p-3 satisfied ANC-012); p-2 reads only the declared --config file.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:41+00:00",
+          "event": "excluded",
+          "item": "lint-p-6",
+          "reason": "Fixed-path-list behaviour of init is p-3's scope (p-3 satisfied ANC-012).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-2",
+          "reason": "Fixed-path-list behaviour of init is p-3's scope (p-3 satisfied ANC-012); p-2 reads only the declared --config file."
+        },
+        {
+          "item": "lint-p-6",
+          "reason": "Fixed-path-list behaviour of init is p-3's scope (p-3 satisfied ANC-012)."
         }
       ]
     },
@@ -608,6 +1048,52 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-3",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:50:28+00:00",
+          "event": "excluded",
+          "item": "lint-p-4",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-5",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6 (p-6 satisfied ANC-013).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-07T07:51:57+00:00",
+          "event": "excluded",
+          "item": "lint-p-7",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6 (p-6 satisfied ANC-013).",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "lint-p-3",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6."
+        },
+        {
+          "item": "lint-p-4",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6."
+        },
+        {
+          "item": "lint-p-5",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6 (p-6 satisfied ANC-013)."
+        },
+        {
+          "item": "lint-p-7",
+          "reason": "docs-bundle/configuration.md path listing is written by p-6 (p-6 satisfied ANC-013)."
         }
       ]
     },
