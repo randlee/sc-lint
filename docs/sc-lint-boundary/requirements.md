@@ -209,7 +209,7 @@ Plan authority: `lint-l-8`.
   fails inventory loading with a fatal diagnostic naming the file and stating
   that the section is removed and must be deleted.
 
-- `REQ-SCB-027` (Accepted — Rand, 2026-11-06; #861; amended — Rand, 2026-11-06, CR-5 option 2)
+- `REQ-SCB-027` (Accepted — Rand, 2026-11-06; #861. `trait_only` amended for phase-o, #861 CR-5 option 2; Pending Rand approval in PR #905.)
   `SCB-BOUNDARY-005` compares each boundary record's declared
   `[implementation]` visibility with the source. For a record whose
   `visibility` is `pub(crate)` or `private`, the named `type` in `module` fails
