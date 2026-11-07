@@ -94,9 +94,10 @@ Use the example in:
   `findings_hash` again, treat it as a stale replay and do not open a new
   hardening round
 - substantial scope drift from the user-discussed plan is a hard stop
-- an ADR the phase depends on that is not `Accepted` on the planning branch
-  before step 6 is a hard stop; ADRs and requirements updates land during
-  planning, never inside a sprint
+- an ADR the phase depends on is drafted on the planning branch and must be
+  `Accepted` before the phase's first dispatch, not before; planning and the
+  plan's beads never wait on acceptance; ADRs and requirements updates land
+  during planning, never inside a sprint
 - remaining in-scope work without sprint ownership is a hard stop
 - a phase plan without a `## Branch Stacks And Parallelism` section is a
   hard stop; sprints are planned as `gh stack` layers
