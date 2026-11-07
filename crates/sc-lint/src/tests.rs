@@ -2529,7 +2529,7 @@ fn lint_profiles_have_stable_membership() {
 
     assert_eq!(
         step_names(steps),
-        vec!["fmt", "version", "manifests", "spell", "pytests"]
+        vec!["version", "fmt", "manifests", "spell", "pytests"]
     );
 }
 
@@ -2614,7 +2614,7 @@ fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
     let steps = success.data["steps"].as_array().expect("steps array");
     assert_eq!(
         step_names(steps),
-        ["fmt", "version", "manifests", "spell", "pytests"]
+        ["version", "fmt", "manifests", "spell", "pytests"]
     );
 }
 
@@ -2627,6 +2627,7 @@ fn lint_profile_starts_cargo_lane_steps_in_plan_order() {
         .expect("full profile succeeds");
 
     let cargo_lane = [
+        "version",
         "fmt",
         "clippy",
         "deny",
@@ -2660,7 +2661,7 @@ fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
         .expect_err("the profile fails");
     assert_eq!(
         error.message,
-        "3 of 14 steps failed: [1] clippy, [6] spell, [8] sc-boundary"
+        "3 of 14 steps failed: [3] spell, [5] clippy, [8] sc-boundary"
     );
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
     assert_eq!(error.code(), "profile.steps_failed");
@@ -2677,8 +2678,8 @@ fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
             .collect::<Vec<_>>();
         assert_eq!(keys, ["exit_code", "index", "message", "name"]);
     }
-    assert_eq!(failed[1]["index"], 6);
-    assert_eq!(failed[1]["name"], "spell");
+    assert_eq!(failed[0]["index"], 3);
+    assert_eq!(failed[0]["name"], "spell");
     let ran = adapter
         .invocations
         .lock()
@@ -2692,7 +2693,7 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
     let loaded = load_repo_lint_profile("fast");
     let mut adapter = FakeSystemAdapter::new(false);
     let (manifests_done, version_waits) = mpsc::channel();
-    // `version` (plan index 1) cannot finish until `manifests` (index 2) has.
+    // `version` (plan index 0) cannot finish until `manifests` (index 2) has.
     let version_waits = Mutex::new(version_waits);
     adapter.on_start.insert(
         "version",
@@ -2719,7 +2720,7 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
         .expect_err("the profile fails");
     assert_eq!(
         error.message,
-        "2 of 5 steps failed: [1] version, [2] manifests"
+        "2 of 5 steps failed: [0] version, [2] manifests"
     );
 
     let completions = adapter
@@ -4789,6 +4790,24 @@ fn rust_loader_rejects_semantic_invalid_profile_fixtures() {
 // Shared scheduler, fail-fast and test selectors (Phase L, l-6).
 // ---------------------------------------------------------------------------
 
+#[test]
+fn version_lint_step_is_first_cargo_step_in_every_profile() {
+    for profile in [
+        crate::cli::LintProfile::Fast,
+        crate::cli::LintProfile::Ci,
+        crate::cli::LintProfile::Full,
+    ] {
+        let plan = workflow::lint_profile_plan(Path::new("."), profile, false);
+        let cargo_steps = plan
+            .iter()
+            .filter(|step| step.lane() == workflow::Lane::Cargo)
+            .map(workflow::StepPlan::name)
+            .collect::<Vec<_>>();
+        assert_eq!(cargo_steps.first().copied(), Some("version"), "{profile:?}");
+        assert!(cargo_steps.iter().skip(1).all(|name| *name != "version"));
+    }
+}
+
 fn parallel_step(name: &str) -> workflow::StepPlan {
     workflow::StepPlan::new(
         name,
@@ -5051,6 +5070,20 @@ fn fail_fast_skips_unstarted_cargo_steps_only() {
     assert_eq!(sorted(adapter.invoked()), ["c1", "p"]);
     assert_eq!(detail_names(&error, "failed_steps"), ["c1"]);
     assert_eq!(detail_names(&error, "skipped_steps"), ["c2", "tail"]);
+}
+
+#[test]
+fn fail_fast_runs_version_before_failing_cargo_step() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("cargo-fails", "cargo failed");
+    let error = run_scheduled(
+        &adapter,
+        vec![cargo_step("version"), cargo_step("cargo-fails")],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("cargo failure fails the run");
+    assert_eq!(adapter.invoked(), ["version", "cargo-fails"]);
+    assert_eq!(detail_names(&error, "failed_steps"), ["cargo-fails"]);
 }
 
 #[test]
