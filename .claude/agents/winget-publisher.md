@@ -11,3 +11,9 @@ metadata:
 Read `publisher-channel-protocol.md`, then the `winget` contract and
 `.claude/skills/publishing/ref/channel-contracts.md`. You own only the
 manifest-declared winget workflow and installer verification.
+
+Before any push or workflow result is reported, run
+`.github/scripts/winget_manifest_check.py` on the installer manifest against
+the release `checksums.txt` (64 hex, exact match); report its output, not an
+assumption. A pending new-package PR is updated in place and every release is
+still submitted, never held.
