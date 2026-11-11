@@ -22,8 +22,7 @@ All notable changes to sc-lint are documented here.
 
 ### Changed
 
-- The native release verification gate can run from any branch.
-- Installer backend probes use the configured timeout, and tests isolate their artifacts from Cargo target-directory overrides.
+- Installer backend probes use the configured timeout.
 
 ### Removed
 
