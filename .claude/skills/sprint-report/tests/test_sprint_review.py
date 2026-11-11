@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from operation_models import BeadRecord
 
 SKILLS = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(SKILLS / 'sprint-report/scripts'), str(SKILLS / 'atm-beads/scripts')]
@@ -34,13 +35,13 @@ class ViewTests(unittest.TestCase):
             {'dev_bead_id': 'dev-b', 'sanity_bead_id': 'gate-b',
              'depends_on_sanity_bead_ids': ['gate-a']},
         ]}
-        beads = {
-            'dev-a': {'id': 'dev-a', 'dependencies': []},
-            'gate-a': {'id': 'gate-a', 'labels': ['stage:dev-sanity'],
+        beads: dict[str, BeadRecord] = {
+            'dev-a': {'id': 'dev-a', 'status': 'closed', 'dependencies': []},
+            'gate-a': {'id': 'gate-a', 'status': 'closed', 'labels': ['stage:dev-sanity'],
                        'dependencies': [{'type': 'blocks', 'depends_on_id': 'dev-a'}]},
             # This execution-only blocker must not become a plan/DAG edge.
-            'dev-b': {'id': 'dev-b', 'dependencies': [{'type': 'blocks', 'depends_on_id': 'runtime-gate'}]},
-            'gate-b': {'id': 'gate-b', 'labels': ['stage:dev-sanity'],
+            'dev-b': {'id': 'dev-b', 'status': 'closed', 'dependencies': [{'type': 'blocks', 'depends_on_id': 'runtime-gate'}]},
+            'gate-b': {'id': 'gate-b', 'status': 'closed', 'labels': ['stage:dev-sanity'],
                        'dependencies': [{'type': 'blocks', 'depends_on_id': 'dev-b'}]},
         }
         graph = dag.build_graph(index, beads)
@@ -50,9 +51,9 @@ class ViewTests(unittest.TestCase):
 
     def generate(self, repo, scratch, view=False, calls=None):
         index = {'root_bead_id': 'root', 'sprints': [{'dev_bead_id': 'dev', 'sanity_bead_id': 'gate'}]}
-        beads = [
-            {'id': 'dev', 'dependencies': []},
-            {'id': 'gate', 'labels': ['stage:dev-sanity'],
+        beads: list[BeadRecord] = [
+            {'id': 'dev', 'status': 'closed', 'dependencies': []},
+            {'id': 'gate', 'status': 'closed', 'labels': ['stage:dev-sanity'],
              'dependencies': [{'type': 'blocks', 'depends_on_id': 'dev'}]},
         ]
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'

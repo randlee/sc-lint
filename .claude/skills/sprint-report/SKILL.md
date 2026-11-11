@@ -25,7 +25,7 @@ Use `--dag` to refresh the diagram without opening a viewer, or
 `--view` to also open its HTML artifact in Wyvern when available:
 
 ```bash
-npm ci --prefix .claude/skills/sprint-report/renderer --ignore-scripts
+(cd .claude/skills/sprint-report/renderer && npm ci --ignore-scripts)
 .claude/skills/sprint-report/scripts/sprint-report --dag
 .claude/skills/sprint-report/scripts/sprint-report --view
 ```
@@ -37,7 +37,8 @@ a log, so the agent remains available. Missing or failing Wyvern does not
 prevent writing the HTML; no alternative viewer is launched automatically.
 
 By default, DAG generation writes `<plans_dir>/phase-<p>/phase-<p>-dag.html`
-locally; it never commits or pushes. It reads the committed plan file and
+locally; the script never commits or pushes. The planner commits it with the
+plan file and the phase file (`atm-beads` "planning"). It reads the committed plan file and
 never rewrites it from Beads state. The HTML embeds the SVG directly, including
 state tooltips and zoom controls, without external dependencies.
 

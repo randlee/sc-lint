@@ -19,8 +19,9 @@ Every run reads the plan file `<plans_dir>/phase-<p>.jsonl`,
 uses them for the dependency graph, queries Beads/ATM only for current state,
 and regenerates the SVG inside a self-contained HTML page.
 
-It writes `<plans_dir>/phase-<p>/phase-<p>-dag.html` locally; it never commits
-or pushes, and never rewrites the plan file.
+It writes `<plans_dir>/phase-<p>/phase-<p>-dag.html` locally; the script never
+commits or pushes, and never rewrites the plan file. The planner commits the
+DAG with the plan file and the phase file.
 
 Without `--view`, do not launch a viewer, render an inline image, or otherwise
 show the diagram. Report only the saved path. With `--view`,
@@ -31,7 +32,7 @@ The page embeds SVG directly with zoom controls and state tooltips; it needs no
 server or installed dependencies to remain readable after download. Wyvern is
 only the optional viewer. Rendering requires Python, Node and the pinned
 [sprint-report renderer](../sprint-report/renderer/package.json):
-`npm ci --prefix .claude/skills/sprint-report/renderer --ignore-scripts`.
+`(cd .claude/skills/sprint-report/renderer && npm ci --ignore-scripts)`.
 
 For report columns, badge meanings and evidence sources, see
 [sprint-report](../sprint-report/SKILL.md). Local exports for development remain
