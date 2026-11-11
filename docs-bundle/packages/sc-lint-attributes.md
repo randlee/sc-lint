@@ -23,7 +23,7 @@ near the item they govern and let the compiler report malformed arguments.
 
 ```toml
 [dependencies]
-sc-lint-attributes = "0.8.6"
+sc-lint-attributes = "0.8.7"
 ```
 
 ## Output and CI

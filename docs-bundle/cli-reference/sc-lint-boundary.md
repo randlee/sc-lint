@@ -1,6 +1,6 @@
 # sc-lint-boundary CLI Reference
 
-Version 0.8.6
+Version 0.8.7
 
 Generated from the CLI command tree. Do not hand-edit.
 

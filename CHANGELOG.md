@@ -4,6 +4,8 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.7]
+
 ### Added
 
 - `SCB-BOUNDARY-005` compares each boundary record's declared
@@ -17,6 +19,10 @@ All notable changes to sc-lint are documented here.
   `atm-graft>=1.4,<1.5` after a bump; `expected` is the workspace version and
   `actual` the specifier. The wheel now depends on `packaging` (#783, ADR-020
   phase o amendment).
+
+### Changed
+
+- Installer backend probes use the configured timeout.
 
 ### Removed
 

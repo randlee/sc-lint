@@ -9,7 +9,7 @@ description = "Shared directive parsing for sc-lint proc-macro and analyzer crat
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/sc-lint-directives/0.8.6"
+documentation = "https://docs.rs/sc-lint-directives/0.8.7"
 keywords = ["rust", "sc-lint", "directives", "parsing", "proc-macro"]
 categories = ["development-tools", "development-tools::procedural-macro-helpers", "parser-implementations"]
 

@@ -9,7 +9,7 @@ It has no standalone command or lint rules. Install it only when building an
 integration that needs these Rust support APIs:
 
 ```toml
-sc-lint-analyzer-support = "0.8.6"
+sc-lint-analyzer-support = "0.8.7"
 ```
 
 The product-facing commands remain:

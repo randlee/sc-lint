@@ -5,7 +5,7 @@ repository-policy problems. The Rust CLI is the product command surface; the
 separately published Python distribution provides bindings and repository
 helper modules.
 
-Current release: **0.8.6**.
+Current release: **0.8.7**.
 
 ## Install
 
@@ -18,7 +18,7 @@ brew install randlee/tap/sc-lint
 Release archives are available from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). The `sc-lint`
 crate page is [on crates.io](https://crates.io/crates/sc-lint); crate API docs
-are on [docs.rs](https://docs.rs/sc-lint/0.8.6).
+are on [docs.rs](https://docs.rs/sc-lint/0.8.7).
 
 The Python package is installed separately:
 
@@ -70,7 +70,7 @@ cargo run -p sc-lint-runtime -- analyze --root . --format text
 
 ## Analyzer rules
 
-The rule inventories below match the 0.8.6 analyzer crates. Full descriptions,
+The rule inventories below match the 0.8.7 analyzer crates. Full descriptions,
 configuration, and examples are in each linked crate guide.
 
 ### Boundary
@@ -104,7 +104,7 @@ checks blocking waits, sleep calls, `block_on`, and mutex guards held across
 
 ## Packages
 
-The workspace version is **0.8.6**. The `sc-lint` CLI composes the analyzer
+The workspace version is **0.8.7**. The `sc-lint` CLI composes the analyzer
 crates; the support crates are reusable building blocks.
 
 | Package | Role |
