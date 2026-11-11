@@ -86,6 +86,14 @@ manifests. Its rules are:
 - `SCB-FEATURE-001`
 - `SCB-MANIFEST-001`–`SCB-MANIFEST-006`
 
+Boundary records must not contain an `[enforcement]` section; that section was
+removed from the record schema and causes inventory loading to fail. The
+`SCB-BOUNDARY-005` rule checks a record's
+`[implementation].visibility` against its named source type and, when declared,
+`[implementation].constructor` against the type's inherent `fn new`. See the
+[boundary guide](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-boundary/README.md)
+for checked values and remediation details.
+
 ### Portability
 
 [`sc-lint-portability`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-portability/README.md)
@@ -118,6 +126,11 @@ crates; the support crates are reusable building blocks.
 | [`sc-lint-directives`](https://crates.io/crates/sc-lint-directives) | Shared directive parser and types |
 | [`sc-lint-schema`](https://crates.io/crates/sc-lint-schema) | Analyzer report and finding types |
 | [`sc-lint` on PyPI](https://pypi.org/project/sc-lint/) | Python bindings and repository helpers |
+
+The Python `check_version_sync` helper also checks that a declared dependency
+on another listed Python project admits the workspace version. A mismatch is
+reported as `python.dependency_specifier`, with the workspace version in
+`expected` and the configured specifier in `actual`.
 
 ## Project links
 

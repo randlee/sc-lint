@@ -52,8 +52,9 @@ specialized backend tools and mixed Rust/Python implementations.
   `[version_sync.release_wiring]` subsections (Amended phase L, #137; Accepted —
   Rand, 2026-10-27).
   A requirement in a listed pyproject that names another listed project must
-  admit the workspace version (`python.dependency_specifier`; ADR-020 phase o
-  amendment, #783; Pending Rand approval in PR #905).
+  admit the workspace version. A mismatch is reported as
+  `python.dependency_specifier`, with the workspace version in `expected` and
+  the specifier in `actual` (#783).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
@@ -382,18 +383,13 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
-  `sc-lint.toml` and `Justfile` only when they are missing, and materializes
-  the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
-  consumer-owned: an existing file is left exactly as it is and is never
-  written. The sc-lint-owned paths in the ADR-023 ownership table are always
-  overwritten with the shipped bytes on ordinary initialization; no conflict
-  or prior-release digest exception applies. An owned path that is a symlink,
-  including a dangling link, is replaced by the shipped regular file without
-  touching its target. `--check` and `--dry-run` do not mutate files; `--check`
-  reports an absent, symlinked, or differing owned file as
-  `CLI.SC_LINT_INTEGRATION_OUTDATED`.
+  `sc-lint.toml` and `Justfile` when they are missing. Existing files at those
+  paths are preserved. `.sc-lint/bootstrap.py` is created when missing and a
+  recognized prior-release bootstrap may be refreshed; an unrecognized change
+  produces `CLI.SC_LINT_INTEGRATION_CONFLICT` and is not overwritten. `--check`
+  and `--dry-run` do not mutate files. `--check` reports missing files and a
+  recognized prior-release bootstrap as `CLI.SC_LINT_INTEGRATION_OUTDATED`.
   A consumer README is outside the command's write set.
-  (Amended for phase-o, ADR-023; Pending Rand approval in PR #905.)
   E.6 owns optional CI workflow generation because it depends on the reusable
   release-verified Action rather than a source-checkout fallback.
 

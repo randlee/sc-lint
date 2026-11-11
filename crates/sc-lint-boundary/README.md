@@ -54,6 +54,25 @@ Rule filters accept individual rule IDs and these kebab-case family names:
 - `dependencies`
 - `manifests`
 
+## Boundary inventory schema and visibility
+
+A boundary record does not have an `[enforcement]` section. The section was
+removed from the record schema; if a record still declares it, inventory
+loading fails with a diagnostic that names the file and says to delete the
+section. Remove the obsolete table rather than setting a flag inside it.
+
+`SCB-BOUNDARY-005` checks the record's `[implementation].visibility` for its
+named type in `[implementation].module`. It reports when the source type is
+wider than the record declares or the declared type cannot be found. For
+`visibility = "trait_only"`, the check reports a public implementing type;
+the record may name a type in another workspace library crate. If the record
+declares `[implementation].constructor`, the check also compares that value
+with the visibility of the type's inherent `fn new`. For example,
+`constructor = "private"` does not permit a public constructor. A declaration
+of `visibility = "public"` or `constructor = "none"` is not checked for that
+item. Findings include the record file, item, and declared and actual
+visibility.
+
 ## Invocation
 
 Primary product surface:

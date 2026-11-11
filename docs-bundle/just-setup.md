@@ -1,15 +1,15 @@
 # Canonical Just setup
 
 This document is the source model for the generated consumer `Justfile`.
-`sc-lint init --just` materializes the same contract; it does not copy Python
-runner scripts or overwrite a consumer README.
+`sc-lint init --just` creates the initial consumer integration files. It does
+not copy Python runner scripts or overwrite a consumer README.
 
 ## Generate the integration
 
 ```sh
 sc-lint init --just --check   # inspect drift without writing
 sc-lint init --just --dry-run # validate without writing; --json lists paths
-sc-lint init --just           # seed consumer files and write sc-lint-owned files
+sc-lint init --just           # create missing files; refresh a recognized older bootstrap
 ```
 
 Human output starts with `init: <status>`:
@@ -18,16 +18,16 @@ Human output starts with `init: <status>`:
 | --- | --- |
 | `current` | A non-mutating check found no drift. |
 | `created` | Only missing files were written. |
-| `updated` | At least one existing sc-lint-owned file was refreshed, with or without missing files created. |
+| `updated` | A recognized prior-release bootstrap was refreshed, with or without missing files created. |
 | `would_create` | `--dry-run`: only missing files would be written. |
-| `would_update` | `--dry-run`: at least one existing sc-lint-owned file would be refreshed. |
+| `would_update` | `--dry-run`: a recognized prior-release bootstrap would be refreshed. |
 
 Non-empty file lists follow, one line each, in this order: `Created:` (or
 `Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
-`--dry-run`) and `Preserved:`. A refreshed sc-lint-owned file appears under
-`Refreshed:` (`Would refresh:` for `--dry-run`). `--check` reports an absent,
-symlinked, or differing owned file as outdated. `sc-lint.toml` and `Justfile` are
-consumer-owned: an existing file is preserved exactly as it is. For example:
+`--dry-run`) and `Preserved:`. Only a bootstrap recognized as coming from a
+prior release can be refreshed. Existing `sc-lint.toml` and `Justfile` files
+are preserved exactly as they are. A different existing bootstrap is not
+overwritten; initialization reports a conflict. For example:
 
 ```text
 init: created
@@ -36,7 +36,7 @@ Preserved: /work/repo/sc-lint.toml
 ```
 
 Paths are printed as the repository root joined with each file name.
-Refreshing an existing integration can print, for example:
+Refreshing a recognized prior-release bootstrap can print, for example:
 
 ```text
 init: updated
@@ -51,11 +51,10 @@ fields are always arrays. `refreshed_files` contains files that were refreshed
 on a real run or would be refreshed on `--dry-run`; `dry_run` and `status`
 distinguish the two cases.
 
-`sc-lint.toml` and `Justfile` are consumer-owned templates, created only when
-missing. The sc-lint-owned paths in the ADR-023 ownership table are overwritten
-with shipped bytes. An owned symlink, including a dangling link, is replaced
-by a regular file without touching its target. (Amended for phase-o, ADR-023;
-Pending Rand approval in PR #905.)
+`--check` reports missing files and a recognized prior-release bootstrap as
+outdated. `--dry-run` shows which files would be created or refreshed. A
+bootstrap with an unrecognized content change is not overwritten; move it
+aside or restore the expected content before retrying initialization.
 
 ## Public recipes
 

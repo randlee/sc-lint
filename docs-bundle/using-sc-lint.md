@@ -14,9 +14,10 @@ sc-lint init --just
 just setup
 ```
 
-This creates consumer files when missing and writes the sc-lint-owned files in
-the ADR-023 ownership table. (Amended for phase-o, ADR-023; Pending Rand
-approval in PR #905.)
+This creates missing integration files and can refresh a bootstrap recognized
+from a prior release. Existing `sc-lint.toml` and `Justfile` files are
+preserved. If an existing bootstrap has an unrecognized content change,
+initialization reports a conflict instead of overwriting it.
 
 On every later clean checkout, including a machine with no `sc-lint` binary on
 `PATH`, run `just setup`. The bootstrap helper downloads the release selected
