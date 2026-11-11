@@ -4,6 +4,8 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.7]
+
 ### Added
 
 - `SCB-BOUNDARY-005` compares each boundary record's declared
@@ -17,6 +19,11 @@ All notable changes to sc-lint are documented here.
   `atm-graft>=1.4,<1.5` after a bump; `expected` is the workspace version and
   `actual` the specifier. The wheel now depends on `packaging` (#783, ADR-020
   phase o amendment).
+
+### Changed
+
+- The native release verification gate can run from any branch.
+- Installer backend probes use the configured timeout, and tests isolate their artifacts from Cargo target-directory overrides.
 
 ### Removed
 

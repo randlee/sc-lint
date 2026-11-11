@@ -34,7 +34,7 @@ ROOT = discover_repo_root()
 BOOTSTRAP = ROOT / "crates/sc-lint/assets/bootstrap.py"
 ADOPTION_INSTALLER = ROOT / "packages/sc-lint-adoption/install.py"
 PACKAGE_ROOT = Path(sc_lint.__file__).resolve().parent.parent
-VERSION = "0.8.6"
+VERSION = "0.8.7"
 GUIDES = (
     "README.md",
     "installation",
