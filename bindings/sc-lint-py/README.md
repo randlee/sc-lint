@@ -44,6 +44,17 @@ The native extension also provides `toml_loads(text)`, which the helper modules
 use so TOML is parsed by the same Rust parser as the CLI on every supported
 Python version.
 
+## Version synchronization
+
+The `check_version_sync` helper verifies the workspace's Python project
+versions and their declared dependencies. When a project listed in
+`python_manifests` under `[version_sync.python]` depends on another listed
+project, the dependency specifier must admit the workspace version. Otherwise
+the helper reports `python.dependency_specifier`; `expected` is the workspace
+version and `actual` is the dependency specifier. See the
+[Python bindings guide](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md#version-synchronization)
+for configuration and the full finding contract.
+
 ## Links
 
 - [Python bindings contract](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md)

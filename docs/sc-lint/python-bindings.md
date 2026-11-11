@@ -113,7 +113,7 @@ The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
 | `cargo_lock` | A workspace package is absent from or mismatched in `Cargo.lock`. |
 | `python.version` | A listed static Python project version differs from the workspace version. |
 | `python.manifest_missing` | A listed Python manifest does not exist. |
-| `python.dependency_specifier` | A listed project's requirement on another listed project does not admit the workspace version; `expected` is the workspace version and `actual` the specifier. |
+| `python.dependency_specifier` | A listed project's requirement on another listed project does not admit the workspace version; `expected` is the workspace version and `actual` the specifier. This finding was added in #783. |
 | `winget.manifest_glob` | The configured glob matched no Winget manifests. |
 | `winget.package_version` | A Winget `PackageVersion` field differs from the workspace version. |
 | `winget.manifest_version` | A Winget `ManifestVersion` field differs from the workspace version. |

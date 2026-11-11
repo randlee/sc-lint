@@ -46,7 +46,7 @@ family names `cycles`, `boundaries`, `internal-only`, `forbid-external-impls`,
 | `SCB-BOUNDARY-002` | boundaries, internal-only | A `boundary.internal_only` item referenced from outside its module. |
 | `SCB-BOUNDARY-003` | boundaries, forbid-external-impls | An impl of a `boundary.forbid_external_impls` trait from another module. |
 | `SCB-BOUNDARY-004` | boundaries, dependencies | An invalid boundary inventory record or field. |
-| `SCB-BOUNDARY-005` | boundaries | A record's `[implementation]` type or its inherent `fn new` whose source visibility is wider than declared, or is not found. Finding kind: `declared_visibility_mismatch`. |
+| `SCB-BOUNDARY-005` | boundaries | Checks `[implementation].visibility` against the named source type and, when present, `[implementation].constructor` against its inherent `fn new`; reports visibility wider than declared or an item not found. Finding kind: `declared_visibility_mismatch`. |
 | `SCB-CALLER-001` | boundaries | A restricted symbol called by a caller not on its approved-caller list. |
 | `SCB-DEPENDENCY-001` | dependencies | A direct workspace-package dependency the owner's record does not allow. |
 | `SCB-DEPENDENCY-002` | dependencies | A direct dependent the target's record does not allow. |
@@ -77,6 +77,23 @@ rejects families. Their `exclude_rules`, `fail_rules`, `exclude_paths` and
 `portability` also takes `unix_path_prefixes`, `config_home_env` and
 `platform_adapters`. See [configuration](../configuration.md#analyzer-tables)
 for the complete key list.
+
+## Boundary inventory schema and visibility
+
+Boundary records have no `[enforcement]` section. It was removed from the
+record schema, and declaring it makes inventory loading fail with a diagnostic
+that identifies the record file and requires deleting the section.
+
+For `SCB-BOUNDARY-005`, the checked record fields are
+`[implementation].visibility` and, when present,
+`[implementation].constructor`. The visibility value is compared with the
+named source type in `[implementation].module`; a type wider than declared or
+one that cannot be found is reported. `trait_only` reports a public
+implementing type. The constructor value is compared with that type's inherent
+`fn new`; for example, `private` does not permit a public constructor.
+`visibility = "public"` and `constructor = "none"` skip checks for those
+items. The finding identifies the record file, item, and declared and actual
+visibility.
 
 ## Recovering inventory and stale-policy findings
 

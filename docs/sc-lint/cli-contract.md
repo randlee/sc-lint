@@ -362,18 +362,15 @@ their human-visible machine-significant fields in the test's pointer table.
 Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
-- `sc-lint init --just` seeds the generated config and Justfile only when each
-  is missing. An existing `sc-lint.toml` or `Justfile` is consumer-owned: it is
-  left exactly as it is and is never read for drift, rewritten, or reported as a
-  conflict. The sc-lint-owned paths in ADR-023 are overwritten with shipped
-  bytes. An owned symlink, including a dangling link, is replaced by a regular
-  file without touching its target. `--check` reports an absent or differing
-  owned file, including an owned symlink, as
-  `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
+- `sc-lint init --just` creates `sc-lint.toml`, `Justfile`, and
+  `.sc-lint/bootstrap.py` when missing. Existing config and Justfile files are
+  preserved. A bootstrap recognized from a prior release may be refreshed; an
+  unrecognized content change produces `CLI.SC_LINT_INTEGRATION_CONFLICT` and
+  is not overwritten. `--check` reports missing files and recognized
+  prior-release bootstraps as `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
-  JSON-envelope producer. (Amended for phase-o, ADR-023; Pending Rand approval
-  in PR #905.)
+  JSON-envelope producer.
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in

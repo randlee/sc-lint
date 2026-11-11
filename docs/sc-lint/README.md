@@ -207,9 +207,14 @@ crate README points back to `sc-lint`.
   self-loop; `SCB-CYCLE-003` trait-impl self-loop
 - `SCB-BOUNDARY-001` to `SCB-BOUNDARY-004` internal-only visibility and
   references, external impls of `forbid_external_impls` traits, and invalid
-  boundary inventory records
-- `SCB-BOUNDARY-005` source type or `new` constructor wider than the boundary
-  record's declared `[implementation]` visibility
+  boundary inventory records. Boundary records do not accept an
+  `[enforcement]` section; declaring it fails inventory loading and requires
+  removing the section.
+- `SCB-BOUNDARY-005` compares a record's `[implementation].visibility` with
+  its named source type and, when present, `[implementation].constructor` with
+  the type's inherent `fn new`. It reports visibility wider than declared or
+  an item that cannot be found; `trait_only` reports a public implementing
+  type.
 - `SCB-CALLER-001` named-caller allowlist
 - `SCB-DEPENDENCY-001` to `SCB-DEPENDENCY-004` workspace package edges and
   stale permissions
