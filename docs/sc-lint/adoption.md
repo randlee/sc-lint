@@ -73,7 +73,7 @@ The installer input describes consumer facts, not imperative setup code:
 
 ```json
 {
-  "minimum_version": "0.8.7",
+  "minimum_version": "0.8.8",
   "profiles": {"ci": ["sc-lint", "lint", "ci"]},
   "ci": {"os": ["linux", "macos", "windows"], "enabled": true},
   "analyzers": {

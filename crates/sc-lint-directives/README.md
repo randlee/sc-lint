@@ -6,8 +6,8 @@ parsing and data types for `#[sc_lint(...)]` source directives; it is not a
 standalone lint command. See the
 [sc-lint repository](https://github.com/randlee/sc-lint).
 
-Current crate release: **0.8.7**. API documentation is on
-[docs.rs](https://docs.rs/sc-lint-directives/0.8.7).
+Current crate release: **0.8.8**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-directives/0.8.8).
 
 ## Purpose
 

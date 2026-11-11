@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "sc-lint"
-version = "0.8.7"
+version = "0.8.8"
 description = "Python bindings and repository helpers for the sc-lint Rust linting tool."
 readme = "README.md"
 dependencies = ["codespell>=2.2", "packaging>=22"]

@@ -4,7 +4,7 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
-## [0.8.7]
+## [0.8.8]
 
 ### Added
 

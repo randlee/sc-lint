@@ -5,7 +5,7 @@ repository-maintenance helper modules used by the project. It does not install
 the Rust CLI executables. Install those separately with Homebrew or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases).
 
-Current release: **0.8.7**. Python 3.9 or newer is required (3.11 or newer on
+Current release: **0.8.8**. Python 3.9 or newer is required (3.11 or newer on
 Windows ARM64).
 
 ## Install
