@@ -84,3 +84,35 @@ Rule IDs and this analyzer's JSON output are stable consumer contracts
   common analyzer configuration. The CLI exits 10 for unsuppressed findings,
   0 for test/exempt/allowed fixtures, and non-zero for malformed allowances.
   Tests drive source/AST inputs and never execute the prohibited operations.
+
+## REQ-RUNTIME-002 — Proposed panic rule and adoption
+
+Status: **AWAITING RAND ACCEPTANCE**. Before dispatch, accept or revise this
+requirement and the proposed ADR-022 phase-q amendment; until then no phase-q
+sprint may claim this as an accepted requirement.
+
+`SCB-RUNTIME-008` detects production `.unwrap()`, `.expect(...)`, `panic!`,
+`unreachable!`, `todo!`, and `unimplemented!` in opted-in Cargo packages. It
+uses the existing runtime test-scope rules and existing ADR-022 function/method
+allowance with a nonblank reason; a separate out-of-line test file carries its
+own `#![cfg(test)]`, and parent-only cfg does not propagate. Nested functions
+require their own allowance. Macro expansion and type-aware proof are not
+claimed. The rule is off for packages not listed in the repository-root
+configuration. The proposed opt-in exception to REQ-RUNTIME-001's new-rule
+default and the optional recorded-baseline behavior are specified by the
+pending ADR-022 amendment. Both opt-in and baseline are in scope until Rand
+explicitly approves a change.
+
+## REQ-RUNTIME-003 — Proposed example target coverage
+
+Status: **AWAITING RAND ACCEPTANCE**. Before dispatch, accept or revise this
+requirement and the proposed ADR-011 phase-q amendment.
+
+Runtime analyzes supported Cargo example source for rules 001, 002, 005,
+006 and 007, and for 008 after that rule is integrated and its package is
+opted in. Rules 003 and 004 retain their deliberate exclusion from examples.
+The normalized report exposes that exclusion through the pending ADR-011 v3
+coverage contract. Shared source discovery keeps boundary and portability's
+existing example exclusion unless a separate approved requirement changes it.
+Existing lib/bin target attribution remains stable; example-only files are
+attributed deterministically to their example target.
