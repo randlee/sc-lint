@@ -16,7 +16,7 @@ the consumer commands after the preflight.
 - uses: randlee/sc-lint@v1
   with:
     operation: lint
-    version: 0.8.6
+    version: 0.8.8
 ```
 
 The Action runs on Linux, macOS, and Windows runners on x86_64 or ARM64 (the
@@ -34,7 +34,7 @@ commit SHA and keep `version` explicit:
 - uses: randlee/sc-lint@<full-commit-sha>
   with:
     operation: test
-    version: 0.8.6
+    version: 0.8.8
 ```
 
 The `v1` tag identifies the Action interface and is a movable tag, refreshed

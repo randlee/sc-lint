@@ -203,6 +203,27 @@ Plan authority: `lint-l-8`.
   (Accepted 2026-10-16,
   [ADR-019, decision 2](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
 
+- `REQ-SCB-026` (Accepted — Rand, 2026-11-06; Rand 2026-11-05 on #860: "we
+  should NOT have labels that do nothing")
+  A boundary record has no `[enforcement]` section. A record that declares one
+  fails inventory loading with a fatal diagnostic naming the file and stating
+  that the section is removed and must be deleted.
+
+- `REQ-SCB-027` (Accepted — Rand, 2026-11-06; #861. `trait_only` amended for phase-o, #861 CR-5 option 2; Pending Rand approval in PR #905.)
+  `SCB-BOUNDARY-005` compares each boundary record's declared
+  `[implementation]` visibility with the source. For a record whose
+  `visibility` is `pub(crate)` or `private`, the named `type` in `module` fails
+  when its source visibility is wider than declared; for `trait_only`, a record
+  may name the implementing type and module in the owner or another workspace
+  library crate. That type fails when it is `pub`; a `trait_only` record naming
+  no type is not checked. For a record whose `constructor` is `pub(crate)` or
+  `private`, the inherent associated `fn new` of that type fails when wider
+  than declared. `pub(super)`, `pub(self)` and `pub(in path)` count as no wider
+  than `pub(crate)`. A declared type or constructor that is not found in the
+  source fails with actual `not found`. Records declaring `public` or
+  `constructor = "none"` are not checked for that item. The diagnostic names
+  the record file, the item, and the declared and actual visibility.
+
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical
   string comparison.

@@ -362,14 +362,12 @@ their human-visible machine-significant fields in the test's pointer table.
 Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
-- `sc-lint init --just` seeds the generated config and Justfile only when each
-  is missing. An existing `sc-lint.toml` or `Justfile` is consumer-owned: it is
-  left exactly as it is and is never read for drift, rewritten, or reported as a
-  conflict. The bootstrap helper is the only product-owned file. A bootstrap
-  matching a known prior release is refreshed through its target (a temporary
-  file beside the target, fsynced and renamed over it) and the link is kept; a
-  dangling bootstrap link, or a bootstrap that differs from the product asset, is
-  `CLI.SC_LINT_INTEGRATION_CONFLICT`. Its CLI `--json`
+- `sc-lint init --just` creates `sc-lint.toml`, `Justfile`, and
+  `.sc-lint/bootstrap.py` when missing. Existing config and Justfile files are
+  preserved. A bootstrap recognized from a prior release may be refreshed; an
+  unrecognized content change produces `CLI.SC_LINT_INTEGRATION_CONFLICT` and
+  is not overwritten. `--check` reports missing files and recognized
+  prior-release bootstraps as `CLI.SC_LINT_INTEGRATION_OUTDATED`. Its CLI `--json`
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer.

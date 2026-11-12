@@ -7,9 +7,9 @@ name = "ScLintBoundaryAnalyzer"
 facade = "analyze_workspace"
 
 [implementation]
-type = "analyze_workspace"
+type = "GraphBuilder"
 module = "sc_lint_boundary"
-visibility = "public"
+visibility = "private"
 constructor = "none"
 
 [composition]
@@ -56,10 +56,6 @@ forbidden = []
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
-
-[enforcement]
-lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
-review_gates = ["no_proc_macro_dependency"]
 
 [status]
 state = "concrete_landed"

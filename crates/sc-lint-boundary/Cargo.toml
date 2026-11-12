@@ -9,7 +9,7 @@ description = "AST-sensitive Rust boundary analyzer."
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/sc-lint-boundary/0.8.6"
+documentation = "https://docs.rs/sc-lint-boundary/0.8.8"
 keywords = ["rust", "sc-lint", "lint", "architecture", "dependencies"]
 categories = ["command-line-utilities", "development-tools"]
 

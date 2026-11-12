@@ -5,7 +5,7 @@ repository-maintenance helper modules used by the project. It does not install
 the Rust CLI executables. Install those separately with Homebrew or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases).
 
-Current release: **0.8.6**. Python 3.9 or newer is required (3.11 or newer on
+Current release: **0.8.8**. Python 3.9 or newer is required (3.11 or newer on
 Windows ARM64).
 
 ## Install
@@ -15,8 +15,9 @@ python -m pip install sc-lint
 ```
 
 The Python package includes the native extension and the `sc_lint` Python
-package. Its `codespell>=2.2` dependency supports the repository spell-check
-helper; the package does not expose a `sc-lint` console script.
+package. Its runtime dependencies are `codespell>=2.2` for the repository
+spell-check helper and `packaging>=22` for Python dependency checks. The
+package does not expose a `sc-lint` console script.
 
 ## Python API
 
@@ -42,6 +43,17 @@ interpreter. It does not add a command-line entry point to the wheel.
 The native extension also provides `toml_loads(text)`, which the helper modules
 use so TOML is parsed by the same Rust parser as the CLI on every supported
 Python version.
+
+## Version synchronization
+
+The `check_version_sync` helper verifies the workspace's Python project
+versions and their declared dependencies. When a project listed in
+`python_manifests` under `[version_sync.python]` depends on another listed
+project, the dependency specifier must admit the workspace version. Otherwise
+the helper reports `python.dependency_specifier`; `expected` is the workspace
+version and `actual` is the dependency specifier. See the
+[Python bindings guide](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md#version-synchronization)
+for configuration and the full finding contract.
 
 ## Links
 

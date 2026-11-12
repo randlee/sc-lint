@@ -61,6 +61,16 @@ Compatibility and installer codes are mapped in
 [troubleshooting](../troubleshooting.md). Missing documentation is
 `CLI.SC_LINT_DOCS_UNAVAILABLE`; run `sc-lint docs --path` to inspect the bundle.
 
+## Release checks
+
+The repository's Python `check_version_sync` helper checks project versions
+and cross-project dependency requirements. A dependency on another project
+listed under `[version_sync.python].python_manifests` must admit the workspace
+version; a mismatch is reported as `python.dependency_specifier`. The workspace
+version is the finding's `expected` value and the configured specifier is its
+`actual` value. See the source repository's
+[Python bindings contract](https://github.com/randlee/sc-lint/blob/main/docs/sc-lint/python-bindings.md#version-synchronization).
+
 ## Related packages
 
 [Boundary](./sc-lint-boundary.md), [portability](./sc-lint-portability.md),

@@ -247,6 +247,7 @@ fn catalog_lists_every_rule_id() {
         ScbBoundary002,
         ScbBoundary003,
         ScbBoundary004,
+        ScbBoundary005,
         ScbCaller001,
         ScbDependency001,
         ScbDependency002,
@@ -263,9 +264,9 @@ fn catalog_lists_every_rule_id() {
     for id in every {
         match id {
             ScbCycle001 | ScbCycle002 | ScbCycle003 | ScbBoundary001 | ScbBoundary002
-            | ScbBoundary003 | ScbBoundary004 | ScbCaller001 | ScbDependency001
-            | ScbDependency002 | ScbDependency003 | ScbDependency004 | ScbFeature001
-            | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
+            | ScbBoundary003 | ScbBoundary004 | ScbBoundary005 | ScbCaller001
+            | ScbDependency001 | ScbDependency002 | ScbDependency003 | ScbDependency004
+            | ScbFeature001 | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
             | ScbManifest005 | ScbManifest006 => {}
         }
     }
@@ -4965,10 +4966,6 @@ impl WorkspaceFixture {
                     allowed_test_double_paths = []
                     forbidden_test_bypasses = []
 
-                    [enforcement]
-                    lint_rules = []
-                    review_gates = []
-
                     [status]
                     state = "concrete_landed"
                 "#,
@@ -5059,10 +5056,6 @@ impl WorkspaceFixture {
                     allowed_test_double_paths = []
                     forbidden_test_bypasses = []
 
-                    [enforcement]
-                    lint_rules = []
-                    review_gates = []
-
                     [status]
                     state = "concrete_landed"
                 "#,
@@ -5131,10 +5124,6 @@ fn write_named_caller_boundary_record(fixture: &WorkspaceFixture, approved_entri
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
 
-                [enforcement]
-                lint_rules = ["SCB-CALLER-001"]
-                review_gates = ["approved_named_callers"]
-
                 [status]
                 state = "concrete_landed"
             "#
@@ -5200,10 +5189,6 @@ fn write_policy_record(
                 [testing]
                 allowed_test_double_paths = []
                 forbidden_test_bypasses = []
-
-                [enforcement]
-                lint_rules = []
-                review_gates = []
 
                 [status]
                 state = "{state}"
@@ -6530,4 +6515,468 @@ fn issue385_boundary_manifest_paths() {
     );
     assert_eq!(findings.len(), 2);
     assert_eq!(status, ReportStatus::Fail);
+}
+
+// SCB-BOUNDARY-005: declared type and constructor visibility (REQ-SCB-027, #861).
+
+fn write_visibility_fixture(
+    fixture: &WorkspaceFixture,
+    source: &str,
+    implementation: &str,
+    hyphenated_binary_target: bool,
+) {
+    fixture.write_workspace_root_with_members(&["crates/store"]);
+    fixture.write_package_manifest("store");
+    fixture.write_source("store", "lib.rs", source);
+    fixture.write(
+        "boundaries/planning.toml",
+        "[planning]\ncurrent_sprint = \"O.1\"\n",
+    );
+    fixture.write(
+        "boundaries/store/roster.toml",
+        &format!(
+            r#"
+boundary_id = "BOUNDARY-Roster"
+owner_package = "store"
+owner_crate_path = "store"
+name = "Roster"
+
+[public]
+facade = "open"
+
+[implementation]
+{implementation}
+
+[composition]
+roots = ["open"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"
+"#
+        ),
+    );
+    if hyphenated_binary_target {
+        let package_path = fixture.root().join("crates/store/Cargo.toml");
+        let manifest = std::fs::read_to_string(&package_path).unwrap();
+        std::fs::write(
+            &package_path,
+            manifest.replace("name = \"store\"", "name = \"store-service\""),
+        )
+        .unwrap();
+        std::fs::rename(
+            fixture.root().join("crates/store/src/lib.rs"),
+            fixture.root().join("crates/store/src/main.rs"),
+        )
+        .unwrap();
+        let record_path = fixture.root().join("boundaries/store/roster.toml");
+        let record = std::fs::read_to_string(&record_path).unwrap();
+        std::fs::write(
+            &record_path,
+            record
+                .replace(
+                    "owner_package = \"store\"",
+                    "owner_package = \"store-service\"",
+                )
+                .replace(
+                    "owner_crate_path = \"store\"",
+                    "owner_crate_path = \"store_service\"",
+                ),
+        )
+        .unwrap();
+        std::fs::rename(
+            fixture.root().join("boundaries/store"),
+            fixture.root().join("boundaries/store-service"),
+        )
+        .unwrap();
+    }
+}
+
+fn visibility_findings_for_fixture(fixture: &WorkspaceFixture) -> Vec<String> {
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap()
+    .findings
+    .into_iter()
+    .filter(|finding| finding.rule_id == RuleId::ScbBoundary005)
+    .map(|finding| finding.message)
+    .collect()
+}
+
+fn visibility_findings(
+    source: &str,
+    implementation: &str,
+    hyphenated_binary_target: bool,
+) -> Vec<String> {
+    let fixture = WorkspaceFixture::new();
+    write_visibility_fixture(&fixture, source, implementation, hyphenated_binary_target);
+    visibility_findings_for_fixture(&fixture)
+}
+
+const PUB_CRATE_RECORD: &str = r#"type = "Store"
+module = "store::roster"
+visibility = "pub(crate)"
+constructor = "pub(crate)""#;
+
+fn hyphenated_binary_visibility_findings(source: &str) -> Vec<String> {
+    visibility_findings(
+        source,
+        &PUB_CRATE_RECORD.replace("store::roster", "store_service::roster"),
+        true,
+    )
+}
+
+#[test]
+fn scb_boundary_005_checks_hyphenated_binary_target() {
+    let findings = hyphenated_binary_visibility_findings(
+        "fn main() {} pub fn open() {} mod roster { pub(crate) struct Store; impl Store { pub(crate) fn new() -> Self { Self } } }",
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+    let findings = hyphenated_binary_visibility_findings(
+        "fn main() {} pub fn open() {} mod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }",
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.contains("source is `pub`")),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_passes_when_source_matches_declared_visibility() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+                impl Store {
+                    pub(crate) fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub struct Store; impl Store { pub fn new() -> Self { Self } } }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "public"
+constructor = "public""#,
+        false,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_fails_when_type_and_constructor_are_wider_than_declared() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub struct Store;
+                impl Store {
+                    pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|message| message.contains("roster.toml"))
+    );
+    assert!(findings.iter().any(|message| {
+        message.contains("type `store::roster::Store` declared `pub(crate)` but source is `pub`")
+    }));
+    assert!(findings.iter().any(|message| message.contains(
+        "constructor `store::roster::Store::new` declared `pub(crate)` but source is `pub`"
+    )));
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Store; }\n",
+        r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "none""#,
+        false,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(findings[0].contains("declared `private` but source is `pub(crate)`"));
+}
+
+#[test]
+fn scb_boundary_005_checks_restricted_visibility() {
+    let private = r#"type = "Store"
+module = "store::roster"
+visibility = "private"
+constructor = "private""#;
+    for (source, record, count, message) in [
+        (
+            "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(in crate::roster) fn new() -> Self { Self } } }",
+            PUB_CRATE_RECORD,
+            0,
+            "",
+        ),
+        (
+            "pub fn open() {} mod roster { pub(self) struct Store; impl Store { pub(in self) fn new() -> Self { Self } } }",
+            private,
+            0,
+            "",
+        ),
+        (
+            "pub fn open() {} mod roster { pub(super) struct Store; impl Store { pub(super) fn new() -> Self { Self } } }",
+            private,
+            2,
+            "source is `pub(super)/pub(self)/pub(in path)`",
+        ),
+    ] {
+        let findings = visibility_findings(source, record, false);
+        assert_eq!(findings.len(), count, "{findings:#?}");
+        assert!(
+            findings.iter().all(|finding| finding.contains(message)),
+            "{findings:#?}"
+        );
+    }
+}
+
+#[test]
+fn scb_boundary_005_distinguishes_constructors_of_same_named_types() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+                impl Store { pub(crate) fn new() -> Self { Self } }
+            }
+            mod other {
+                pub struct Store;
+                impl Store { pub fn new() -> Self { Self } }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_does_not_find_another_types_constructor() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster { pub(crate) struct Store; }
+            mod other {
+                pub(crate) struct Store;
+                impl Store { pub(crate) fn new() -> Self { Self } }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(findings[0].contains("constructor `store::roster::Store::new` declared `pub(crate)` but source is `not found`"), "{findings:#?}");
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub(crate) struct Other; }\n",
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|message| message.contains("but source is `not found`")),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_finds_constructor_in_an_impl_in_another_module() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                pub(crate) struct Store;
+            }
+            mod roster_impl {
+                impl crate::roster::Store {
+                    pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        r#"type = "Store"
+module = "store::roster"
+visibility = "pub(crate)"
+constructor = "pub(crate)""#,
+        false,
+    );
+    // The impl names the type by path, so its `new` is attributed to `Store`.
+    assert!(
+        findings.iter().any(|message| message.contains(
+            "constructor `store::roster::Store::new` declared `pub(crate)` but source is `pub`"
+        )),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn scb_boundary_005_skips_trait_only_records_which_name_no_type() {
+    let findings = visibility_findings(
+        "pub fn open() {}\nmod roster { pub struct Store; }\n",
+        r#"visibility = "trait_only"
+constructor = "none""#,
+        false,
+    );
+    assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn scb_boundary_005_checks_optional_trait_only_owner_type() {
+    let record = r#"type = "Store"
+module = "store::roster"
+visibility = "trait_only"
+constructor = "none""#;
+    let private = visibility_findings(
+        "pub fn open() {} mod roster { pub(crate) struct Store; }",
+        record,
+        false,
+    );
+    assert!(private.is_empty(), "{private:#?}");
+    let public = visibility_findings(
+        "pub fn open() {} mod roster { pub struct Store; }",
+        record,
+        false,
+    );
+    assert_eq!(public.len(), 1, "{public:#?}");
+    assert!(
+        public[0].contains("declared `trait_only` but source is `pub`"),
+        "{public:#?}"
+    );
+    let missing = visibility_findings("pub fn open() {} mod roster {}", record, false);
+    assert_eq!(missing.len(), 1, "{missing:#?}");
+    assert!(missing[0].contains("source is `not found`"), "{missing:#?}");
+}
+
+#[test]
+fn scb_boundary_005_checks_trait_only_type_in_another_workspace_library() {
+    for (visibility, expected) in [("pub", 1), ("pub(crate)", 0)] {
+        let fixture = WorkspaceFixture::new();
+        write_visibility_fixture(
+            &fixture,
+            "pub fn open() {}",
+            r#"type = "Store"
+module = "adapter::roster"
+visibility = "trait_only"
+constructor = "none""#,
+            false,
+        );
+        fixture.write_workspace_root_with_members(&["crates/store", "crates/adapter"]);
+        fixture.write_package_manifest("adapter");
+        fixture.write_source(
+            "adapter",
+            "lib.rs",
+            &format!("mod roster {{ {visibility} struct Store; }}"),
+        );
+        let findings = visibility_findings_for_fixture(&fixture);
+        assert_eq!(findings.len(), expected, "{findings:#?}");
+    }
+}
+
+#[test]
+fn scb_boundary_005_reports_ambiguous_trait_only_library() {
+    let fixture = WorkspaceFixture::new();
+    write_visibility_fixture(
+        &fixture,
+        "pub fn open() {}",
+        r#"type = "Store"
+module = "adapter::roster"
+visibility = "trait_only"
+constructor = "none""#,
+        false,
+    );
+    fixture.write_workspace_root_with_members(&["crates/store", "crates/one", "crates/two"]);
+    for package in ["one", "two"] {
+        fixture.write_package_manifest(package);
+        let path = fixture.root().join(format!("crates/{package}/Cargo.toml"));
+        let manifest = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(path, format!("{manifest}\n[lib]\nname = \"adapter\"\n")).unwrap();
+        fixture.write_source(package, "lib.rs", "mod roster { pub struct Store; }");
+    }
+    let findings = visibility_findings_for_fixture(&fixture);
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0].contains("ambiguous workspace library crate"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn trait_only_requires_type_and_module_together() {
+    for record in ["type = \"Store\"", "module = \"store::roster\""] {
+        let fixture = WorkspaceFixture::new();
+        write_visibility_fixture(
+            &fixture,
+            "pub fn open() {}",
+            &format!("visibility = \"trait_only\"\nconstructor = \"none\"\n{record}"),
+            false,
+        );
+        let error = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Boundaries),
+        })
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("must define both implementation.type and implementation.module"),
+            "{error:#}"
+        );
+    }
+}
+
+#[test]
+fn scb_boundary_005_checks_all_cfg_declarations() {
+    let findings = visibility_findings(
+        r#"
+            pub fn open() {}
+            mod roster {
+                #[cfg(windows)] pub(crate) struct Store;
+                #[cfg(unix)] pub struct Store;
+                impl Store {
+                    #[cfg(windows)] pub(crate) fn new() -> Self { Self }
+                    #[cfg(unix)] pub fn new() -> Self { Self }
+                }
+            }
+        "#,
+        PUB_CRATE_RECORD,
+        false,
+    );
+    assert_eq!(findings.len(), 2, "{findings:#?}");
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.contains("source is `pub`")),
+        "{findings:#?}"
+    );
 }

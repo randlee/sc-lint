@@ -88,7 +88,7 @@ version-matched macro crate and admit it in each annotated crate's boundary:
 
 ```toml
 [dependencies]
-sc-lint-attributes = "0.8.6"
+sc-lint-attributes = "0.8.8"
 ```
 
 Add `sc-lint-attributes` to the `dependencies.allowed_dependencies` array in

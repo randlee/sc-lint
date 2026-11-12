@@ -6,8 +6,8 @@ provides the `#[sc_lint(...)]` attribute namespace used by analyzer-owned
 source declarations; it is not a standalone lint command. See the
 [sc-lint repository](https://github.com/randlee/sc-lint).
 
-Current crate release: **0.8.6**. API documentation is on
-[docs.rs](https://docs.rs/sc-lint-attributes/0.8.6).
+Current crate release: **0.8.8**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-attributes/0.8.8).
 
 ## Purpose
 

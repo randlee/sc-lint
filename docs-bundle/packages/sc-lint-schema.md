@@ -19,7 +19,7 @@ adapter:
 
 ```toml
 [dependencies]
-sc-lint-schema = "0.8.6"
+sc-lint-schema = "0.8.8"
 ```
 
 Keep field names and status values stable; add compatible fields rather than

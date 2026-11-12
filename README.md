@@ -5,7 +5,7 @@ repository-policy problems. The Rust CLI is the product command surface; the
 separately published Python distribution provides bindings and repository
 helper modules.
 
-Current release: **0.8.6**.
+Current release: **0.8.8**.
 
 ## Install
 
@@ -18,7 +18,7 @@ brew install randlee/tap/sc-lint
 Release archives are available from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). The `sc-lint`
 crate page is [on crates.io](https://crates.io/crates/sc-lint); crate API docs
-are on [docs.rs](https://docs.rs/sc-lint/0.8.6).
+are on [docs.rs](https://docs.rs/sc-lint/0.8.8).
 
 The Python package is installed separately:
 
@@ -70,7 +70,7 @@ cargo run -p sc-lint-runtime -- analyze --root . --format text
 
 ## Analyzer rules
 
-The rule inventories below match the 0.8.6 analyzer crates. Full descriptions,
+The rule inventories below match the 0.8.8 analyzer crates. Full descriptions,
 configuration, and examples are in each linked crate guide.
 
 ### Boundary
@@ -80,11 +80,19 @@ checks graph cycles, source boundaries, dependency policy, features, and
 manifests. Its rules are:
 
 - `SCB-CYCLE-001`–`SCB-CYCLE-003`
-- `SCB-BOUNDARY-001`–`SCB-BOUNDARY-004`
+- `SCB-BOUNDARY-001`–`SCB-BOUNDARY-005`
 - `SCB-CALLER-001`
 - `SCB-DEPENDENCY-001`–`SCB-DEPENDENCY-004`
 - `SCB-FEATURE-001`
 - `SCB-MANIFEST-001`–`SCB-MANIFEST-006`
+
+Boundary records must not contain an `[enforcement]` section; that section was
+removed from the record schema and causes inventory loading to fail. The
+`SCB-BOUNDARY-005` rule checks a record's
+`[implementation].visibility` against its named source type and, when declared,
+`[implementation].constructor` against the type's inherent `fn new`. See the
+[boundary guide](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-boundary/README.md)
+for checked values and remediation details.
 
 ### Portability
 
@@ -104,7 +112,7 @@ checks blocking waits, sleep calls, `block_on`, and mutex guards held across
 
 ## Packages
 
-The workspace version is **0.8.6**. The `sc-lint` CLI composes the analyzer
+The workspace version is **0.8.8**. The `sc-lint` CLI composes the analyzer
 crates; the support crates are reusable building blocks.
 
 | Package | Role |
@@ -118,6 +126,11 @@ crates; the support crates are reusable building blocks.
 | [`sc-lint-directives`](https://crates.io/crates/sc-lint-directives) | Shared directive parser and types |
 | [`sc-lint-schema`](https://crates.io/crates/sc-lint-schema) | Analyzer report and finding types |
 | [`sc-lint` on PyPI](https://pypi.org/project/sc-lint/) | Python bindings and repository helpers |
+
+The Python `check_version_sync` helper also checks that a declared dependency
+on another listed Python project admits the workspace version. A mismatch is
+reported as `python.dependency_specifier`, with the workspace version in
+`expected` and the configured specifier in `actual`.
 
 ## Project links
 
@@ -135,3 +148,6 @@ From a source checkout, run the complete repository gates:
 just lint
 just test
 ```
+
+Before running `cargo test` directly in a fresh checkout, run `just setup` to
+build the local wheels required by the consumer fixture.

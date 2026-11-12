@@ -5,12 +5,12 @@
 ownership, boundary, and manifest-policy checks. The `sc-boundary` name is the
 analyzer target accepted by `sc-lint lint`.
 
-Current crate release: **0.8.6**. Install the product CLI with
+Current crate release: **0.8.8**. Install the product CLI with
 `brew install randlee/tap/sc-lint` or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
 crate as a Rust library, run `cargo add sc-lint-boundary@0.8`. See the
 [repository](https://github.com/randlee/sc-lint) and
-[API documentation](https://docs.rs/sc-lint-boundary/0.8.6).
+[API documentation](https://docs.rs/sc-lint-boundary/0.8.8).
 
 ## Purpose
 
@@ -43,6 +43,7 @@ Rule IDs include:
 - `SCB-MANIFEST-005`
 - `SCB-MANIFEST-006`
 - `SCB-BOUNDARY-004`
+- `SCB-BOUNDARY-005`
 
 Rule filters accept individual rule IDs and these kebab-case family names:
 
@@ -52,6 +53,25 @@ Rule filters accept individual rule IDs and these kebab-case family names:
 - `forbid-external-impls`
 - `dependencies`
 - `manifests`
+
+## Boundary inventory schema and visibility
+
+A boundary record does not have an `[enforcement]` section. The section was
+removed from the record schema; if a record still declares it, inventory
+loading fails with a diagnostic that names the file and says to delete the
+section. Remove the obsolete table rather than setting a flag inside it.
+
+`SCB-BOUNDARY-005` checks the record's `[implementation].visibility` for its
+named type in `[implementation].module`. It reports when the source type is
+wider than the record declares or the declared type cannot be found. For
+`visibility = "trait_only"`, the check reports a public implementing type;
+the record may name a type in another workspace library crate. If the record
+declares `[implementation].constructor`, the check also compares that value
+with the visibility of the type's inherent `fn new`. For example,
+`constructor = "private"` does not permit a public constructor. A declaration
+of `visibility = "public"` or `constructor = "none"` is not checked for that
+item. Findings include the record file, item, and declared and actual
+visibility.
 
 ## Invocation
 

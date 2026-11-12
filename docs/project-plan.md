@@ -133,6 +133,11 @@ Active follow-on after the completed Phase `C` line:
 
 The scheduled sprint plans are:
 
+- `phase-o` (0.8.7)
+  - one install and upgrade path (ADR-023), consumer canary before publish,
+    boundary #860/#861, version-sync #783
+  - plan in beads: root `lint-phase-o`, index `docs/plans/phase-o.jsonl`
+
 - `lint-spx.1`
   - Beads-backed ATM task-assignment orchestration
   - `docs/plans/orchestration/lint-spx.1-codex-orchestration-task-assign.md`

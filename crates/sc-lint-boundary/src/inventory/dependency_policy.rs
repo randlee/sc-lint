@@ -460,7 +460,6 @@ impl TryFrom<RawBoundaryRecord> for BoundaryRecord {
             references: value.references,
             contracts: value.contracts,
             testing: value.testing,
-            enforcement: value.enforcement,
             status: value.status,
         })
     }

@@ -12,8 +12,8 @@ COMMIT = "a" * 40
 TARGETS = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
 
 
-def verify_run(*, title=f"Release Native Verify {TAG} {COMMIT}", event="workflow_run", branch="main"):
-    return {"databaseId": 7, "displayTitle": title, "event": event, "headBranch": branch}
+def verify_run(*, title=f"Release Native Verify {TAG} {COMMIT}", head_sha=COMMIT):
+    return {"databaseId": 7, "displayTitle": title, "headSha": head_sha}
 
 
 def jobs(**conclusions):
@@ -35,6 +35,9 @@ def jobs(**conclusions):
     ".cargo/config.toml",
     ".github/actions/setup-python-release-build/action.yml",
     ".github/workflows/prerelease-archive.yml",
+    ".github/workflows/release-native-verify.yml",
+    ".github/scripts/release_native_verify.py",
+    ".github/scripts/release_native_gate.py",
 ])
 def test_build_input_change_fails(path):
     assert gate.changed_build_inputs(["docs/requirements.md", path]) == [path]
@@ -46,11 +49,11 @@ def test_non_build_change_passes(path):
 
 
 def test_run_with_every_native_job_successful_proves_the_tag_and_commit():
-    assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS, "main") is None
+    assert gate.run_failure(verify_run(), jobs(), TAG, COMMIT, TARGETS) is None
 
 
-def test_dispatch_from_the_default_branch_is_trusted():
-    assert gate.run_failure(verify_run(event="workflow_dispatch"), jobs(), TAG, COMMIT, TARGETS, "main") is None
+def test_run_with_a_different_head_sha_fails():
+    assert gate.run_failure(verify_run(head_sha="b" * 40), jobs(), TAG, COMMIT, TARGETS) == "run headSha does not match the verified commit"
 
 
 @pytest.mark.parametrize("title", [
@@ -59,17 +62,12 @@ def test_dispatch_from_the_default_branch_is_trusted():
     f"Release Native Verify prerelease/v1.2.4 {COMMIT}",
 ])
 def test_run_for_another_commit_or_tag_fails(title):
-    assert gate.run_failure(verify_run(title=title), jobs(), TAG, COMMIT, TARGETS, "main") == "title does not bind the tag and commit"
-
-
-def test_dispatch_from_another_branch_fails():
-    reason = gate.run_failure(verify_run(event="workflow_dispatch", branch="feature"), jobs(), TAG, COMMIT, TARGETS, "main")
-    assert reason == "untrusted workflow_dispatch run from feature"
+    assert gate.run_failure(verify_run(title=title), jobs(), TAG, COMMIT, TARGETS) == "title does not bind the tag and commit"
 
 
 @pytest.mark.parametrize("conclusion, shown", [("skipped", "skipped"), ("failure", "failure"), (None, "missing")])
 def test_unsuccessful_or_missing_native_job_fails(conclusion, shown):
-    reason = gate.run_failure(verify_run(), jobs(**{"aarch64-apple-darwin": conclusion}), TAG, COMMIT, TARGETS, "main")
+    reason = gate.run_failure(verify_run(), jobs(**{"aarch64-apple-darwin": conclusion}), TAG, COMMIT, TARGETS)
     assert reason == f"native jobs did not succeed: Native aarch64-apple-darwin ({shown})"
 
 
@@ -81,9 +79,8 @@ def fixed_commands(monkeypatch, *, changed, runs, candidate="c" * 40):
         ("git", "rev-parse", "--verify", f"refs/tags/{TAG}^{{commit}}"): COMMIT,
         ("git", "rev-parse", "--verify", "candidate^{commit}"): candidate,
         ("git", "show", f"{COMMIT}:release/publish-artifacts.toml"): manifest,
-        ("gh", "repo", "view", "--json", "defaultBranchRef"): json.dumps({"defaultBranchRef": {"name": "main"}}),
         ("gh", "run", "list", "--workflow", "release-native-verify.yml", "--status", "success", "--limit", "200",
-         "--json", "databaseId,displayTitle,event,headBranch"): json.dumps(runs),
+         "--json", "databaseId,displayTitle,headSha"): json.dumps(runs),
         ("gh", "run", "view", "7", "--json", "jobs"): json.dumps({"jobs": jobs()}),
         ("git", "diff", "--name-only", "--no-renames", COMMIT, candidate): "\n".join(changed),
     }

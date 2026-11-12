@@ -1,36 +1,33 @@
 # Canonical Just setup
 
 This document is the source model for the generated consumer `Justfile`.
-`sc-lint init --just` materializes the same contract; it does not copy Python
-runner scripts or overwrite a consumer README.
+`sc-lint init --just` creates the initial consumer integration files. It does
+not copy Python runner scripts or overwrite a consumer README.
 
 ## Generate the integration
 
 ```sh
 sc-lint init --just --check   # inspect drift without writing
 sc-lint init --just --dry-run # validate without writing; --json lists paths
-sc-lint init --just           # seed missing files or refresh bootstrap
+sc-lint init --just           # create missing files; refresh a recognized older bootstrap
 ```
 
 Human output starts with `init: <status>`:
 
 | Status | Meaning |
 | --- | --- |
-| `current` | Nothing needs writing. |
+| `current` | A non-mutating check found no drift. |
 | `created` | Only missing files were written. |
-| `updated` | At least one prior-release file was refreshed, with or without missing files created. |
+| `updated` | A recognized prior-release bootstrap was refreshed, with or without missing files created. |
 | `would_create` | `--dry-run`: only missing files would be written. |
-| `would_update` | `--dry-run`: at least one prior-release file would be refreshed. |
+| `would_update` | `--dry-run`: a recognized prior-release bootstrap would be refreshed. |
 
 Non-empty file lists follow, one line each, in this order: `Created:` (or
 `Would create:` for `--dry-run`), `Refreshed:` (or `Would refresh:` for
-`--dry-run`) and `Preserved:`. A refreshed prior-release bootstrap appears under
-`Refreshed:` (`Would refresh:` for `--dry-run`). An unedited 0.8.4
-`.sc-lint/bootstrap.py` is refreshed with the current one, and `--check`
-reports it as outdated. `sc-lint.toml` and `Justfile` are consumer-owned: an
-existing file is preserved exactly as it is, whatever its content, and is never
-a conflict. Only a differing `.sc-lint/bootstrap.py` makes init report a
-conflict instead of overwriting it. For example:
+`--dry-run`) and `Preserved:`. Only a bootstrap recognized as coming from a
+prior release can be refreshed. Existing `sc-lint.toml` and `Justfile` files
+are preserved exactly as they are. A different existing bootstrap is not
+overwritten; initialization reports a conflict. For example:
 
 ```text
 init: created
@@ -39,7 +36,7 @@ Preserved: /work/repo/sc-lint.toml
 ```
 
 Paths are printed as the repository root joined with each file name.
-Upgrading an unedited 0.8.4 integration prints, for example:
+Refreshing a recognized prior-release bootstrap can print, for example:
 
 ```text
 init: updated
@@ -54,16 +51,10 @@ fields are always arrays. `refreshed_files` contains files that were refreshed
 on a real run or would be refreshed on `--dry-run`; `dry_run` and `status`
 distinguish the two cases.
 
-The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only,
-and only `.sc-lint/bootstrap.py` is product-owned. `sc-lint.toml` and `Justfile`
-are consumer-owned templates: seeded only when missing, and an existing file is
-never read for drift, rewritten, or reported as a conflict. A differing existing
-bootstrap is a structured error (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3)
-instead of an overwrite. A bootstrap symbolic link is classified by its target's
-content and refreshed by writing through to the target, so the link itself is
-kept; a dangling bootstrap link is a conflict.
-The installer also rejects unresolved template variables before writing;
-details are in [Best practices](./best-practices.md#template-rendering).
+`--check` reports missing files and a recognized prior-release bootstrap as
+outdated. `--dry-run` shows which files would be created or refreshed. A
+bootstrap with an unrecognized content change is not overwritten; move it
+aside or restore the expected content before retrying initialization.
 
 ## Public recipes
 

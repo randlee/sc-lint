@@ -422,7 +422,7 @@ impl Fixture {
         fs::write(
             self.root().join("boundaries/example/example.toml"),
             format!(
-                "boundary_id = \"BOUNDARY-Example\"\nowner_package = \"example\"\nowner_crate_path = \"example\"\nname = \"Example\"\n\n[public]\nfacade = \"Member\"\n\n[implementation]\ntype = \"Member\"\nmodule = \"example\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = {roots}\n\n[dependencies]\nallowed_dependents = {allowed_dependents}\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n"
+                "boundary_id = \"BOUNDARY-Example\"\nowner_package = \"example\"\nowner_crate_path = \"example\"\nname = \"Example\"\n\n[public]\nfacade = \"Member\"\n\n[implementation]\ntype = \"Member\"\nmodule = \"example\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = {roots}\n\n[dependencies]\nallowed_dependents = {allowed_dependents}\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[status]\nstate = \"concrete_landed\"\n"
             ),
         )
         .expect("owner boundary inventory");
@@ -432,7 +432,7 @@ impl Fixture {
         fs::write(
             self.root().join("boundaries/example/example.toml"),
             format!(
-                "boundary_id = \"BOUNDARY-Example\"\nowner_package = \"example\"\nowner_crate_path = \"example\"\nname = \"Example\"\n\n[public]\nfacade = \"{facade}\"\n\n[implementation]\ntype = \"Example\"\nmodule = \"example\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"Example\"]\n\n[dependencies]\nallowed_dependents = []\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n"
+                "boundary_id = \"BOUNDARY-Example\"\nowner_package = \"example\"\nowner_crate_path = \"example\"\nname = \"Example\"\n\n[public]\nfacade = \"{facade}\"\n\n[implementation]\ntype = \"Example\"\nmodule = \"example\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"Example\"]\n\n[dependencies]\nallowed_dependents = []\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[status]\nstate = \"concrete_landed\"\n"
             ),
         )
         .expect("boundary inventory");
@@ -443,7 +443,7 @@ impl Fixture {
             .expect("consumer boundary directory");
         fs::write(
             self.root().join("boundaries/consumer/consumer.toml"),
-            "boundary_id = \"BOUNDARY-Consumer\"\nowner_package = \"consumer\"\nowner_crate_path = \"consumer\"\nname = \"Consumer\"\n\n[public]\nfacade = \"Consumer\"\n\n[implementation]\ntype = \"Consumer\"\nmodule = \"consumer\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"Consumer\"]\n\n[dependencies]\nallowed_dependents = [\"example\"]\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
+            "boundary_id = \"BOUNDARY-Consumer\"\nowner_package = \"consumer\"\nowner_crate_path = \"consumer\"\nname = \"Consumer\"\n\n[public]\nfacade = \"Consumer\"\n\n[implementation]\ntype = \"Consumer\"\nmodule = \"consumer\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"Consumer\"]\n\n[dependencies]\nallowed_dependents = [\"example\"]\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[status]\nstate = \"concrete_landed\"\n",
         )
         .expect("consumer boundary inventory");
     }

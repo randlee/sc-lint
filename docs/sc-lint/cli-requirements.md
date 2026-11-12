@@ -51,6 +51,10 @@ specialized backend tools and mixed Rust/Python implementations.
   It also supports atm-core's `[version_sync.winget]` and
   `[version_sync.release_wiring]` subsections (Amended phase L, #137; Accepted —
   Rand, 2026-10-27).
+  A requirement in a listed pyproject that names another listed project must
+  admit the workspace version. A mismatch is reported as
+  `python.dependency_specifier`, with the workspace version in `expected` and
+  the specifier in `actual` (#783).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
@@ -338,8 +342,8 @@ specialized backend tools and mixed Rust/Python implementations.
   itself cannot be verified, the command must report a distinct recovery error
   identifying the manual backup location. This direct binary setup contract is
   unchanged by consumer tool provisioning: ordinary bootstrap setup invokes
-  the managed-wheel Python helper using the persisted `.sc-lint/install.json`
-  tools object. Exact cargo versions and rustup targets, CARGO_HOME handling,
+  the managed-wheel Python helper using `[tool.sc-lint.tools]` in the selected
+  `sc-lint.toml`. Exact cargo versions and rustup targets, CARGO_HOME handling,
   inspect/install/verify and non-mutating dry-run follow
   [ADR-017, change 6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts)
   (Accepted, Rand, 2026-10-12); lint execution never installs tools.
@@ -349,6 +353,8 @@ specialized backend tools and mixed Rust/Python implementations.
   adds no work, and no tool is skipped by default (#865).
   (Amended for phase-n sprint n-9, PR #866; Accepted — Rand 2026-11-04
   "i did read and approve".)
+  (Tool declaration source amended for phase-o, ADR-023; Pending Rand approval
+  in PR #905.)
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
@@ -377,25 +383,13 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` seeds the consumer templates
-  `sc-lint.toml` and `Justfile` only when they are missing, and materializes
-  the product-owned `.sc-lint/bootstrap.py`. `sc-lint.toml` and `Justfile` are
-  consumer-owned: an existing file is left exactly as it is, is never a
-  conflict, and is never written. Only `.sc-lint/bootstrap.py` is
-  product-owned: a differing existing bootstrap is a structured conflict
-  (`CLI.SC_LINT_INTEGRATION_CONFLICT`, exit 3), never an overwrite. Exception
-  for the prior-release bootstrap: comparison ignores line endings (CRLF and
-  LF), and a matching prior-release `.sc-lint/bootstrap.py` is refreshed with
-  the current asset. A current integration is idempotent; `--check` and
-  `--dry-run` do not mutate it. A consumer README is outside the command's
-  write set.
-  (Amended for phase-n, PR #858, ADR-022 decisions 1, 2 and 5; Accepted —
-  Rand 2026-11-04 "yes adr/rq approved":
-  sc-lint.toml and Justfile are consumer-owned templates seeded only when
-  absent; only bootstrap.py is product-owned.)
-  `--check` reports a file that would be refreshed as
-  `CLI.SC_LINT_INTEGRATION_OUTDATED`. (Amended 2026-11-04 for 0.8.5,
-  lint-085.56 and lint-085.61; Accepted — Rand 2026-11-04
-  ("req-cli-022 approved").)
+  `sc-lint.toml` and `Justfile` when they are missing. Existing files at those
+  paths are preserved. `.sc-lint/bootstrap.py` is created when missing and a
+  recognized prior-release bootstrap may be refreshed; an unrecognized change
+  produces `CLI.SC_LINT_INTEGRATION_CONFLICT` and is not overwritten. `--check`
+  and `--dry-run` do not mutate files. `--check` reports missing files and a
+  recognized prior-release bootstrap as `CLI.SC_LINT_INTEGRATION_OUTDATED`.
+  A consumer README is outside the command's write set.
   E.6 owns optional CI workflow generation because it depends on the reusable
   release-verified Action rather than a source-checkout fallback.
 
@@ -433,12 +427,14 @@ specialized backend tools and mixed Rust/Python implementations.
   ordering is deterministic and does not depend on step timing. Consumer test
   profiles support named command and group selectors, `default`, environment,
   working-directory and platform settings, and forwarded command arguments.
-  Limitations: selectors are not declared in `install.json`; `default` is one
-  selector name, a call accepts one selector, selector descriptions and
-  `requires` are not supported, and installer-side selector validation is not
-  added. See [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
+  Selectors are declared in `sc-lint.toml`; `default` is one selector name, a
+  call accepts one selector, selector descriptions and
+  `requires` are not supported. See
+  [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
+  (Selector configuration source amended for phase-o, ADR-023; Pending Rand
+  approval in PR #905.)
 
 - `REQ-CLI-024`
   `sc-lint docs` must discover the installed offline documentation bundle
