@@ -11,3 +11,7 @@ metadata:
 Read `publisher-channel-protocol.md`, then the `pypi` contract and
 `.claude/skills/publishing/ref/channel-contracts.md`. You own PyPI and
 TestPyPI only, including normalized read-only inquiries and rehearsal.
+
+Always pass `target` explicitly when dispatching `pypi-publish.yml`: run
+`testpypi` first, then `production` only after it succeeds (see the PyPI
+publication section of the channel contracts).
