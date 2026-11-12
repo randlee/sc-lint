@@ -22,7 +22,7 @@ metadata:
   <h2>Integration tests: v{{ version }}</h2>
   <p>Commit <code>{{ commit }}</code>; generated {{ timestamp }}</p>
   <p>Working tree changes at start: {{ source_status | length }} (see results JSON).</p>
-  <p>Status: {{ status }} (pytest exit {{ exit_code }})</p>
+  <p>Status: {{ status }} (command exit {{ exit_code }})</p>
   <p>Passed: {{ counts.passed }}; failed: {{ counts.failed }}; errors: {{ counts.error }}; skipped: {{ counts.skipped }}; deselected: {{ counts.deselected }}</p>
   <table><thead><tr><th>Test</th><th>Outcome</th><th>Detail</th></tr></thead><tbody>
   {% for test in tests %}<tr><td>{{ test.name }}</td><td>{{ test.outcome }}</td><td>{{ test.detail }}</td></tr>{% endfor %}
