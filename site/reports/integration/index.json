@@ -1,0 +1,18 @@
+{
+  "runs": [
+    {
+      "href": "20261112T001553Z-v0.8.8-cdf93f0b/report.html",
+      "version": "0.8.8",
+      "commit": "cdf93f0b3ad9b8cba132a5ba2fd3d7d25763f197",
+      "timestamp": "2026-11-12T00:15:53Z",
+      "counts": {
+        "passed": 14,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "deselected": 216
+      },
+      "status": "PASS"
+    }
+  ]
+}

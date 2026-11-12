@@ -1,0 +1,22 @@
+---
+required_variables:
+  - runs
+  - runs.href
+  - runs.version
+  - runs.commit
+  - runs.timestamp
+  - runs.status
+  - runs.counts.passed
+  - runs.counts.failed
+  - runs.counts.error
+  - runs.counts.skipped
+  - runs.counts.deselected
+metadata:
+  purpose: Index of integration test evidence reports
+---
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Integration test reports</title>
+<style>body{font-family:sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#1f2937}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #cbd5e1;padding:8px;overflow-wrap:anywhere}</style></head>
+<body><main><h1>Integration test reports</h1><table><thead><tr><th>Report</th><th>Commit</th><th>Generated</th><th>Status</th><th>Results</th></tr></thead><tbody>
+{% for run in runs %}<tr><td><a href="{{ run.href }}">v{{ run.version }}</a></td><td><code>{{ run.commit }}</code></td><td>{{ run.timestamp }}</td><td>{{ run.status }}</td><td>{{ run.counts.passed }} passed, {{ run.counts.failed }} failed, {{ run.counts.error }} errors, {{ run.counts.skipped }} skipped, {{ run.counts.deselected }} deselected</td></tr>{% endfor %}
+</tbody></table></main></body></html>
