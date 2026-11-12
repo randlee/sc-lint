@@ -29,13 +29,21 @@ def test_empty_results_refused(tmp_path):
         module.normalize(xml, 0, "0.8.8", "abc", "now")
 
 
-def test_real_pytest_reports_deselected_items(tmp_path):
+def test_real_pytest_reports_deselected_items(tmp_path, monkeypatch):
     (tmp_path / "test_sample.py").write_text("def test_keep(): pass\ndef test_drop(): pass\n")
     result_path = tmp_path / "deselected.json"
+    monkeypatch.setenv("PYTEST_ADDOPTS", "--not-a-real-option")
+    monkeypatch.setenv("PYTEST_PLUGINS", "not_a_real_plugin")
     env = os.environ.copy()
+    env.pop("PYTEST_ADDOPTS", None)
+    env.pop("PYTEST_PLUGINS", None)
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     env["PYTHONPATH"] = str(SCRIPTS)
     env["SC_LINT_EVIDENCE_DESELECTIONS"] = str(result_path)
-    result = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "integration_evidence_pytest", "-k", "keep", str(tmp_path / "test_sample.py")], env=env, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "--rootdir=.", "-p", "integration_evidence_pytest", "-k", "keep", "test_sample.py"],
+        cwd=tmp_path, env=env, capture_output=True, text=True, check=False,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result_path.read_text()) == {"deselected": 1}
 
