@@ -1,3 +1,2 @@
-{"sprint":"q-3"}
-{"sprint":"q-4","depends_on":["q-3"]}
-{"sprint":"q-5","depends_on":["q-4"]}
+{"sprint":"q-7"}
+{"sprint":"q-6"}
