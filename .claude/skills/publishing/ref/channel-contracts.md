@@ -65,6 +65,14 @@ retain `already_live` entries, and publish only the missing set in manifest
 order. Cargo publishing is permanent; never bump a version merely because a
 new crate was missing in an earlier run.
 
+## PyPI publication — `pypi-publisher`
+
+Dispatch `pypi-publish.yml` for the release tag twice, each time with `target`
+set explicitly: first `target=testpypi` (rehearsal), then `target=production`
+only after the rehearsal succeeds. Retry a transient registry failure (e.g. a
+503) by re-dispatching the same step; uploads use `--skip-existing`. Confirm
+the version on pypi.org's JSON API before reporting success.
+
 ## GitHub Release — `github-release-publisher`
 
 No external secret is needed. The root release workflow must declare

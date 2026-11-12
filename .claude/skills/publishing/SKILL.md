@@ -74,6 +74,9 @@ changing a background channel-worker contract or registry inquiry helper.
 
 ## Operating rules
 
+- Before any `workflow_dispatch`, read the workflow's `inputs:` and pass every
+  choice-type input explicitly; never rely on a default (`pypi-publish.yml`
+  defaults `target` to `testpypi`).
 - Use the assignment's publishing manifest (normally
   `release/publish-artifacts.toml`) and `.github/scripts/release_artifacts.py` as the
   only repository-specific publish surface.
