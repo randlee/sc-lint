@@ -1,0 +1,18 @@
+{
+  "commit": "cdf93f0b3ad9b8cba132a5ba2fd3d7d25763f197",
+  "generated_at": "2026-11-11T23:02:10+00:00",
+  "href": "20261111T230210Z-prerelease-v0.8.8-run43116653621/index.html",
+  "label": "prerelease/v0.8.8 run 43116653621",
+  "status": "PASS",
+  "status_class": "pass",
+  "tag": "prerelease/v0.8.8",
+  "targets": [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc"
+  ],
+  "trigger": "workflow_dispatch with tag prerelease/v0.8.8"
+}
