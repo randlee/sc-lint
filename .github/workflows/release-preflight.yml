@@ -294,6 +294,14 @@ jobs:
           prefix="$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["prerelease"]["tag_prefix"])' "${RELEASE_ARTIFACT_MANIFEST}")"
           python3 .github/scripts/release_native_gate.py "${prefix}${RELEASE_VERSION}" "refs/tags/release-candidate-${RELEASE_TAG}"
 
+      - id: integration_evidence_gate
+        name: Require passing integration evidence
+        if: ${{ always() && steps.meta.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          RELEASE_VERSION: ${{ steps.meta.outputs.release_version }}
+        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref HEAD
+
       - id: unpublished
         name: Verify release version is unpublished on crates.io
         if: ${{ always() && steps.meta.outcome == 'success' }}
@@ -483,6 +491,7 @@ jobs:
           VERSION_LOCKSTEP: ${{ steps.version_lockstep.outcome }}
           RELEASE_CANDIDATE_PROVENANCE: ${{ steps.release_candidate_provenance.outcome }}
           NATIVE_MATRIX_GATE: ${{ steps.native_matrix_gate.outcome }}
+          INTEGRATION_EVIDENCE_GATE: ${{ steps.integration_evidence_gate.outcome }}
           UNPUBLISHED: ${{ steps.unpublished.outcome }}
           PACKAGE_CHECKS: ${{ steps.package_checks.outcome }}
           GITHUB_RELEASE_PERMISSIONS: ${{ steps.github_release_permissions.outcome }}
@@ -520,6 +529,7 @@ jobs:
           record version-lockstep "${VERSION_LOCKSTEP}"
           record release-candidate-provenance "${RELEASE_CANDIDATE_PROVENANCE}"
           record native-matrix-gate "${NATIVE_MATRIX_GATE}"
+          record integration-evidence-gate "${INTEGRATION_EVIDENCE_GATE}"
           record unpublished-version "${UNPUBLISHED}"
           record github-release-permissions "${GITHUB_RELEASE_PERMISSIONS}"
           record channel-results "${CHANNEL_RESULTS}"

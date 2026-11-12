@@ -135,11 +135,15 @@ test-adoption:
 # Run the adoption tests that execute the kit's just layers against a product
 # built into target/adoption-product, never the shared target/debug or
 # .sc-lint/wheels. Missing artifacts fail the run.
-test-adoption-integration:
+test-adoption-integration *args:
     cargo build --workspace --target-dir target/adoption-product
     {{host_python}} -m pip wheel --quiet --disable-pip-version-check -w target/adoption-product/wheels bindings/sc-lint-py
-    {{host_python}} -m pytest tests/adoption -q -m integration --integration --sc-lint-bin {{adoption_binary}} --sc-lint-wheel-dir target/adoption-product/wheels
+    {{host_python}} -m pytest tests/adoption -q -m integration --integration --sc-lint-bin {{adoption_binary}} --sc-lint-wheel-dir target/adoption-product/wheels {{args}}
 
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv
     {{host_python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml --check --dry-run
+
+# Run the integration suite and generate its durable evidence report.
+integration-evidence:
+    {{host_python}} .github/scripts/integration_evidence.py
