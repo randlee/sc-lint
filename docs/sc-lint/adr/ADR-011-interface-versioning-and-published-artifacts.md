@@ -145,24 +145,3 @@ function signatures remain unchanged, but callers that relied on
 `analyzer_report_schema()` returning v1 must select the explicit v1 function
 or update their validation expectations.
 
-## Proposed Amendment — phase q example coverage report
-
-Status: **AWAITING RAND ACCEPTANCE**. This proposal is not an accepted decision
-and is a prerequisite for phase-q dispatch.
-
-When runtime example targets exist, the runtime analyzer reports the deliberate
-`SCB-RUNTIME-003` and `SCB-RUNTIME-004` example exclusions in a
-`coverage_exclusions` array. Each entry contains `rule_id`,
-`target_kind: "example"`, and `reason: "rule_scope"`. These entries are
-coverage information, not findings, and do not change the exit status.
-The top-level normalized analyzer report carries the field unchanged.
-
-This is a new closed analyzer report schema `0.3.0` and a new
-`analyzer-report-v3` artifact. The v3 schema also reserves an optional structured `baselined` array for the proposed ADR-022 panic baseline; the baseline layer emits it only if that amendment is accepted. The existing closed v1 and v2 artifacts are
-not edited in place. Extend the version dispatcher, backend payload drift
-validation, schema accessors, and normalization for v3. The runtime analyzer
-emits v3 when this coverage field is present; existing reports otherwise
-retain their existing versions. Strict v1/v2 consumers must upgrade to accept
-v3: this is not wire-compatible with closed validators. Document any Rust API
-or package semver impact before release. Acceptance requires fixtures for v1,
-v2, v3, unsupported versions, direct analyzer output, and normalized CLI output.

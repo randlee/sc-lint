@@ -99,20 +99,20 @@ own `#![cfg(test)]`, and parent-only cfg does not propagate. Nested functions
 require their own allowance. Macro expansion and type-aware proof are not
 claimed. The rule is off for packages not listed in the repository-root
 configuration. The proposed opt-in exception to REQ-RUNTIME-001's new-rule
-default and the optional recorded-baseline behavior are specified by the
-pending ADR-022 amendment. Both opt-in and baseline are in scope until Rand
-explicitly approves a change.
+default is specified by the pending ADR-022 amendment. A recorded baseline is
+provisionally outside phase q pending Rand; no request for a baseline is on
+record.
 
 ## REQ-RUNTIME-003 — Proposed example target coverage
 
 Status: **AWAITING RAND ACCEPTANCE**. Before dispatch, accept or revise this
-requirement and the proposed ADR-011 phase-q amendment.
+requirement before dispatch.
 
 Runtime analyzes supported Cargo example source for rules 001, 002, 005,
 006 and 007, and for 008 after that rule is integrated and its package is
 opted in. Rules 003 and 004 retain their deliberate exclusion from examples.
-The normalized report exposes that exclusion through the pending ADR-011 v3
-coverage contract. Shared source discovery keeps boundary and portability's
-existing example exclusion unless a separate approved requirement changes it.
+The 003/004 exclusion is documented in the runtime README and rule catalog;
+no analyzer report schema change is required. Shared source discovery keeps
+boundary and portability's existing example exclusion unless a separate approved requirement changes it.
 Existing lib/bin target attribution remains stable; example-only files are
 attributed deterministically to their example target.

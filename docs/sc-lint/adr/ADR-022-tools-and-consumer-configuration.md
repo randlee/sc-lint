@@ -196,50 +196,19 @@ this amendment adds `sc-lint-runtime` as a consumer of the directive model.
    sites from its findings; the reason stays in source. It does not list
    honoured allowances in its report as decision 4 describes for `PORT-010`.
 
-## Proposed Amendment — phase q panic-rule adoption
 
-Status: **AWAITING RAND ACCEPTANCE**. This proposal is not an accepted decision
-and is a prerequisite for phase-q dispatch. It would create a limited exception
-for `SCB-RUNTIME-008` to the existing no-repository-wide-suppression rule.
+## Proposed Amendment — phase q panic-rule package opt-in
 
-The repository-root `sc-lint.toml` opts Cargo **packages**, not individual
-targets, into the panic rule:
-
-```toml
-[tool.sc-lint.analyzers.runtime]
-panic_rule_packages = ["worker", "server"]
-```
-
-An opted-in package includes its supported production lib, bin and example
-targets. An empty or absent list opts in none. Unknown and duplicate package
-names are typed configuration errors. Existing `exclude_rules`, `rule_filter`,
-`fail_rules` and `exclude_paths_by_rule` retain their documented behavior: a
-site is evaluated only when the package is opted in and the common rule/path
-filters select it; `fail_rules` controls whether a remaining finding fails.
-Catalog changes must be narrowly scoped so other rules keep their existing
-defaults. The proposed REQ-RUNTIME-002 explicitly defines this rule's exception
-to REQ-RUNTIME-001's fail-by-default wording.
-
-The optional repository baseline file is `.sc-lint/runtime-panic-baseline.json`.
-It uses a versioned JSON object with sorted entries keyed by rule id,
-workspace-relative path, enclosing item, call kind and zero-based per-item
-occurrence index. Line numbers appear in findings but are not identity keys.
-Duplicate or malformed entries are typed errors. Removed entries are ignored
-for lint and removed on an explicit refresh; changed identity is a new finding.
-Baselined findings are reported separately as baselined, with identity and
-source location, and do not fail the run. A non-baselined finding is reported
-normally and fails subject to the common filters.
-
-The top-level command `sc-lint lint sc-runtime --update-panic-baseline` writes
-or replaces the baseline atomically from current findings in opted-in packages,
-reports the destination and entry count, and exits zero on success; malformed
-configuration, analysis or write errors return actionable nonzero diagnostics
-and leave the previous file intact. A refresh is explicit and is never performed
-by an ordinary lint run. CLI and report contract changes need their own version
-and compatibility review.
-
-**Alternative awaiting Rand:** defer the baseline entirely; retain package
-opt-in and site allowances. In that variant remove baseline storage, refresh
-command and baseline-report behavior from phase q; the package opt-in proposal
-and its catalog/requirement decision still require acceptance. No such deferral
-is approved by this draft.
+Status: **AWAITING RAND ACCEPTANCE**. This proposal is not accepted and is a
+prerequisite for phase-q dispatch. The repository-root `sc-lint.toml`
+`[tool.sc-lint.analyzers.runtime]` key `panic_rule_packages = ["worker"]`
+opts named Cargo packages into `SCB-RUNTIME-008`; absent or empty opts in
+none, and an opted-in package includes its supported production lib, bin and
+example targets. Unknown or duplicate package names are typed configuration
+errors. The existing `exclude_rules`, `rule_filter`, `fail_rules`, and
+`exclude_paths_by_rule` retain their documented effects: evaluate a site only
+when both the package opt-in and common rule/path selection allow it, and use
+`fail_rules` to decide whether a remaining finding fails. Other rules retain
+their current defaults. This proposal gives 008 a narrow exception to
+REQ-RUNTIME-001's fail-by-default wording. Existing ADR-022 function/method
+site allowances are unchanged.
