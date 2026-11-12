@@ -99,7 +99,9 @@ own `#![cfg(test)]`, and parent-only cfg does not propagate. Nested functions
 require their own allowance. Macro expansion and type-aware proof are not
 claimed. The rule is off for packages not listed in the repository-root
 configuration. The proposed opt-in exception to REQ-RUNTIME-001's new-rule
-default is specified by the pending ADR-022 amendment. A recorded baseline is
+default is specified by the pending ADR-022 amendment. The runtime analyzer
+validates its package list through its catalog-owned configuration keys; shared
+analyzer configuration remains the single source. A recorded baseline is
 provisionally outside phase q pending Rand; no request for a baseline is on
 record.
 
@@ -114,5 +116,8 @@ opted in. Rules 003 and 004 retain their deliberate exclusion from examples.
 The 003/004 exclusion is documented in the runtime README and rule catalog;
 no analyzer report schema change is required. Shared source discovery keeps
 boundary and portability's existing example exclusion unless a separate approved requirement changes it.
+Existing source-discovery entry points retain their signatures and defaults;
+runtime uses a separate target-aware context for example discovery. The 003/004
+sleep scope uses that target classification, including nested example modules.
 Existing lib/bin target attribution remains stable; example-only files are
 attributed deterministically to their example target.
