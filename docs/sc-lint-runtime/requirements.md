@@ -103,7 +103,8 @@ default is specified by the pending ADR-022 amendment. The runtime analyzer
 validates its package list through its catalog-owned configuration keys; shared
 analyzer configuration remains the single source. A recorded baseline is
 provisionally outside phase q pending Rand; no request for a baseline is on
-record.
+record. Runtime CLI help and its generated references include the new rule ID
+and stay consistent.
 
 ## REQ-RUNTIME-003 — Proposed example target coverage
 
@@ -117,7 +118,7 @@ The 003/004 exclusion is documented in the runtime README and rule catalog;
 no analyzer report schema change is required. Shared source discovery keeps
 boundary and portability's existing example exclusion unless a separate approved requirement changes it.
 Existing source-discovery entry points retain their signatures and defaults;
-runtime uses a separate target-aware context for example discovery. The 003/004
+runtime uses a separate crate-private target-aware context for example discovery. The 003/004
 sleep scope uses that target classification, including nested example modules.
 Existing lib/bin target attribution remains stable; example-only files are
 attributed deterministically to their example target.
