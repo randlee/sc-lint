@@ -1,0 +1,44 @@
+{
+  "title": "aarch64-unknown-linux-gnu (prerelease/v0.8.8)",
+  "target": "aarch64-unknown-linux-gnu",
+  "status": "PASS",
+  "status_class": "pass",
+  "error": "",
+  "checks": [
+    {
+      "name": "sha256 sc-lint_0.8.8_aarch64-unknown-linux-gnu.tar.gz",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "sha256 sc_lint-0.8.8-cp39-abi3-manylinux_2_28_aarch64.whl",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "binary sc-lint",
+      "status": "pass",
+      "detail": "aarch64-unknown-linux-gnu; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-boundary",
+      "status": "pass",
+      "detail": "aarch64-unknown-linux-gnu; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-portability",
+      "status": "pass",
+      "detail": "aarch64-unknown-linux-gnu; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-runtime",
+      "status": "pass",
+      "detail": "aarch64-unknown-linux-gnu; reports 0.8.8"
+    },
+    {
+      "name": "wheel sc_lint-0.8.8-cp39-abi3-manylinux_2_28_aarch64.whl",
+      "status": "pass",
+      "detail": "installs and reports 0.8.8"
+    }
+  ]
+}
