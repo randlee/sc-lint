@@ -1,0 +1,44 @@
+{
+  "title": "x86_64-pc-windows-msvc (prerelease/v0.8.8)",
+  "target": "x86_64-pc-windows-msvc",
+  "status": "PASS",
+  "status_class": "pass",
+  "error": "",
+  "checks": [
+    {
+      "name": "sha256 sc-lint_0.8.8_x86_64-pc-windows-msvc.zip",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "sha256 sc_lint-0.8.8-cp39-abi3-win_amd64.whl",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "binary sc-lint",
+      "status": "pass",
+      "detail": "x86_64-pc-windows-msvc; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-boundary",
+      "status": "pass",
+      "detail": "x86_64-pc-windows-msvc; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-portability",
+      "status": "pass",
+      "detail": "x86_64-pc-windows-msvc; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-runtime",
+      "status": "pass",
+      "detail": "x86_64-pc-windows-msvc; reports 0.8.8"
+    },
+    {
+      "name": "wheel sc_lint-0.8.8-cp39-abi3-win_amd64.whl",
+      "status": "pass",
+      "detail": "installs and reports 0.8.8"
+    }
+  ]
+}

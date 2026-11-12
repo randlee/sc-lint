@@ -1,0 +1,44 @@
+{
+  "title": "aarch64-apple-darwin (prerelease/v0.8.8)",
+  "target": "aarch64-apple-darwin",
+  "status": "PASS",
+  "status_class": "pass",
+  "error": "",
+  "checks": [
+    {
+      "name": "sha256 sc-lint_0.8.8_aarch64-apple-darwin.tar.gz",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "sha256 sc_lint-0.8.8-cp39-abi3-macosx_11_0_arm64.whl",
+      "status": "pass",
+      "detail": "matches checksums.txt"
+    },
+    {
+      "name": "binary sc-lint",
+      "status": "pass",
+      "detail": "aarch64-apple-darwin; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-boundary",
+      "status": "pass",
+      "detail": "aarch64-apple-darwin; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-portability",
+      "status": "pass",
+      "detail": "aarch64-apple-darwin; reports 0.8.8"
+    },
+    {
+      "name": "binary sc-lint-runtime",
+      "status": "pass",
+      "detail": "aarch64-apple-darwin; reports 0.8.8"
+    },
+    {
+      "name": "wheel sc_lint-0.8.8-cp39-abi3-macosx_11_0_arm64.whl",
+      "status": "pass",
+      "detail": "installs and reports 0.8.8"
+    }
+  ]
+}
