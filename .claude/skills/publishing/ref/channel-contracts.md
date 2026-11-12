@@ -88,6 +88,17 @@ Use the contract-declared GitHub token liveness check before dispatching the
 manifest-declared workflow. The manifest owns the package identifier and
 installer target.
 
+- Every `InstallerSha256` in the submitted installer manifest must be exactly
+  64 hex characters and equal the release `checksums.txt` entry for its
+  `InstallerUrl` asset. `.github/scripts/winget_manifest_check.py
+  <installer.yaml> <checksums.txt>` enforces this; `winget-publish.yml` runs it
+  on the submitted PR head and fails the leg on any mismatch. A manual
+  in-place update must run it on the edited manifest before every push, and a
+  push that skipped it is not a submission.
+- A pending new-package PR does not hold a release. Update it in place to the
+  new version (manifests, hashes, title) and submit every release until one is
+  accepted; never wait for the pending PR (Rand 2026-11-09).
+
 ## Scoop — `scoop-publisher`
 
 Use the contract-declared GitHub token liveness check before dispatching the

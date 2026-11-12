@@ -144,3 +144,33 @@ jobs:
           # Must authorize a fork of microsoft/winget-pkgs; the repository
           # GITHUB_TOKEN is intentionally not used for this external channel.
           token: ${{ secrets.WINGET_GITHUB_TOKEN }}
+
+      # Hash gate: the submitted installer manifest must carry 64-hex
+      # InstallerSha256 values that exactly match the release checksums.txt
+      # (a 63-char hash shipped in 0.8.6 and drew Manifest-Validation-Error).
+      # The releaser opens the PR itself, so this runs on the submitted head
+      # and fails the leg red, loudly, if the manifest is bad.
+      - name: Verify submitted installer manifest against release checksums
+        if: ${{ steps.winget_probe.outputs.already_published != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          RELEASE_GH_TOKEN: ${{ github.token }}
+          IDENTIFIER: ${{ fromJSON(needs.verify-release.outputs.channel_config).channel.identifier }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          first_letter="$(tr '[:upper:]' '[:lower:]' <<<"${IDENTIFIER:0:1}")"
+          manifest_path="manifests/${first_letter}/${IDENTIFIER//.//}/${version}/${IDENTIFIER}.installer.yaml"
+          pr="$(gh api -X GET search/issues \
+            -f q="repo:microsoft/winget-pkgs type:pr is:open in:title ${IDENTIFIER} ${version}" \
+            --jq '.items[0].number')"
+          [[ -n "${pr}" && "${pr}" != "null" ]] || { echo "no open winget-pkgs PR found for ${IDENTIFIER} ${version}" >&2; exit 1; }
+          read -r head_repo head_sha < <(gh api "repos/microsoft/winget-pkgs/pulls/${pr}" \
+            --jq '[.head.repo.full_name, .head.sha] | @tsv')
+          gh api "repos/${head_repo}/contents/${manifest_path}?ref=${head_sha}" \
+            -H 'Accept: application/vnd.github.raw' > installer.yaml
+          GH_TOKEN="${RELEASE_GH_TOKEN}" gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" --pattern checksums.txt --output checksums.txt
+          python3 .github/scripts/winget_manifest_check.py installer.yaml checksums.txt
