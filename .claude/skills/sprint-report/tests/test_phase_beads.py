@@ -11,8 +11,9 @@ SKILL = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(SKILL / 'scripts'), str(SKILL.parent / 'atm-beads/scripts')]
 import phase_beads as pb
 import sprint_dag as dag
+from sprint_dag import Graph
 
-ROWS = [{'id': 'atm-x-1.group-dev', 'labels': ['phase-x', 'stage:dev']}]
+ROWS = [{'id': 'atm-x-1.group-dev', 'status': 'open', 'labels': ['phase-x', 'stage:dev']}]
 
 
 class FakeCache:
@@ -66,6 +67,10 @@ class PhaseBeadsTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'dolt down'):
                 self.read(unavailable)
 
+    def test_cache_rejects_operation_record_with_invalid_typed_fields(self):
+        with self.assertRaisesRegex(ValueError, 'invalid bead records'):
+            self.read(lambda repo: FakeCache(rows=[{'id': 'atm-x-1', 'labels': [3]}]))
+
     def test_empty_phase_is_an_error(self):
         with self.assertRaisesRegex(RuntimeError, 'no phase-x beads'):
             self.read(lambda repo: FakeCache(rows=[]))
@@ -75,7 +80,8 @@ class PhaseBeadsTests(unittest.TestCase):
         def run_json(repo, *command):
             calls.append(command)
             return {'events': []} if command[:3] == ('atm', 'task', 'events') else []
-        graph = {'nodes': ['atm-x-1.group-dev']}
+        graph: Graph = {'nodes': ['atm-x-1.group-dev'], 'edges': [], 'gate_pairs': {},
+                        'edge_meaning': 'source depends on target', 'render_direction': 'prerequisite to dependent'}
         with mock.patch.object(dag, 'run_json', side_effect=run_json):
             dag.collect_state(Path('/repo'), graph, {}, {}, 'x')
         blocked = [c for c in calls if c[:2] == ('bd', 'blocked')]
