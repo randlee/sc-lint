@@ -628,9 +628,9 @@ Architecture consequences:
   for normal users
 - backend binaries included in the release manifest should be installed from
   that top-level formula when they are part of the supported toolset
-- any retained per-backend formula, such as `sc-lint-boundary.rb`, must remain
-  explicitly documented as a legacy compatibility surface rather than the
-  normal user install path
+- no per-backend formulas are published; `sc-lint-boundary` ships only as an
+  executable of the top-level `sc-lint` formula (the standalone
+  `sc-lint-boundary.rb` was retired, issue #153)
 
 Phase E adds two release-distribution consumers to that same manifest-led
 model: the installed documentation bundle and a reusable GitHub Action. The

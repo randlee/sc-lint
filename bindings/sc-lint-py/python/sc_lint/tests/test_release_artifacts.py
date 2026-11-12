@@ -352,6 +352,29 @@ class ReleaseArtifactsTests(unittest.TestCase):
             completed = subprocess.run([ruby, "-c", str(formula_path)], capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
+    def test_only_sc_lint_formula_is_emitted_and_it_installs_sc_lint_boundary(self) -> None:
+        # Issue #153: the standalone sc-lint-boundary formula is retired; the
+        # sc-lint formula is the only one and must still ship the executable.
+        import tomllib
+
+        publish = tomllib.loads(PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8"))
+        formulas = publish["channels"]["homebrew"]["formulas"]
+        self.assertEqual([f["path"] for f in formulas], ["Formula/sc-lint.rb"])
+        self.assertIn("sc-lint-boundary", formulas[0]["binaries"])
+        consumer_input = json.loads(
+            (REPO_ROOT / "release/sc-publish-consumer-input.json").read_text(encoding="utf-8")
+        )
+        self.assertNotIn("sc-lint-boundary.rb", json.dumps(consumer_input))
+        self.assertFalse((REPO_ROOT / "homebrew-tap/Formula/sc-lint-boundary.rb").exists())
+        formula = release_artifacts.render_homebrew_formula_text(
+            self.manifest,
+            formula_name="sc-lint",
+            version="0.4.0",
+            tag="v0.4.0",
+            sha_map={target: "a" * 64 for target in release_artifacts.HOMEBREW_TARGETS},
+        )
+        self.assertIn("sc-lint-boundary", formula)
+
     def test_legacy_homebrew_layout_helper_stages_bins_and_docs(self) -> None:
         # This local staging helper does not model the current publish workflow.
         archive = self.stage_archive()
