@@ -65,6 +65,14 @@ retain `already_live` entries, and publish only the missing set in manifest
 order. Cargo publishing is permanent; never bump a version merely because a
 new crate was missing in an earlier run.
 
+## PyPI publication — `pypi-publisher`
+
+Dispatch `pypi-publish.yml` for the release tag twice, each time with `target`
+set explicitly: first `target=testpypi` (rehearsal), then `target=production`
+only after the rehearsal succeeds. Retry a transient registry failure (e.g. a
+503) by re-dispatching the same step; uploads use `--skip-existing`. Confirm
+the version on pypi.org's JSON API before reporting success.
+
 ## GitHub Release — `github-release-publisher`
 
 No external secret is needed. The root release workflow must declare
@@ -87,6 +95,17 @@ For vendor compatibility, a legacy single `binary` normalizes to a one-entry
 Use the contract-declared GitHub token liveness check before dispatching the
 manifest-declared workflow. The manifest owns the package identifier and
 installer target.
+
+- Every `InstallerSha256` in the submitted installer manifest must be exactly
+  64 hex characters and equal the release `checksums.txt` entry for its
+  `InstallerUrl` asset. `.github/scripts/winget_manifest_check.py
+  <installer.yaml> <checksums.txt>` enforces this; `winget-publish.yml` runs it
+  on the submitted PR head and fails the leg on any mismatch. A manual
+  in-place update must run it on the edited manifest before every push, and a
+  push that skipped it is not a submission.
+- A pending new-package PR does not hold a release. Update it in place to the
+  new version (manifests, hashes, title) and submit every release until one is
+  accepted; never wait for the pending PR (Rand 2026-11-09).
 
 ## Scoop — `scoop-publisher`
 
