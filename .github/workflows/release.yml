@@ -119,7 +119,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.meta.outputs.release_version }}
           RELEASE_SHA: ${{ steps.release_gate.outputs.release_sha }}
-        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref "$RELEASE_SHA"
+        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref "$RELEASE_SHA" --candidate-ref "release-candidate-v${RELEASE_VERSION}"
 
       - name: Verify npm source at resolved release commit
         env:

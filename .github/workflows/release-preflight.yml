@@ -300,7 +300,7 @@ jobs:
         continue-on-error: true
         env:
           RELEASE_VERSION: ${{ steps.meta.outputs.release_version }}
-        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref HEAD
+        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref HEAD --candidate-ref "release-candidate-v${RELEASE_VERSION}"
 
       - id: unpublished
         name: Verify release version is unpublished on crates.io
