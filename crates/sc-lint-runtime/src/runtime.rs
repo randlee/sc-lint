@@ -251,6 +251,7 @@ fn discover_runtime_sources(workspace: &WorkspaceMetadata) -> Result<Vec<Runtime
                 &package.name,
                 &target.name,
                 &mut seen,
+                &mut BTreeSet::new(),
                 &mut files,
             )?;
         }
@@ -272,25 +273,37 @@ fn collect_example_module(
     package: &PackageName,
     target: &TargetName,
     seen: &mut BTreeSet<PathBuf>,
+    visited: &mut BTreeSet<PathBuf>,
     files: &mut Vec<RuntimeFileContext>,
 ) -> Result<()> {
-    if !path.is_file() || !seen.insert(canonical_or_original(path)) {
+    let canonical = canonical_or_original(path);
+    if !path.is_file() || !visited.insert(canonical.clone()) {
         return Ok(());
     }
     let source = fs::read_to_string(path)
         .with_context(|| format!("failed to read example source {}", path.display()))?;
     let parsed = syn::parse_file(&source)
         .with_context(|| format!("failed to parse example source {}", path.display()))?;
-    files.push(RuntimeFileContext {
-        file: FileContext {
-            source_path: path.to_path_buf(),
-            package: package.clone(),
-            target: target.clone(),
-            is_test_file: false,
-        },
-        kind: PackageTargetKind::Example,
-    });
-    collect_nested_example_modules(&parsed.items, module_dir, package, target, seen, files)
+    if seen.insert(canonical) {
+        files.push(RuntimeFileContext {
+            file: FileContext {
+                source_path: path.to_path_buf(),
+                package: package.clone(),
+                target: target.clone(),
+                is_test_file: false,
+            },
+            kind: PackageTargetKind::Example,
+        });
+    }
+    collect_nested_example_modules(
+        &parsed.items,
+        module_dir,
+        package,
+        target,
+        seen,
+        visited,
+        files,
+    )
 }
 
 fn collect_nested_example_modules(
@@ -299,6 +312,7 @@ fn collect_nested_example_modules(
     package: &PackageName,
     target: &TargetName,
     seen: &mut BTreeSet<PathBuf>,
+    visited: &mut BTreeSet<PathBuf>,
     files: &mut Vec<RuntimeFileContext>,
 ) -> Result<()> {
     for item in items {
@@ -311,6 +325,7 @@ fn collect_nested_example_modules(
                 package,
                 target,
                 seen,
+                visited,
                 files,
             )?;
         } else {
@@ -338,6 +353,7 @@ fn collect_nested_example_modules(
                 package,
                 target,
                 seen,
+                visited,
                 files,
             )?;
         }

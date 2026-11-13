@@ -48,7 +48,13 @@ fn examples_are_discovered_with_target_ownership_and_existing_scopes() {
         "[package]\nname = \"tokio\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
     );
     write(root, "vendor/tokio/src/lib.rs", "");
-    write(root, "src/lib.rs", WAIT);
+    write(
+        root,
+        "src/lib.rs",
+        &format!(
+            "{WAIT}\nfn sleeps() {{ std::thread::sleep(std::time::Duration::ZERO); std::thread::sleep_until(std::time::Instant::now()); }}"
+        ),
+    );
     write(
         root,
         "examples/conventional/main.rs",
@@ -92,12 +98,20 @@ fn examples_are_discovered_with_target_ownership_and_existing_scopes() {
             .unwrap_or_else(|| panic!("missing {path}: {json}"));
         assert!(item["owner_ids"].to_string().contains(target), "{item}");
     }
-    assert!(
-        !findings
+    for id in ["SCB-RUNTIME-003", "SCB-RUNTIME-004"] {
+        let matching = findings
             .iter()
-            .any(|f| ["SCB-RUNTIME-003", "SCB-RUNTIME-004"]
-                .contains(&f["rule_id"].as_str().unwrap()))
-    );
+            .filter(|f| f["rule_id"] == id)
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "{json}");
+        assert!(
+            matching[0]["message"]
+                .as_str()
+                .unwrap()
+                .replace('\\', "/")
+                .contains("src/lib.rs")
+        );
+    }
 }
 
 #[test]
@@ -193,4 +207,42 @@ async fn guard(m: &Mutex<bool>) { let g = m.lock().unwrap(); std::future::pendin
             "missing {id}: {json}"
         );
     }
+}
+
+#[test]
+fn shared_library_example_root_still_discovers_external_modules() {
+    let fixture = TempDir::new().unwrap();
+    let root = fixture.path();
+    write(root, "sc-lint.toml", "[tool.sc-lint]\n");
+    write(
+        root,
+        "Cargo.toml",
+        "[package]\nname='sample'\nversion='0.1.0'\nedition='2021'\nautoexamples=false\n[workspace]\n[[example]]\nname='shared'\npath='src/lib.rs'\n",
+    );
+    write(
+        root,
+        "src/lib.rs",
+        &format!("{WAIT}\n#[path = \"../outside.rs\"] mod outside;\n"),
+    );
+    write(root, "outside.rs", WAIT);
+    let (status, json) = run(root);
+    assert_eq!(status, 10, "{json}");
+    let findings = json["data"]["findings"].as_array().unwrap();
+    assert_eq!(findings.len(), 2, "{json}");
+    assert!(
+        findings.iter().any(
+            |finding| finding["message"].as_str().unwrap().contains("outside.rs")
+                && finding["owner_ids"].to_string().contains("shared")
+        ),
+        "{json}"
+    );
+    assert!(
+        findings.iter().any(|finding| finding["message"]
+            .as_str()
+            .unwrap()
+            .replace('\\', "/")
+            .contains("src/lib.rs")
+            && finding["owner_ids"].to_string().contains("sample")),
+        "{json}"
+    );
 }

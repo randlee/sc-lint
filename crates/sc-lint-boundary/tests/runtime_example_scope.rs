@@ -1,4 +1,4 @@
-use sc_lint_boundary::{AnalyzeOptions, RuleFilter, analyze_workspace};
+use sc_lint_boundary::{AnalyzeOptions, analyze_workspace_configured};
 use sc_lint_schema::OutputFormat;
 use std::{fs, path::Path};
 use tempfile::TempDir;
@@ -16,21 +16,32 @@ fn example_targets_do_not_change_boundary_findings() {
     write(
         root,
         "Cargo.toml",
-        "[package]\nname='sample'\nversion='0.1.0'\nedition='2021'\n[workspace]\n",
+        "[workspace]\nmembers=['app']\nresolver='2'\n[workspace.package]\nversion='0.1.0'\nedition='2021'\nrust-version='1.85'\nauthors=['test']\nlicense='MIT'\nrepository='https://example.invalid'\nhomepage='https://example.invalid'\n",
     );
-    write(root, "src/lib.rs", "pub fn clean() {}\n");
+    write(
+        root,
+        "app/Cargo.toml",
+        "[package]\nname='app'\nversion.workspace=true\nedition.workspace=true\nrust-version.workspace=true\nauthors.workspace=true\nlicense.workspace=true\nrepository.workspace=true\nhomepage.workspace=true\n",
+    );
+    write(root, "app/src/lib.rs", "pub fn clean() {}\n");
+    write(
+        root,
+        "sc-lint.toml",
+        "[tool.sc-lint.analyzers.boundary]\n[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]\ndependency='cron'\nallowed_manifest_paths=[]\nallowed_source_roots=[]\nmanifest_message='not declared'\nsource_message='not imported'\n",
+    );
     let options = AnalyzeOptions {
         root: root.to_path_buf(),
         format: OutputFormat::Json,
-        rule: Some(RuleFilter::Cycles),
+        rule: None,
     };
-    let before = analyze_workspace(&options).unwrap();
+    let before = analyze_workspace_configured(&options, None, Some("SCB-MANIFEST-004")).unwrap();
     write(
         root,
-        "examples/example.rs",
-        "use sample::clean;\nfn main() { clean(); }\n",
+        "app/examples/example.rs",
+        "use cron::Schedule;\nfn main() {}\n",
     );
-    let after = analyze_workspace(&options).unwrap();
+    let after = analyze_workspace_configured(&options, None, Some("SCB-MANIFEST-004")).unwrap();
+    assert!(before.findings.is_empty());
     assert_eq!(before.findings, after.findings);
     assert_eq!(before.status, after.status);
 }
