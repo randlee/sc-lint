@@ -60,16 +60,38 @@ fn allowance_is_scoped_to_function_and_requires_reason() {
     write(
         root,
         "src/lib.rs",
-        "#[sc_lint(allow(SCB-RUNTIME-008), reason = \"approved\")] fn outer() { Some(1).unwrap(); fn inner() { panic!(); } }\n",
+        "#[sc_lint(allow(SCB-RUNTIME-008), reason = \"approved\")] fn outer() { Some(1).unwrap(); fn inner() { panic!(); } }\nfn sibling() { panic!(); }\n",
     );
     let report = analyze(root).unwrap();
-    assert_eq!(report.findings.len(), 1, "{report:?}");
+    assert_eq!(report.findings.len(), 2, "{report:?}");
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.message.contains("src/lib.rs:1:")),
+        "the nested function retains its own finding: {report:?}"
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.message.contains("src/lib.rs:2:")),
+        "the sibling function retains its finding: {report:?}"
+    );
     write(
         root,
         "src/lib.rs",
         "#[sc_lint(allow(SCB-RUNTIME-008), reason = \" \")] fn f() { panic!(); }",
     );
-    assert!(analyze(root).is_err());
+    let error = analyze(root).unwrap_err().to_string();
+    assert!(
+        error.contains("DIRECTIVE.SITE_ALLOW.EMPTY_REASON"),
+        "{error}"
+    );
+    assert!(
+        error.contains("provide a non-empty reason string"),
+        "{error}"
+    );
 }
 #[test]
 fn package_list_rejects_empty_duplicate_and_unknown_names() {
@@ -240,5 +262,13 @@ fn method_allowance_and_missing_reason_follow_adr022() {
         "src/lib.rs",
         "struct S; impl S { #[sc_lint(allow(SCB-RUNTIME-008))] fn f(&self) { panic!(); } }\n",
     );
-    assert!(analyze(root).is_err());
+    let error = analyze(root).unwrap_err().to_string();
+    assert!(
+        error.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"),
+        "{error}"
+    );
+    assert!(
+        error.contains("add reason = \"...\" to the allowance"),
+        "{error}"
+    );
 }
