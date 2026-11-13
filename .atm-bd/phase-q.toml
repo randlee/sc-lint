@@ -1,7 +1,7 @@
 plan = "docs/plans/phase-q.jsonl"
 root = "lint-phase-q"
 integration_branch = "integrate/phase-q"
-lead = "team-lead"
+lead = "flint"
 
 [templates]
 dev = ".claude/skills/atm-bd-orchestration/templates/dev-template.xml.j2"
