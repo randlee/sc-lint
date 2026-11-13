@@ -1,0 +1,301 @@
+@prefix jj:   <urn:judge-jev:ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# The judge-jev ontology (ADR-JEV-0006): quality trees, their questions and
+# rules, and the runs and answers recorded against them, and the definitions
+# (ADR-JEV-0008) attached to records. Prefix jj: <urn:judge-jev:ontology#>.
+# Shapes for trees are in assets/shapes/quality-tree.shacl.ttl, for definitions
+# files in assets/shapes/definitions.shacl.ttl.
+
+<urn:judge-jev:ontology> a owl:Ontology ;
+    rdfs:label "judge-jev ontology" ;
+    rdfs:comment "Quality trees (waves, questions, options, rules) and the runs, answers and verdicts recorded against them." .
+
+# ---- Tree ------------------------------------------------------------------
+
+jj:Tree a owl:Class ;
+    rdfs:label "Tree" ;
+    rdfs:comment "A quality tree: a start node and the waves and leaves reachable from it." .
+
+jj:Node a owl:Class ;
+    rdfs:label "Node" ;
+    rdfs:comment "A node of a tree: a wave or a leaf. (Added to the ADR vocabulary as the range of jj:start, jj:node and jj:goto.)" .
+
+jj:Wave a owl:Class ;
+    rdfs:subClassOf jj:Node ;
+    rdfs:label "Wave" ;
+    rdfs:comment "A node that asks questions in one Jev request and picks the next node or the verdict from the answers." .
+
+jj:Leaf a owl:Class ;
+    rdfs:subClassOf jj:Node ;
+    rdfs:label "Leaf" ;
+    rdfs:comment "A node that asks nothing and holds only a verdict." .
+
+jj:start a owl:ObjectProperty ;
+    rdfs:label "start" ;
+    rdfs:comment "The node a walk of the tree begins at; it is a jj:node of the same tree." ;
+    rdfs:domain jj:Tree ; rdfs:range jj:Node .
+
+jj:node a owl:ObjectProperty ;
+    rdfs:label "node" ;
+    rdfs:comment "A node of a tree. A tree's node ids (jj:id) are unique. Also relates a wave run to the node it ran." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Tree jj:WaveRun ) ] ;
+    rdfs:range jj:Node .
+
+jj:kind a owl:DatatypeProperty ;
+    rdfs:label "kind" ;
+    rdfs:comment "The record kind the tree judges: \"req\", \"adr\" or \"nfr\"." ;
+    rdfs:domain jj:Tree ; rdfs:range xsd:string .
+
+jj:id a owl:DatatypeProperty ;
+    rdfs:label "id" ;
+    rdfs:comment "The id used in the JSON sent to Jev and in the walker: letters, digits and _.:- only. Added to the ADR vocabulary: a tree id, a node id, or a question id (the key in a wave's questions object)." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Tree jj:Node jj:Question ) ] ; rdfs:range xsd:string .
+
+jj:version a owl:DatatypeProperty ;
+    rdfs:label "version" ;
+    rdfs:comment "The tree's own version number. Added to the ADR vocabulary to carry the JSON tree's version." ;
+    rdfs:domain jj:Tree ; rdfs:range xsd:integer .
+
+jj:approved a owl:DatatypeProperty ;
+    rdfs:label "approved" ;
+    rdfs:comment "Whether the tree is approved. Added to the ADR vocabulary to carry the JSON tree's approved flag." ;
+    rdfs:domain jj:Tree ; rdfs:range xsd:boolean .
+
+jj:note a owl:DatatypeProperty ;
+    rdfs:label "note" ;
+    rdfs:comment "A free-text note on the tree. Added to the ADR vocabulary to carry the JSON tree's note." ;
+    rdfs:domain jj:Tree ; rdfs:range xsd:string .
+
+jj:asks a owl:ObjectProperty ;
+    rdfs:label "asks" ;
+    rdfs:comment "A question the wave puts to Jev. A wave asks at least one." ;
+    rdfs:domain jj:Wave ; rdfs:range jj:Question .
+
+jj:rule a owl:ObjectProperty ;
+    rdfs:label "rule" ;
+    rdfs:comment "A rule of the wave, tried in ascending jj:rank. All of a wave's rules are of one kind." ;
+    rdfs:domain jj:Wave ; rdfs:range jj:Rule .
+
+jj:per a owl:DatatypeProperty ;
+    rdfs:label "per" ;
+    rdfs:comment "\"statement\": the wave is sent once per statement of the record." ;
+    rdfs:domain jj:Wave ; rdfs:range xsd:string .
+
+jj:statements a owl:DatatypeProperty ;
+    rdfs:label "statements" ;
+    rdfs:comment "The dotted path of the record field holding the statements of a per-statement wave." ;
+    rdfs:domain jj:Wave ; rdfs:range xsd:string .
+
+jj:modal a owl:DatatypeProperty ;
+    rdfs:label "modal" ;
+    rdfs:comment "A statement modal a per-statement wave judges (for example \"Must\"); with none, all statements are judged." ;
+    rdfs:domain jj:Wave ; rdfs:range xsd:string .
+
+jj:verdict a owl:DatatypeProperty ;
+    rdfs:label "verdict" ;
+    rdfs:comment "The verdict a leaf or a verdict rule gives." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Leaf jj:VerdictRule ) ] ; rdfs:range xsd:string .
+
+# ---- Question --------------------------------------------------------------
+
+jj:Question a owl:Class ;
+    rdfs:label "Question" ;
+    rdfs:comment "A choice question with an IRI that any wave may ask." .
+
+jj:Option a owl:Class ;
+    rdfs:label "Option" ;
+    rdfs:comment "One choice of a question: a label and the criterion that says when to pick it." .
+
+jj:instructions a owl:DatatypeProperty ;
+    rdfs:label "instructions" ;
+    rdfs:comment "The question text sent to Jev." ;
+    rdfs:domain jj:Question ; rdfs:range xsd:string .
+
+jj:option a owl:ObjectProperty ;
+    rdfs:label "option" ;
+    rdfs:comment "An option of a question (2 to 255), or the option an OptionProbability is for." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Question jj:OptionProbability ) ] ; rdfs:range jj:Option .
+
+jj:rank a owl:DatatypeProperty ;
+    rdfs:label "rank" ;
+    rdfs:comment "An integer order. Rules of a wave are tried by ascending rank and the last has no conditions; the reason lists a wave's questions by ascending rank; a question's options are listed by ascending rank (options carry a rank so the JSON criteria order is kept). Ranks are unique within their wave or question." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Question jj:Rule jj:Option ) ] ; rdfs:range xsd:integer .
+
+jj:label a owl:DatatypeProperty ;
+    rdfs:label "label" ;
+    rdfs:comment "The option's name, the choice Jev answers with." ;
+    rdfs:domain jj:Option ; rdfs:range xsd:string .
+
+jj:criterion a owl:DatatypeProperty ;
+    rdfs:label "criterion" ;
+    rdfs:comment "The text that says when the option applies (it carries the fix hint)." ;
+    rdfs:domain jj:Option ; rdfs:range xsd:string .
+
+# ---- Rule ------------------------------------------------------------------
+
+jj:Rule a owl:Class ;
+    rdfs:label "Rule" ;
+    rdfs:comment "A rule of a wave. Added to the ADR vocabulary as the common superclass of the two rule kinds." .
+
+jj:BranchRule a owl:Class ;
+    rdfs:subClassOf jj:Rule ;
+    rdfs:label "BranchRule" ;
+    rdfs:comment "A rule that, when all its conditions hold, sends the walk to jj:goto." .
+
+jj:VerdictRule a owl:Class ;
+    rdfs:subClassOf jj:Rule ;
+    rdfs:label "VerdictRule" ;
+    rdfs:comment "A rule that, when its conditions hold, ends the walk with jj:verdict." .
+
+jj:Condition a owl:Class ;
+    rdfs:label "Condition" ;
+    rdfs:comment "A question and the choices that satisfy it: one jj:choice, or several of which any satisfies it." .
+
+jj:goto a owl:ObjectProperty ;
+    rdfs:label "goto" ;
+    rdfs:comment "The node a branch rule leads to; it is a jj:node of the same tree." ;
+    rdfs:domain jj:BranchRule ; rdfs:range jj:Node .
+
+jj:whenAll a owl:ObjectProperty ;
+    rdfs:label "whenAll" ;
+    rdfs:comment "A condition that must hold (all of a rule's whenAll conditions)." ;
+    rdfs:domain jj:Rule ; rdfs:range jj:Condition .
+
+jj:whenAny a owl:ObjectProperty ;
+    rdfs:label "whenAny" ;
+    rdfs:comment "A condition of which at least one must hold (verdict rules only)." ;
+    rdfs:domain jj:VerdictRule ; rdfs:range jj:Condition .
+
+jj:question a owl:ObjectProperty ;
+    rdfs:label "question" ;
+    rdfs:comment "The question a condition is about; asked by the wave of the condition's rule." ;
+    rdfs:domain jj:Condition ; rdfs:range jj:Question .
+
+jj:choice a owl:ObjectProperty ;
+    rdfs:label "choice" ;
+    rdfs:comment "An option of the condition's jj:question that satisfies it." ;
+    rdfs:domain jj:Condition ; rdfs:range jj:Option .
+
+# ---- Run -------------------------------------------------------------------
+
+jj:Run a owl:Class ;
+    rdfs:label "Run" ;
+    rdfs:comment "One judgment of one record by one tree." .
+
+jj:WaveRun a owl:Class ;
+    rdfs:label "WaveRun" ;
+    rdfs:comment "One wave of a run: its request, its statement (per-statement waves) and the rule that fired." .
+
+jj:Answer a owl:Class ;
+    rdfs:label "Answer" ;
+    rdfs:comment "Jev's answer to one question in one wave run." .
+
+jj:OptionProbability a owl:Class ;
+    rdfs:label "OptionProbability" ;
+    rdfs:comment "The probability Jev gave one option of an answer." .
+
+jj:tree a owl:ObjectProperty ;
+    rdfs:label "tree" ;
+    rdfs:comment "The tree a run walked." ;
+    rdfs:domain jj:Run ; rdfs:range jj:Tree .
+
+jj:treeDigest a owl:DatatypeProperty ;
+    rdfs:label "treeDigest" ;
+    rdfs:comment "SHA-256 of the tree's RDFC-1.0 canonical form (lower-case hex)." ;
+    rdfs:domain jj:Run ; rdfs:range xsd:string .
+
+jj:record a owl:ObjectProperty ;
+    rdfs:label "record" ;
+    rdfs:comment "The IRI of a Raptor record: the record a run judged, or the record an attachment names (<repository URN>#<record id>)." ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( jj:Run jj:Attachment ) ] .
+
+jj:inRun a owl:ObjectProperty ;
+    rdfs:label "inRun" ;
+    rdfs:domain jj:WaveRun ; rdfs:range jj:Run .
+
+jj:requestId a owl:DatatypeProperty ;
+    rdfs:label "requestId" ;
+    rdfs:domain jj:WaveRun ; rdfs:range xsd:string .
+
+jj:statement a owl:DatatypeProperty ;
+    rdfs:label "statement" ;
+    rdfs:comment "The statement a per-statement wave run judged." ;
+    rdfs:domain jj:WaveRun ; rdfs:range xsd:string .
+
+jj:fired a owl:ObjectProperty ;
+    rdfs:label "fired" ;
+    rdfs:comment "The rule that matched in this wave run." ;
+    rdfs:domain jj:WaveRun ; rdfs:range jj:Rule .
+
+jj:ofWaveRun a owl:ObjectProperty ;
+    rdfs:label "ofWaveRun" ;
+    rdfs:domain jj:Answer ; rdfs:range jj:WaveRun .
+
+jj:toQuestion a owl:ObjectProperty ;
+    rdfs:label "toQuestion" ;
+    rdfs:domain jj:Answer ; rdfs:range jj:Question .
+
+jj:chose a owl:ObjectProperty ;
+    rdfs:label "chose" ;
+    rdfs:domain jj:Answer ; rdfs:range jj:Option .
+
+jj:confidence a owl:DatatypeProperty ;
+    rdfs:label "confidence" ;
+    rdfs:domain jj:Answer ; rdfs:range xsd:decimal .
+
+jj:probability a owl:ObjectProperty ;
+    rdfs:label "probability" ;
+    rdfs:domain jj:Answer ; rdfs:range jj:OptionProbability .
+
+jj:p a owl:DatatypeProperty ;
+    rdfs:label "p" ;
+    rdfs:domain jj:OptionProbability ; rdfs:range xsd:decimal .
+
+jj:verdictValue a owl:DatatypeProperty ;
+    rdfs:label "verdictValue" ;
+    rdfs:comment "The verdict a run ended with." ;
+    rdfs:domain jj:Run ; rdfs:range xsd:string .
+
+# ---- Definition (ADR-JEV-0008) ----------------------------------------------
+
+jj:Definition a owl:Class ;
+    rdfs:label "Definition" ;
+    rdfs:comment "A short meaning of a term, sourced from the repository's own material, carried in the requests about the records it is attached to. A definitions file holds only jj:Definition and jj:Attachment nodes." .
+
+jj:Attachment a owl:Class ;
+    rdfs:label "Attachment" ;
+    rdfs:comment "Where a definition applies: one Raptor record (jj:record) and optionally one location (jj:location). Record only: every request about the record carries the definition. Record and location: only the request about that record at that location does. An attachment is a node because an RDF edge links only two things; it may be a blank node." .
+
+jj:term a owl:DatatypeProperty ;
+    rdfs:label "term" ;
+    rdfs:comment "The term a definition defines (one non-blank string)." ;
+    rdfs:domain jj:Definition ; rdfs:range xsd:string .
+
+jj:text a owl:DatatypeProperty ;
+    rdfs:label "text" ;
+    rdfs:comment "The definition's meaning, short, sent to Jev whole (never truncated)." ;
+    rdfs:domain jj:Definition ; rdfs:range xsd:string .
+
+jj:source a owl:DatatypeProperty ;
+    rdfs:label "source" ;
+    rdfs:comment "Where the meaning comes from: a repo-relative path (optionally with #Heading or ::Symbol) or a record IRI, as a string." ;
+    rdfs:domain jj:Definition ; rdfs:range xsd:string .
+
+jj:attachedTo a owl:ObjectProperty ;
+    rdfs:label "attachedTo" ;
+    rdfs:comment "An attachment of the definition. A definition with none is carried by no request (doctor warns)." ;
+    rdfs:domain jj:Definition ; rdfs:range jj:Attachment .
+
+jj:location a owl:DatatypeProperty ;
+    rdfs:label "location" ;
+    rdfs:comment "The location under evaluation as the location string of judge-jev check (docs/cli.md, Locations): path, path#Heading or path::Symbol, relative to the repository. Absent: the attachment is record only." ;
+    rdfs:domain jj:Attachment ; rdfs:range xsd:string .
+
+jj:carriedDefinition a owl:ObjectProperty ;
+    rdfs:label "carriedDefinition" ;
+    rdfs:comment "A definition that the requests of the run carried." ;
+    rdfs:domain jj:Run ; rdfs:range jj:Definition .

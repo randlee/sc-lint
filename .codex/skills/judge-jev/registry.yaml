@@ -1,0 +1,13 @@
+# Agent registry for judge-jev, installed as .codex/skills/judge-jev/registry.yaml.
+# Paths are relative to the install root (the folder install.py --dest named).
+agents:
+  jev-fix-proposer:
+    version: 0.1.0
+    path: .codex/agents/jev-fix-proposer.md
+
+skills:
+  judge-jev:
+    version: 0.1.0
+    path: .codex/skills/judge-jev/SKILL.md
+    depends_on:
+      jev-fix-proposer: "0.x"

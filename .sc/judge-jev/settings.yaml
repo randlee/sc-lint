@@ -1,0 +1,5 @@
+# .sc/judge-jev/settings.yaml
+# Repository settings for the sc-judge-jev plugin; commit this file, never put secrets in it.
+schema_version: 1
+# allow_remote_judge: may record text be sent to TypeSafe (Jev) for judging? Only the user decides it.
+allow_remote_judge: true
