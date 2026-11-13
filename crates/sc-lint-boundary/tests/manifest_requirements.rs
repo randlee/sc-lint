@@ -117,6 +117,42 @@ homepage.workspace = true
 }
 
 #[test]
+fn dependency_requirement_violations_are_inactive_without_the_config_family() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Cargo.toml",
+        r#"[workspace]
+members = ["crates/app", "crates/internal"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.1"
+authors = ["sc-lint contributors"]
+license = "MIT"
+repository = "https://example.invalid/sc-lint"
+homepage = "https://example.invalid/sc-lint"
+
+[workspace.dependencies]
+exact = "=1.2.3"
+bounded = ">=1.2, <1.8"
+"#,
+    );
+    fixture.write("sc-lint.toml", "[tool.sc-lint.analyzers.boundary]\n");
+
+    let report = fixture
+        .analyze()
+        .expect("dependency requirements without config analyze");
+    assert!(report.findings.iter().all(|finding| {
+        !matches!(
+            finding.rule_id,
+            RuleId::ScbManifest007 | RuleId::ScbManifest008
+        )
+    }));
+}
+
+#[test]
 fn exact_and_tilde_registry_requirements_cover_workspace_template_and_test_manifests() {
     let fixture = Fixture::new();
     fixture.write(
