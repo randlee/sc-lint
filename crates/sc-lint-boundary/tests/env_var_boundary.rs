@@ -30,7 +30,7 @@ fn detects_direct_and_same_file_wrappers_but_respects_boundaries() {
     write(
         root,
         "sc-lint.toml",
-        "[[tool.sc-lint.analyzers.boundary.env_var_boundary]]\nforbidden_env_vars=['SECRET']\nrestricted_crate_roots=['restricted']\nboundary_reader_functions=['restricted::read_secret']\n",
+        "[[tool.sc-lint.analyzers.boundary.env_var_boundary]]\nforbidden_env_vars=['SECRET']\nrestricted_crate_roots=['restricted']\nboundary_reader_functions=['restricted::read_secret', 'restricted::Reader::allowed']\n",
     );
     write(
         root,
@@ -51,6 +51,10 @@ fn detects_direct_and_same_file_wrappers_but_respects_boundaries() {
             "fn calls_reader() { read_secret(); }\n",
             "#[cfg(test)] mod tests { fn ignored() { std::env::var(\"SECRET\"); } }\n",
             "#[test] fn ignored_too() { std::env::var(\"SECRET\"); }\n",
+            "mod different { fn forward(key: &str) { env::var(key); } }\n",
+            "mod safe { fn forward(_: &str) {} fn call() { forward(\"SECRET\"); } }\n",
+            "fn outer() { fn inner() { std::env::var(\"SECRET\"); } }\n",
+            "struct Reader; impl Reader { fn allowed() { std::env::var(\"SECRET\"); } fn forbidden() { std::env::var(\"SECRET\"); } }\n",
         ),
     );
     write(
@@ -78,8 +82,8 @@ fn detects_direct_and_same_file_wrappers_but_respects_boundaries() {
         .iter()
         .filter(|f| f.rule_id == RuleId::ScbEnv001)
         .collect();
-    assert_eq!(findings.len(), 7, "{findings:#?}");
-    for line in [1, 2, 5, 6, 10, 11, 12] {
+    assert_eq!(findings.len(), 9, "{findings:#?}");
+    for line in [1, 2, 5, 6, 10, 11, 12, 18, 19] {
         assert!(
             findings.iter().any(|f| f
                 .message
