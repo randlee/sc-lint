@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -48,56 +47,56 @@ pub(super) fn analyze(
         let relative = relative_slash_path(root, &file.source_path);
         let prefix = module_prefix(package.name.as_str(), package_root, &file.source_path);
         let functions = collect::functions(&parsed, prefix);
-        for function in &functions {
-            for rule in &rules {
+        for rule in rules {
+            findings.extend(findings_for_rule(&relative, &functions, rule));
+        }
+    }
+    Ok(findings)
+}
+
+fn findings_for_rule(
+    relative: &str,
+    functions: &[collect::Function],
+    rule: &EnvVarBoundary,
+) -> Vec<Finding> {
+    let summaries = collect::summaries(functions, &rule.boundary_reader_functions);
+    let mut findings = Vec::new();
+    for function in functions {
+        if rule.boundary_reader_functions.contains(&function.path) {
+            continue;
+        }
+        let mut reads = function
+            .direct
+            .iter()
+            .filter_map(|(value, line)| match value {
+                Value::Literal(name) => Some((name.clone(), *line)),
+                Value::Parameter(_) => None,
+            })
+            .collect::<Vec<_>>();
+        for call in &function.calls {
+            for index in collect::matching_functions(functions, &function.path, &call.target) {
                 if rule
                     .boundary_reader_functions
-                    .iter()
-                    .any(|reader| reader == &function.path)
+                    .contains(&functions[index].path)
                 {
                     continue;
                 }
-                let summaries = collect::summaries(&functions, &rule.boundary_reader_functions);
-                let mut reads = BTreeSet::new();
-                for (value, line) in &function.direct {
-                    if let Value::Literal(name) = value {
-                        reads.insert((name.clone(), *line));
-                    }
-                }
-                for call in &function.calls {
-                    for index in
-                        collect::matching_functions(&functions, &function.path, &call.target)
-                    {
-                        if rule
-                            .boundary_reader_functions
-                            .contains(&functions[index].path)
-                        {
-                            continue;
-                        }
-                        for effect in &summaries[index] {
-                            if let Some(Value::Literal(name)) =
-                                collect::substitute(effect, &call.args)
-                            {
-                                reads.insert((name, call.line));
-                            }
-                        }
-                    }
-                }
-                for (name, line) in reads {
-                    if rule.forbidden_env_vars.contains(&name) {
-                        findings.push(Finding {
-                            rule_id: RuleId::ScbEnv001,
-                            kind: "env_var_boundary_violation".into(),
-                            message: format!("{relative}:{line}: forbidden environment variable `{name}` read outside a boundary reader"),
-                            owner_ids: vec![OwnerId::new(relative.clone())],
-                            node_ids: Vec::new(),
-                        });
+                for effect in &summaries[index] {
+                    if let Some(Value::Literal(name)) = collect::substitute(effect, &call.args) {
+                        reads.push((name, call.line));
                     }
                 }
             }
         }
+        findings.extend(reads.into_iter().filter(|(name, _)| rule.forbidden_env_vars.contains(name)).map(|(name, line)| Finding {
+            rule_id: RuleId::ScbEnv001,
+            kind: "env_var_boundary_violation".into(),
+            message: format!("{relative}:{line}: forbidden environment variable `{name}` read outside a boundary reader"),
+            owner_ids: vec![OwnerId::new(relative)],
+            node_ids: Vec::new(),
+        }));
     }
-    Ok(findings)
+    findings
 }
 
 fn restricted(rule: &EnvVarBoundary, package: &str) -> bool {

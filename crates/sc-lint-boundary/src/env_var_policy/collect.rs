@@ -139,6 +139,17 @@ impl<'ast> Visit<'ast> for FunctionCollector {
         visit::visit_item_mod(self, item);
         self.module.pop();
     }
+    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
+        if let syn::Type::Path(path) = item.self_ty.as_ref()
+            && let Some(ident) = path.path.segments.last()
+        {
+            self.module.push(ident.ident.to_string());
+            visit::visit_item_impl(self, item);
+            self.module.pop();
+            return;
+        }
+        visit::visit_item_impl(self, item);
+    }
     fn visit_item_fn(&mut self, item: &'ast ItemFn) {
         self.function(&item.sig.ident.to_string(), &item.sig.inputs, &item.block);
         self.visit_block(&item.block);
