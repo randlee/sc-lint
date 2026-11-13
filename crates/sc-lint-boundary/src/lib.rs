@@ -691,7 +691,7 @@ pub fn analyze_workspace_configured(
                 inventory.as_ref(),
                 &policy_config,
             )
-            .map_err(|error| BoundaryError::manifest_policy(&common.root, error))?,
+            .map_err(|error| manifest_policy_analysis_error(&common.root, error))?,
         );
         report.findings.sort_by(|left, right| {
             analysis::finding_sort_key(left)
@@ -728,7 +728,7 @@ fn analyze_inventory_free_manifest_policy(
                 None,
                 policy_config,
             )
-            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+            .map_err(|error| manifest_policy_analysis_error(&options.root, error))?,
         );
     }
     Ok(apply_configured_rule_filter(
@@ -737,6 +737,13 @@ fn analyze_inventory_free_manifest_policy(
         options.root.as_path(),
         &NodeSourcePaths::new(),
     ))
+}
+
+fn manifest_policy_analysis_error(root: &Path, error: anyhow::Error) -> BoundaryError {
+    match error.downcast::<BoundaryError>() {
+        Ok(error) => error,
+        Err(error) => BoundaryError::manifest_policy(root, error),
+    }
 }
 
 fn apply_configured_rule_filter(
