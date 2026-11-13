@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 use std::sync::Mutex;
 use std::sync::mpsc;
+#[cfg(unix)]
+use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
@@ -50,6 +52,106 @@ use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
 const CLI_CONTRACT: &str = include_str!("../../../docs/sc-lint/cli-contract.md");
+
+static MOCK_EXECUTABLE_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_mock_executables() -> std::sync::MutexGuard<'static, ()> {
+    MOCK_EXECUTABLE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn with_mock_executable_lock<T>(operation: impl FnOnce() -> T) -> T {
+    with_mock_executable_lock_after_contention(|| {}, operation)
+}
+
+fn with_mock_executable_lock_after_contention<T>(
+    on_contention: impl FnOnce(),
+    operation: impl FnOnce() -> T,
+) -> T {
+    let guard = match MOCK_EXECUTABLE_LOCK.try_lock() {
+        Ok(guard) => guard,
+        Err(std::sync::TryLockError::WouldBlock) => {
+            on_contention();
+            lock_mock_executables()
+        }
+        Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+    };
+    let _guard = guard;
+    operation()
+}
+
+#[cfg(unix)]
+#[test]
+fn mock_executable_spawn_waits_until_writer_closes_the_file() {
+    let fixture = TempDir::new().expect("fixture");
+    let executable = fixture.path().join("mock-backend");
+    with_mock_executable_lock(|| {
+        fs::write(&executable, "#!/bin/sh\nexit 0\n").expect("mock backend");
+        set_mock_backend_permissions(&executable);
+    });
+
+    let (writer_opened_tx, writer_opened_rx) = mpsc::sync_channel(0);
+    let (release_writer_tx, release_writer_rx) = mpsc::sync_channel(0);
+    let writer_path = executable.clone();
+    let writer = thread::spawn(move || {
+        with_mock_executable_lock(|| {
+            let writable = fs::OpenOptions::new()
+                .write(true)
+                .open(writer_path)
+                .expect("open executable for writing");
+            writer_opened_tx.send(()).expect("signal open writer");
+            release_writer_rx.recv().expect("release writer");
+            drop(writable);
+        });
+    });
+    writer_opened_rx.recv().expect("writer opened executable");
+
+    // Linux reports the old helper behavior as ETXTBSY when exec overlaps a
+    // writable handle. macOS permits this script case, so the lock-contention
+    // assertion below covers serialization there.
+    #[cfg(target_os = "linux")]
+    {
+        let legacy_error = ProcessCommand::new(&executable)
+            .output()
+            .expect_err("an executable open for writing must not be executed");
+        assert_eq!(legacy_error.raw_os_error(), Some(26), "expected ETXTBSY");
+    }
+    #[cfg(not(target_os = "linux"))]
+    assert!(
+        ProcessCommand::new(&executable)
+            .output()
+            .expect("execute mock backend")
+            .status
+            .success()
+    );
+
+    let (executor_waiting_tx, executor_waiting_rx) = mpsc::sync_channel(0);
+    let executor_path = executable.clone();
+    let executor = thread::spawn(move || {
+        with_mock_executable_lock_after_contention(
+            || {
+                executor_waiting_tx
+                    .send(())
+                    .expect("signal lock contention")
+            },
+            || ProcessCommand::new(executor_path).output(),
+        )
+    });
+    executor_waiting_rx
+        .recv()
+        .expect("executor waits while writer owns the lock");
+
+    release_writer_tx
+        .send(())
+        .expect("release executable writer");
+    writer.join().expect("writer thread");
+    let output = executor
+        .join()
+        .expect("executor thread")
+        .expect("spawn after writer closed the file");
+    assert!(output.status.success());
+}
 
 #[test]
 fn cli_contract_exit_code_mapping_matches_code_constants() {
@@ -790,6 +892,7 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
     let binary = bin_dir.join("sc-lint");
+    let _executable_lock = lock_mock_executables();
     fs::write(
         &binary,
         "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SC_LINT_RECORD\"\n",
@@ -873,6 +976,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
     let binary = bin_dir.join("sc-lint.cmd");
+    let _executable_lock = lock_mock_executables();
     fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
     let path = std::env::join_paths(
         std::iter::once(bin_dir.clone()).chain(
@@ -952,6 +1056,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
     );
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
+    let _executable_lock = lock_mock_executables();
     fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
     let output = ProcessCommand::new("python")
         .args([
@@ -1158,7 +1263,9 @@ fn compatibility_check_uses_semver_not_lexical_comparison() {
         ]);
         let context = CommandContext::from_cli(&cli).expect("compatibility context");
         let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-        let result = crate::command::execute(&context, &loaded);
+        let result = with_mock_executable_lock(|| {
+            crate::command::execute(&context, &loaded).map_err(Box::new)
+        });
         assert_eq!(result.is_ok(), expected_ok, "version {version}");
         if expected_ok {
             let success = result.expect("compatible release passes");
@@ -1208,7 +1315,9 @@ fn compatibility_check_reports_malformed_installed_version_in_human_and_json_for
     ]);
     let context = CommandContext::from_cli(&cli).expect("compatibility context");
     let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-    let error = crate::command::execute(&context, &loaded).expect_err("bad version fails");
+    let error =
+        with_mock_executable_lock(|| crate::command::execute(&context, &loaded).map_err(Box::new))
+            .expect_err("bad version fails");
     assert_eq!(error.code(), "CLI.SC_LINT_VERSION_UNPARSABLE");
     assert!(error.cause.is_some());
     let json: Value = serde_json::from_str(&crate::render::render_error_json(
@@ -1365,7 +1474,9 @@ fn compatibility_check_human_error_includes_all_available_identity_details() {
     ]);
     let context = CommandContext::from_cli(&cli).expect("compatibility context");
     let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-    let error = crate::command::execute(&context, &loaded).expect_err("old version fails");
+    let error =
+        with_mock_executable_lock(|| crate::command::execute(&context, &loaded).map_err(Box::new))
+            .expect_err("old version fails");
     let human = crate::render::render_error_human(context.command_id(), &error);
     for required in [
         "0.4.1",
@@ -1956,16 +2067,19 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
         .map(|target_dir| target_dir.join(cli_name))
         .expect("sc-lint executable path");
     let cli_copy = mock_backend._tempdir.path().join(cli_name);
-    fs::copy(cli_source, &cli_copy).expect("copy sc-lint beside mock backend");
-
-    // The backend resolver prefers binaries next to sc-lint over PATH. Running
-    // this copy makes the mocked sibling binary the one the CLI dispatches to.
-    let output = ProcessCommand::new(cli_copy)
-        .args(["--json", "--root"])
-        .arg(fixture.root())
-        .args(["lint", target])
-        .output()
-        .expect("run mocked analyzer command");
+    // The backend resolver prefers binaries next to sc-lint over PATH. Keep
+    // the copy and its spawn in the same critical section as mock executable
+    // setup so another test thread cannot fork while the destination is open
+    // for writing.
+    let output = with_mock_executable_lock(|| {
+        fs::copy(cli_source, &cli_copy).expect("copy sc-lint beside mock backend");
+        ProcessCommand::new(cli_copy)
+            .args(["--json", "--root"])
+            .arg(fixture.root())
+            .args(["lint", target])
+            .output()
+            .expect("run mocked analyzer command")
+    });
     let exit_code = output.status.code().expect("process exit code");
     let envelope = serde_json::from_slice(&output.stdout).expect("success envelope JSON");
     (exit_code, envelope)
@@ -1991,15 +2105,16 @@ fn run_lint_with_path_backend_without_version() -> (std::process::Output, MockBa
         .map(|target_dir| target_dir.join(cli_name))
         .expect("sc-lint executable path");
     let cli_copy = launcher_dir.path().join(cli_name);
-    fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
-
-    let output = ProcessCommand::new(cli_copy)
-        .env("PATH", backend.search_path())
-        .args(["--json", "--root"])
-        .arg(fixture.root())
-        .args(["lint", "sc-portability"])
-        .output()
-        .expect("run isolated sc-lint launcher");
+    let output = with_mock_executable_lock(|| {
+        fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
+        ProcessCommand::new(cli_copy)
+            .env("PATH", backend.search_path())
+            .args(["--json", "--root"])
+            .arg(fixture.root())
+            .args(["lint", "sc-portability"])
+            .output()
+            .expect("run isolated sc-lint launcher")
+    });
     (output, backend, launcher_dir)
 }
 
@@ -2090,37 +2205,39 @@ fn run_lint_with_real_path_backend(
         }
     };
     let launcher_name = binary_name(crate::consts::SERVICE_NAME);
-    fs::copy(
-        built_binaries
-            .get(crate::consts::SERVICE_NAME)
-            .expect("shared sc-lint launcher"),
-        launcher_dir.path().join(&launcher_name),
-    )
-    .expect("copy isolated sc-lint launcher");
-    for backend in [
-        crate::consts::TOOL_BOUNDARY,
-        crate::consts::TOOL_PORTABILITY,
-        crate::consts::TOOL_RUNTIME,
-    ] {
-        let name = binary_name(backend);
+    let output = with_mock_executable_lock(|| {
         fs::copy(
-            built_binaries.get(backend).expect("shared backend binary"),
-            backend_dir.path().join(&name),
+            built_binaries
+                .get(crate::consts::SERVICE_NAME)
+                .expect("shared sc-lint launcher"),
+            launcher_dir.path().join(&launcher_name),
         )
-        .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
-    }
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    let path = std::env::join_paths(
-        std::iter::once(backend_dir.path().to_path_buf()).chain(std::env::split_paths(&path)),
-    )
-    .expect("join isolated backend PATH");
-    let output = ProcessCommand::new(launcher_dir.path().join(launcher_name))
-        .env("PATH", path)
-        .args(["--json", "--root"])
-        .arg(fixture.root())
-        .args(["lint", target])
-        .output()
-        .unwrap_or_else(|error| panic!("run real {tool} PATH backend: {error}"));
+        .expect("copy isolated sc-lint launcher");
+        for backend in [
+            crate::consts::TOOL_BOUNDARY,
+            crate::consts::TOOL_PORTABILITY,
+            crate::consts::TOOL_RUNTIME,
+        ] {
+            let name = binary_name(backend);
+            fs::copy(
+                built_binaries.get(backend).expect("shared backend binary"),
+                backend_dir.path().join(&name),
+            )
+            .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
+        }
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let path = std::env::join_paths(
+            std::iter::once(backend_dir.path().to_path_buf()).chain(std::env::split_paths(&path)),
+        )
+        .expect("join isolated backend PATH");
+        ProcessCommand::new(launcher_dir.path().join(launcher_name))
+            .env("PATH", path)
+            .args(["--json", "--root"])
+            .arg(fixture.root())
+            .args(["lint", target])
+            .output()
+            .unwrap_or_else(|error| panic!("run real {tool} PATH backend: {error}"))
+    });
     (output, launcher_dir, backend_dir)
 }
 
@@ -2179,7 +2296,9 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
     )
     .expect("portability context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let success =
+        with_mock_executable_lock(|| crate::command::execute(&context, &loaded).map_err(Box::new))
+            .expect("dispatch succeeds");
     let expected_finding_count = success
         .data
         .get("findings")
@@ -2253,7 +2372,9 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
     )
     .expect("runtime context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let success =
+        with_mock_executable_lock(|| crate::command::execute(&context, &loaded).map_err(Box::new))
+            .expect("dispatch succeeds");
     let expected_finding_count = success
         .data
         .get("findings")
@@ -3313,6 +3434,7 @@ struct MockBackend {
 
 impl MockBackend {
     fn install(tool: &str, payload: &Value) -> Self {
+        let _executable_lock = lock_mock_executables();
         let tempdir = TempDir::new().expect("temp dir");
         let script_name = if cfg!(windows) {
             format!("{tool}.cmd")
@@ -3338,6 +3460,7 @@ impl MockBackend {
     }
 
     fn install_native(tool: &str, payload: &Value) -> Self {
+        let _executable_lock = lock_mock_executables();
         let tempdir = TempDir::new().expect("temp dir");
         let source_path = tempdir.path().join("mock_backend.rs");
         let executable_name = if cfg!(windows) {
@@ -3368,6 +3491,7 @@ impl MockBackend {
     }
 
     fn install_native_without_version(tool: &str) -> Self {
+        let _executable_lock = lock_mock_executables();
         let tempdir = TempDir::new().expect("temp dir");
         let source_path = tempdir.path().join("mock_backend.rs");
         let executable_name = if cfg!(windows) {
