@@ -1,3 +1,6 @@
+mod analyze;
+mod collect;
+
 use std::path::Path;
 
 use cargo_metadata::Metadata;
@@ -19,9 +22,10 @@ pub(crate) struct EnvVarBoundary {
 }
 
 pub(crate) fn analyze(
-    _root: &Path,
-    _metadata: &Metadata,
-    _config: &EnvVarBoundaryConfig,
+    root: &Path,
+    metadata: &Metadata,
+    config: &EnvVarBoundaryConfig,
 ) -> std::result::Result<Vec<Finding>, BoundaryError> {
-    Ok(Vec::new())
+    analyze::analyze(root, metadata, config)
+        .map_err(|error| BoundaryError::manifest_policy(root, error))
 }
