@@ -223,3 +223,22 @@ fn opt_in_is_per_workspace_package() {
             .contains("first")
     );
 }
+
+#[test]
+fn method_allowance_and_missing_reason_follow_adr022() {
+    let fixture = fixture();
+    let root = fixture.path();
+    config(root, "['sample']");
+    write(
+        root,
+        "src/lib.rs",
+        "struct S; impl S { #[sc_lint_attributes::sc_lint(allow(SCB-RUNTIME-008), reason=\"approved\")] fn f(&self) { panic!(); } }\n",
+    );
+    assert!(analyze(root).unwrap().findings.is_empty());
+    write(
+        root,
+        "src/lib.rs",
+        "struct S; impl S { #[sc_lint(allow(SCB-RUNTIME-008))] fn f(&self) { panic!(); } }\n",
+    );
+    assert!(analyze(root).is_err());
+}
