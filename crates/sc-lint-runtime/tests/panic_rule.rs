@@ -192,3 +192,34 @@ fn disabled_analyzer_still_validates_configured_package_names() {
         Err(RuntimeError::PanicPackages(PanicPackageError::Unknown(_)))
     ));
 }
+
+#[test]
+fn opt_in_is_per_workspace_package() {
+    let fixture = TempDir::new().unwrap();
+    let root = fixture.path();
+    write(
+        root,
+        "Cargo.toml",
+        "[workspace]\nmembers=['first','second']\nresolver='2'\n",
+    );
+    for name in ["first", "second"] {
+        write(
+            root,
+            &format!("{name}/Cargo.toml"),
+            &format!("[package]\nname='{name}'\nversion='0.1.0'\nedition='2021'\n"),
+        );
+        write(
+            root,
+            &format!("{name}/src/lib.rs"),
+            "fn f() { panic!(); }\n",
+        );
+    }
+    config(root, "['first']");
+    let report = analyze(root).unwrap();
+    assert_eq!(report.findings.len(), 1, "{report:?}");
+    assert!(
+        report.findings[0].owner_ids[0]
+            .to_string()
+            .contains("first")
+    );
+}
