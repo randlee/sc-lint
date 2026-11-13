@@ -25,7 +25,7 @@ CI orchestration.
 
 ## Runtime rules
 
-Rule 008 detects production `.unwrap()`, `.expect(...)`, `panic!`, `unreachable!`, `todo!`, and `unimplemented!` in opted-in packages. It does not expand macros or perform type-aware proof.
+Rule 008 detects production `.unwrap()`, `.expect(...)`, `panic!`, `unreachable!`, `todo!`, and `unimplemented!` in opted-in packages. Matching is syntactic, so methods with these names are detected regardless of receiver type. Macro bodies are not expanded, and type-aware proof is not performed.
 
 Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
 

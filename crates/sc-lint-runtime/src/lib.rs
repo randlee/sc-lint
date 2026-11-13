@@ -139,7 +139,7 @@ pub enum PanicPackageError {
 }
 
 fn panic_packages(
-    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    names: Vec<String>,
     workspace: &WorkspaceMetadata,
 ) -> Result<std::collections::BTreeSet<String>, RuntimeError> {
     let available = workspace
@@ -148,10 +148,7 @@ fn panic_packages(
         .map(|package| package.name.as_str().to_owned())
         .collect::<std::collections::BTreeSet<_>>();
     let mut selected = std::collections::BTreeSet::new();
-    for name in settings
-        .own_strings("panic_rule_packages")?
-        .unwrap_or_default()
-    {
+    for name in names {
         if name.trim().is_empty() {
             return Err(PanicPackageError::Empty.into());
         }
@@ -185,21 +182,28 @@ fn analyze_workspace_configured_with_metadata_loader(
     mut load_metadata: impl FnMut(&Path) -> anyhow_crate::Result<WorkspaceMetadata>,
 ) -> std::result::Result<FindingsReport, RuntimeError> {
     let settings = load_analyzer_settings(&RUNTIME_CATALOG, &options.root, config, rule_filter)?;
-    let (findings, scanned_crates) = if settings.enabled {
+    let configured = settings
+        .own_strings("panic_rule_packages")?
+        .unwrap_or_default();
+    let (findings, scanned_crates) = if settings.enabled || !configured.is_empty() {
         let workspace =
             load_metadata(&options.root).map_err(|source| RuntimeError::AnalyzeFindings {
                 root: options.root.clone(),
                 source: source.into(),
             })?;
-        let selected = panic_packages(&settings, &workspace)?;
-        let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &selected)
-            .map_err(|source| RuntimeError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
-        let scanned_crates =
-            sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);
-        (findings, scanned_crates)
+        let selected = panic_packages(configured, &workspace)?;
+        if settings.enabled {
+            let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &selected)
+                .map_err(|source| RuntimeError::AnalyzeFindings {
+                    root: options.root.clone(),
+                    source: source.into(),
+                })?;
+            let scanned_crates =
+                sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);
+            (findings, scanned_crates)
+        } else {
+            (Vec::new(), 0)
+        }
     } else {
         (Vec::new(), 0)
     };
