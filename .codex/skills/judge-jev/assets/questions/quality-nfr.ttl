@@ -1,0 +1,132 @@
+@prefix jj: <urn:judge-jev:ontology#> .
+@prefix t:  <urn:judge-jev:tree:> .
+@prefix q:  <urn:judge-jev:question:> .
+@prefix o:  <urn:judge-jev:option:> .
+
+# The shipped NFR quality tree (the same content as quality-nfr.json):
+# the questions are resources with IRIs, so another tree or wave may ask them.
+
+t:quality-nfr a jj:Tree ;
+    jj:id "quality-nfr" ;
+    jj:kind "nfr" ;
+    jj:version 1 ;
+    jj:approved true ;
+    jj:note "wave-1 wording approved by Rand Lee, 2026-11-08" ;
+    jj:start t:quality-nfr:wave-1 ;
+    jj:node t:quality-nfr:wave-1 .
+
+t:quality-nfr:wave-1 a jj:Wave ;
+    jj:id "wave-1" ;
+    jj:per "statement" ;
+    jj:statements "requirement_statement.statements" ;
+    jj:modal "Must" ;
+    jj:modal "MustNot" ;
+    jj:asks q:nfr.obligations , q:nfr.joined_by , q:nfr.term , q:nfr.check ;
+    jj:rule t:quality-nfr:wave-1:rule-1 , t:quality-nfr:wave-1:rule-2 , t:quality-nfr:wave-1:rule-3 .
+
+t:quality-nfr:wave-1:rule-1 a jj:VerdictRule ;
+    jj:rank 1 ;
+    jj:verdict "no" ;
+    jj:whenAll
+        [ a jj:Condition ; jj:question q:nfr.obligations ;
+          jj:choice o:nfr.obligations:2 , o:nfr.obligations:3 , o:nfr.obligations:4 ] ,
+        [ a jj:Condition ; jj:question q:nfr.joined_by ;
+          jj:choice o:nfr.joined_by:and-list , o:nfr.joined_by:alternatives , o:nfr.joined_by:obligation-rationale ] .
+
+t:quality-nfr:wave-1:rule-2 a jj:VerdictRule ;
+    jj:rank 2 ;
+    jj:verdict "no" ;
+    jj:whenAny
+        [ a jj:Condition ; jj:question q:nfr.term ;
+          jj:choice o:nfr.term:project-term-defined-nowhere , o:nfr.term:vague-qualifier , o:nfr.term:undefined-acronym ] ,
+        [ a jj:Condition ; jj:question q:nfr.check ;
+          jj:choice o:nfr.check:needs-a-measure , o:nfr.check:none ] .
+
+t:quality-nfr:wave-1:rule-3 a jj:VerdictRule ;
+    jj:rank 3 ;
+    jj:verdict "yes" .
+
+q:nfr.obligations a jj:Question ;
+    jj:id "obligations" ;
+    jj:rank 1 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. How many independent obligations does this statement impose?" ;
+    jj:option o:nfr.obligations:1 , o:nfr.obligations:2 , o:nfr.obligations:3 , o:nfr.obligations:4 .
+
+o:nfr.obligations:1 a jj:Option ; jj:rank 1 ;
+    jj:label "1" ;
+    jj:criterion "One obligation." .
+o:nfr.obligations:2 a jj:Option ; jj:rank 2 ;
+    jj:label "2" ;
+    jj:criterion "Two independent obligations." .
+o:nfr.obligations:3 a jj:Option ; jj:rank 3 ;
+    jj:label "3" ;
+    jj:criterion "Three independent obligations." .
+o:nfr.obligations:4 a jj:Option ; jj:rank 4 ;
+    jj:label "4+" ;
+    jj:criterion "Four or more independent obligations." .
+
+q:nfr.joined_by a jj:Question ;
+    jj:id "joined_by" ;
+    jj:rank 2 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What joins its obligations?" ;
+    jj:option o:nfr.joined_by:none , o:nfr.joined_by:and-list , o:nfr.joined_by:condition-obligation , o:nfr.joined_by:alternatives , o:nfr.joined_by:obligation-rationale .
+
+o:nfr.joined_by:none a jj:Option ; jj:rank 1 ;
+    jj:label "none" ;
+    jj:criterion "One obligation; nothing is joined." .
+o:nfr.joined_by:and-list a jj:Option ; jj:rank 2 ;
+    jj:label "and-list" ;
+    jj:criterion "A list of items joined by and or commas. Fix: split into one statement per item." .
+o:nfr.joined_by:condition-obligation a jj:Option ; jj:rank 3 ;
+    jj:label "condition+obligation" ;
+    jj:criterion "A condition (when, if, unless) plus one obligation. Acceptable: a condition is not a second obligation." .
+o:nfr.joined_by:alternatives a jj:Option ; jj:rank 4 ;
+    jj:label "alternatives" ;
+    jj:criterion "Alternatives joined by or. Fix: split, or state the choice." .
+o:nfr.joined_by:obligation-rationale a jj:Option ; jj:rank 5 ;
+    jj:label "obligation+rationale" ;
+    jj:criterion "An obligation plus its reason or purpose. Fix: move the rationale to Rationale." .
+
+q:nfr.term a jj:Question ;
+    jj:id "term" ;
+    jj:rank 3 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What kind of term in this statement is unclear?" ;
+    jj:option o:nfr.term:none , o:nfr.term:project-term-defined-in-a-linked-record , o:nfr.term:project-term-defined-nowhere , o:nfr.term:vague-qualifier , o:nfr.term:undefined-acronym .
+
+o:nfr.term:none a jj:Option ; jj:rank 1 ;
+    jj:label "none" ;
+    jj:criterion "Every term is common usage or defined in the record." .
+o:nfr.term:project-term-defined-in-a-linked-record a jj:Option ; jj:rank 2 ;
+    jj:label "project term defined in a linked record" ;
+    jj:criterion "A project term defined in a record this one links. Acceptable." .
+o:nfr.term:project-term-defined-nowhere a jj:Option ; jj:rank 3 ;
+    jj:label "project term defined nowhere" ;
+    jj:criterion "A project term defined neither here nor in a linked record. Fix: define it or link the record." .
+o:nfr.term:vague-qualifier a jj:Option ; jj:rank 4 ;
+    jj:label "vague qualifier" ;
+    jj:criterion "A qualifier such as fast, clear or robust with no measure. Fix: replace it with a measure." .
+o:nfr.term:undefined-acronym a jj:Option ; jj:rank 5 ;
+    jj:label "undefined acronym" ;
+    jj:criterion "An acronym that is never expanded or defined. Fix: define the acronym." .
+
+q:nfr.check a jj:Question ;
+    jj:id "check" ;
+    jj:rank 4 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What would check this statement?" ;
+    jj:option o:nfr.check:unit-test , o:nfr.check:cli-run , o:nfr.check:inspection-or-grep , o:nfr.check:needs-a-measure , o:nfr.check:none .
+
+o:nfr.check:unit-test a jj:Option ; jj:rank 1 ;
+    jj:label "unit test" ;
+    jj:criterion "A unit or integration test." .
+o:nfr.check:cli-run a jj:Option ; jj:rank 2 ;
+    jj:label "CLI run" ;
+    jj:criterion "Running a command and reading its output or exit code." .
+o:nfr.check:inspection-or-grep a jj:Option ; jj:rank 3 ;
+    jj:label "inspection or grep" ;
+    jj:criterion "Reading or searching files or output." .
+o:nfr.check:needs-a-measure a jj:Option ; jj:rank 4 ;
+    jj:label "needs a measure" ;
+    jj:criterion "A check exists only once a number is given. Fix: add a threshold." .
+o:nfr.check:none a jj:Option ; jj:rank 5 ;
+    jj:label "none" ;
+    jj:criterion "Nothing could check it. Fix: rewrite as an outcome." .

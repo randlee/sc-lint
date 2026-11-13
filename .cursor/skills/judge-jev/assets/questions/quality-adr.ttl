@@ -1,0 +1,84 @@
+@prefix jj: <urn:judge-jev:ontology#> .
+@prefix t:  <urn:judge-jev:tree:> .
+@prefix q:  <urn:judge-jev:question:> .
+@prefix o:  <urn:judge-jev:option:> .
+
+# The shipped ADR quality tree (the same content as quality-adr.json):
+# the questions are resources with IRIs, so another tree or wave may ask them.
+
+t:quality-adr a jj:Tree ;
+    jj:id "quality-adr" ;
+    jj:kind "adr" ;
+    jj:version 1 ;
+    jj:approved true ;
+    jj:note "wave-1 wording approved by Rand Lee, 2026-11-08" ;
+    jj:start t:quality-adr:wave-1 ;
+    jj:node t:quality-adr:wave-1 .
+
+t:quality-adr:wave-1 a jj:Wave ;
+    jj:id "wave-1" ;
+    jj:asks q:adr.context , q:adr.alternatives , q:adr.consequences ;
+    jj:rule t:quality-adr:wave-1:rule-1 , t:quality-adr:wave-1:rule-2 .
+
+t:quality-adr:wave-1:rule-1 a jj:VerdictRule ;
+    jj:rank 1 ;
+    jj:verdict "no" ;
+    jj:whenAny
+        [ a jj:Condition ; jj:question q:adr.context ;
+          jj:choice o:adr.context:background-only , o:adr.context:missing ] ,
+        [ a jj:Condition ; jj:question q:adr.alternatives ;
+          jj:choice o:adr.alternatives:named-only , o:adr.alternatives:none ] ,
+        [ a jj:Condition ; jj:question q:adr.consequences ;
+          jj:choice o:adr.consequences:positive-only , o:adr.consequences:missing ] .
+
+t:quality-adr:wave-1:rule-2 a jj:VerdictRule ;
+    jj:rank 2 ;
+    jj:verdict "yes" .
+
+q:adr.context a jj:Question ;
+    jj:id "context" ;
+    jj:rank 1 ;
+    jj:instructions "`item.text` is one architecture decision record as JSON. Does its context name the problem and the forces behind the decision?" ;
+    jj:option o:adr.context:problem-and-forces , o:adr.context:background-only , o:adr.context:missing .
+
+o:adr.context:problem-and-forces a jj:Option ; jj:rank 1 ;
+    jj:label "problem and forces" ;
+    jj:criterion "Names the problem and the forces or constraints that shaped the decision." .
+o:adr.context:background-only a jj:Option ; jj:rank 2 ;
+    jj:label "background only" ;
+    jj:criterion "Gives background but no problem. Fix: state the problem." .
+o:adr.context:missing a jj:Option ; jj:rank 3 ;
+    jj:label "missing" ;
+    jj:criterion "No context in substance. Fix: add the problem and its forces." .
+
+q:adr.alternatives a jj:Question ;
+    jj:id "alternatives" ;
+    jj:rank 2 ;
+    jj:instructions "`item.text` is one architecture decision record as JSON. Does it name the alternatives considered?" ;
+    jj:option o:adr.alternatives:named-with-reasons-rejected , o:adr.alternatives:named-only , o:adr.alternatives:none .
+
+o:adr.alternatives:named-with-reasons-rejected a jj:Option ; jj:rank 1 ;
+    jj:label "named with reasons rejected" ;
+    jj:criterion "Names alternatives and why each was rejected." .
+o:adr.alternatives:named-only a jj:Option ; jj:rank 2 ;
+    jj:label "named only" ;
+    jj:criterion "Names alternatives without why they were rejected. Fix: add why rejected." .
+o:adr.alternatives:none a jj:Option ; jj:rank 3 ;
+    jj:label "none" ;
+    jj:criterion "Names no alternative. Fix: add alternatives." .
+
+q:adr.consequences a jj:Question ;
+    jj:id "consequences" ;
+    jj:rank 3 ;
+    jj:instructions "`item.text` is one architecture decision record as JSON. Does it name the decision's consequences?" ;
+    jj:option o:adr.consequences:positive-and-negative , o:adr.consequences:positive-only , o:adr.consequences:missing .
+
+o:adr.consequences:positive-and-negative a jj:Option ; jj:rank 1 ;
+    jj:label "positive and negative" ;
+    jj:criterion "Names benefits and costs." .
+o:adr.consequences:positive-only a jj:Option ; jj:rank 2 ;
+    jj:label "positive only" ;
+    jj:criterion "Names only benefits. Fix: add the costs." .
+o:adr.consequences:missing a jj:Option ; jj:rank 3 ;
+    jj:label "missing" ;
+    jj:criterion "Names no consequence. Fix: add benefits and costs." .
