@@ -28,6 +28,8 @@ __pycache__
 .sc/*
 # sc-plan-anchor install state (settings + lock) is committed.
 !.sc/plan-anchor/
+# judge-jev install state (settings + lock) is committed.
+!.sc/judge-jev/
 **/.sc-compose/logs/
 reports/
 # Published test records live under site/reports (served by GitHub Pages).
