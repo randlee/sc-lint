@@ -235,6 +235,7 @@ fn discover_runtime_sources(workspace: &WorkspaceMetadata) -> Result<Vec<Runtime
             RuntimeFileContext { file, kind }
         })
         .collect::<Vec<_>>();
+    let mut example_paths = BTreeSet::new();
     for package in packages {
         let mut examples = package
             .targets
@@ -245,15 +246,22 @@ fn discover_runtime_sources(workspace: &WorkspaceMetadata) -> Result<Vec<Runtime
         for target in examples {
             let root = &target.src_path;
             let module_dir = root.parent().unwrap_or_else(|| Path::new("")).to_path_buf();
+            let mut visited = BTreeSet::new();
             collect_example_module(
                 root,
                 &module_dir,
                 &package.name,
                 &target.name,
                 &mut seen,
-                &mut BTreeSet::new(),
+                &mut visited,
                 &mut files,
             )?;
+            example_paths.extend(visited);
+        }
+    }
+    for file in &mut files {
+        if example_paths.contains(&canonical_or_original(&file.file.source_path)) {
+            file.kind = PackageTargetKind::Example;
         }
     }
     Ok(files)

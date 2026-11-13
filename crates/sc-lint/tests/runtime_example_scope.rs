@@ -246,3 +246,63 @@ fn shared_library_example_root_still_discovers_external_modules() {
         "{json}"
     );
 }
+
+#[test]
+fn nested_modules_of_src_example_skip_sleep_rules_without_changing_owner() {
+    let fixture = TempDir::new().unwrap();
+    let root = fixture.path();
+    write(
+        root,
+        "Cargo.toml",
+        "[package]\nname='sample'\nversion='0.1.0'\nedition='2021'\nautoexamples=false\n[dependencies]\ntokio={path='vendor/tokio'}\n[workspace]\nexclude=['vendor/tokio']\n[[example]]\nname='sample-example'\npath='src/example.rs'\n",
+    );
+    write(root, "sc-lint.toml", "[tool.sc-lint]\n");
+    write(
+        root,
+        "vendor/tokio/Cargo.toml",
+        "[package]\nname='tokio'\nversion='1.0.0'\nedition='2021'\n",
+    );
+    write(root, "vendor/tokio/src/lib.rs", "");
+    write(
+        root,
+        "src/lib.rs",
+        "pub fn control() { std::thread::sleep(std::time::Duration::ZERO); std::thread::sleep_until(std::time::Instant::now()); }\n",
+    );
+    write(root, "src/example.rs", "mod nested;\nfn main() {}\n");
+    write(
+        root,
+        "src/nested.rs",
+        &format!(
+            "{WAIT}\nfn sleeps() {{ std::thread::sleep(std::time::Duration::ZERO); std::thread::sleep_until(std::time::Instant::now()); }}"
+        ),
+    );
+    let (status, json) = run(root);
+    assert_eq!(status, 10, "{json}");
+    let findings = json["data"]["findings"].as_array().unwrap();
+    for id in ["SCB-RUNTIME-003", "SCB-RUNTIME-004"] {
+        let matching = findings
+            .iter()
+            .filter(|f| f["rule_id"] == id)
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "{json}");
+        assert!(
+            matching[0]["message"]
+                .as_str()
+                .unwrap()
+                .replace('\\', "/")
+                .contains("src/lib.rs")
+        );
+    }
+    let wait = findings
+        .iter()
+        .find(|f| f["rule_id"] == "SCB-RUNTIME-001")
+        .unwrap();
+    assert!(
+        wait["message"]
+            .as_str()
+            .unwrap()
+            .replace('\\', "/")
+            .contains("src/nested.rs")
+    );
+    assert!(wait["owner_ids"].to_string().contains("sample"), "{wait}");
+}
