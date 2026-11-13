@@ -169,7 +169,7 @@ wheels are described in the offline
 
 ## Workspace crates
 
-All crates share the workspace version line (0.8.8). The primary product is
+All crates share the workspace version line (0.8.9). The primary product is
 `sc-lint`; the other crates are its analyzers and support libraries, and each
 crate README points back to `sc-lint`.
 

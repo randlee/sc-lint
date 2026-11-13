@@ -1,6 +1,6 @@
 # sc-lint-portability CLI Reference
 
-Version 0.8.8
+Version 0.8.9
 
 Generated from the CLI command tree. Do not hand-edit.
 

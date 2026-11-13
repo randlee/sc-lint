@@ -9,7 +9,7 @@ description = "AST-sensitive Rust portability analyzer."
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/sc-lint-portability/0.8.8"
+documentation = "https://docs.rs/sc-lint-portability/0.8.9"
 keywords = ["rust", "sc-lint", "lint", "portability", "cross-platform"]
 categories = ["command-line-utilities", "development-tools"]
 

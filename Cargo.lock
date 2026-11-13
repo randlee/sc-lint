@@ -1039,7 +1039,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "clap",
  "dunce",
@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-analyzer-support"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1087,17 +1087,17 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-attributes"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "proc-macro2",
  "quote",
- "sc-lint-directives 0.8.8",
+ "sc-lint-directives 0.8.9",
  "syn 3.0.9",
 ]
 
 [[package]]
 name = "sc-lint-boundary"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1108,7 +1108,7 @@ dependencies = [
  "rayon",
  "sc-docli",
  "sc-lint-analyzer-support",
- "sc-lint-directives 0.8.8",
+ "sc-lint-directives 0.8.9",
  "sc-lint-schema",
  "semver",
  "serde",
@@ -1132,7 +1132,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-directives"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1141,14 +1141,14 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-portability"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "anyhow",
  "clap",
  "rayon",
  "sc-docli",
  "sc-lint-analyzer-support",
- "sc-lint-directives 0.8.8",
+ "sc-lint-directives 0.8.9",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-py"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "pyo3",
  "sc-lint",
@@ -1170,7 +1170,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-runtime"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "anyhow",
  "clap",
@@ -1179,7 +1179,7 @@ dependencies = [
  "rayon",
  "sc-docli",
  "sc-lint-analyzer-support",
- "sc-lint-directives 0.8.8",
+ "sc-lint-directives 0.8.9",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -1190,7 +1190,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-schema"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "jsonschema",
  "serde",
