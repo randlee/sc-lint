@@ -19,6 +19,7 @@ pub(crate) enum PracticeRule {
     TokioSleep,
     BlockOn,
     MutexAcrossAwait,
+    PanickingCall,
 }
 impl PracticeRule {
     pub(crate) fn id(self) -> RuleId {
@@ -27,6 +28,7 @@ impl PracticeRule {
             Self::TokioSleep => RuleId::ScbRuntime005,
             Self::BlockOn => RuleId::ScbRuntime006,
             Self::MutexAcrossAwait => RuleId::ScbRuntime007,
+            Self::PanickingCall => RuleId::ScbRuntime008,
         }
     }
     pub(crate) fn recovery(self) -> &'static str {
@@ -35,6 +37,7 @@ impl PracticeRule {
             Self::TokioSleep => "use yield_now or event-driven synchronization instead of sleeping",
             Self::BlockOn => "await the future on the existing runtime instead",
             Self::MutexAcrossAwait => "drop the guard or end its scope before awaiting",
+            Self::PanickingCall => "return or handle the error explicitly",
         }
     }
 }

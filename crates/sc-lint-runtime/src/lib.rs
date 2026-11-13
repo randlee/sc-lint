@@ -32,6 +32,7 @@ use thiserror::Error;
 
 mod api;
 mod imports;
+mod panicking_calls;
 mod position;
 mod practices;
 mod runtime;
@@ -69,6 +70,7 @@ runtime_rules! {
     ScbRuntime005 => ("SCB-RUNTIME-005", "tokio_timer_sleep"),
     ScbRuntime006 => ("SCB-RUNTIME-006", "blocking_executor_entry"),
     ScbRuntime007 => ("SCB-RUNTIME-007", "mutex_guard_across_await"),
+    ScbRuntime008 => ("SCB-RUNTIME-008", "panicking_call"),
 }
 
 pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
@@ -77,7 +79,7 @@ pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
     path_addressable_rules: CATALOG_RULES,
     families: &[],
     default_fail: CATALOG_RULES,
-    own_keys: &[],
+    own_keys: &["panic_rule_packages"],
 };
 
 pub type FindingsReport = SchemaFindingsReport<RuleId>;
@@ -112,12 +114,55 @@ pub enum RuntimeError {
     },
     #[error(transparent)]
     AnalyzerConfig(#[from] AnalyzerConfigError),
+    #[error(transparent)]
+    PanicPackages(#[from] PanicPackageError),
 }
 
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, RuntimeError> {
     analyze_workspace_configured(options, None, None)
+}
+
+#[derive(Debug, Error)]
+pub enum PanicPackageError {
+    #[error(
+        "panic_rule_packages contains an empty package name; remove it or provide a workspace package name"
+    )]
+    Empty,
+    #[error("panic_rule_packages contains duplicate package `{0}`; list each package once")]
+    Duplicate(String),
+    #[error(
+        "panic_rule_packages names unknown workspace package `{0}`; use a workspace package name"
+    )]
+    Unknown(String),
+}
+
+fn panic_packages(
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    workspace: &WorkspaceMetadata,
+) -> Result<std::collections::BTreeSet<String>, RuntimeError> {
+    let available = workspace
+        .workspace_packages()
+        .into_iter()
+        .map(|package| package.name.as_str().to_owned())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut selected = std::collections::BTreeSet::new();
+    for name in settings
+        .own_strings("panic_rule_packages")?
+        .unwrap_or_default()
+    {
+        if name.trim().is_empty() {
+            return Err(PanicPackageError::Empty.into());
+        }
+        if !selected.insert(name.clone()) {
+            return Err(PanicPackageError::Duplicate(name).into());
+        }
+        if !available.contains(&name) {
+            return Err(PanicPackageError::Unknown(name).into());
+        }
+    }
+    Ok(selected)
 }
 
 pub fn analyze_workspace_configured(
@@ -146,12 +191,11 @@ fn analyze_workspace_configured_with_metadata_loader(
                 root: options.root.clone(),
                 source: source.into(),
             })?;
-        let findings =
-            runtime::analyze_runtime_liveness(&options.root, &workspace).map_err(|source| {
-                RuntimeError::AnalyzeFindings {
-                    root: options.root.clone(),
-                    source: source.into(),
-                }
+        let selected = panic_packages(&settings, &workspace)?;
+        let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &selected)
+            .map_err(|source| RuntimeError::AnalyzeFindings {
+                root: options.root.clone(),
+                source: source.into(),
             })?;
         let scanned_crates =
             sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);

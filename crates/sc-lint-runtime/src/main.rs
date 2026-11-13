@@ -33,8 +33,8 @@ enum Command {
         /// Analyzer configuration file; defaults to discovery from the workspace root.
         #[arg(long)]
         config: Option<PathBuf>,
-        /// Comma-separated rule IDs: SCB-RUNTIME-001 through SCB-RUNTIME-007. Rule families are not supported.
-        #[arg(long, value_name = "SCB-RUNTIME-001..007[,..]")]
+        /// Comma-separated rule IDs: SCB-RUNTIME-001 through SCB-RUNTIME-008. Rule families are not supported.
+        #[arg(long, value_name = "SCB-RUNTIME-001..008[,..]")]
         rule_filter: Option<String>,
     },
 }
@@ -64,7 +64,7 @@ fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
     match error {
         AnalyzerConfigError::Selector { analyzer, selector } => {
             format!(
-                "{analyzer}: unknown --rule-filter selector `{selector}`; valid selectors are SCB-RUNTIME-001 through SCB-RUNTIME-007 (no rule families)"
+                "{analyzer}: unknown --rule-filter selector `{selector}`; valid selectors are SCB-RUNTIME-001 through SCB-RUNTIME-008 (no rule families)"
             )
         }
         _ => error.to_string(),

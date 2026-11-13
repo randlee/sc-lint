@@ -1247,11 +1247,12 @@ fn catalog_lists_every_rule_id() {
         ScbRuntime005,
         ScbRuntime006,
         ScbRuntime007,
+        ScbRuntime008,
     ];
     for id in every {
         match id {
             ScbRuntime001 | ScbRuntime002 | ScbRuntime003 | ScbRuntime004 | ScbRuntime005
-            | ScbRuntime006 | ScbRuntime007 => {}
+            | ScbRuntime006 | ScbRuntime007 | ScbRuntime008 => {}
         }
     }
     assert_eq!(

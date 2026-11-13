@@ -25,4 +25,4 @@ Usage: sc-lint-runtime analyze [OPTIONS]
 - `--config <CONFIG>` — Analyzer configuration file; defaults to discovery from the workspace root
 - `--format <FORMAT>` — default: `text` — choices: `text, json` — Findings output format
 - `--root <ROOT>` — default: `.` — Workspace root to inspect
-- `--rule-filter <SCB-RUNTIME-001..007[,..]>` — Comma-separated rule IDs: SCB-RUNTIME-001 through SCB-RUNTIME-007. Rule families are not supported
+- `--rule-filter <SCB-RUNTIME-001..008[,..]>` — Comma-separated rule IDs: SCB-RUNTIME-001 through SCB-RUNTIME-008. Rule families are not supported
