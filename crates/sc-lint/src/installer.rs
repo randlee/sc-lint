@@ -1567,14 +1567,12 @@ mod tests {
         fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("staged launcher");
         for backend in MANAGED_BACKENDS {
-            fs::copy(&built_binaries[*backend], staged_bin.join(backend))
-                .expect("copy staged real backend");
+            copy_executable_fixture(&built_binaries[*backend], &staged_bin.join(backend));
         }
-        fs::copy(
+        copy_executable_fixture(
             &built_binaries[crate::consts::TOOL_RUNTIME],
-            staged_bin.join(crate::consts::TOOL_PORTABILITY),
-        )
-        .expect("swap staged portability backend");
+            &staged_bin.join(crate::consts::TOOL_PORTABILITY),
+        );
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("staged docs manifest");
         fs::write(staged_docs.join("README.md"), "# docs\n").expect("staged docs README");
@@ -1595,14 +1593,12 @@ mod tests {
         fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("installed launcher");
         for backend in MANAGED_BACKENDS {
-            fs::copy(&built_binaries[*backend], installed_bin.join(backend))
-                .expect("copy installed real backend");
+            copy_executable_fixture(&built_binaries[*backend], &installed_bin.join(backend));
         }
-        fs::copy(
+        copy_executable_fixture(
             &built_binaries[crate::consts::TOOL_RUNTIME],
-            installed_bin.join(crate::consts::TOOL_PORTABILITY),
-        )
-        .expect("swap installed portability backend");
+            &installed_bin.join(crate::consts::TOOL_PORTABILITY),
+        );
         fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("installed docs manifest");
         fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
@@ -1982,9 +1978,7 @@ mod tests {
             let binary = built_binaries
                 .get(name)
                 .unwrap_or_else(|| panic!("Cargo build did not produce release binary `{name}`"));
-            fs::copy(binary, bin_dir.join(name)).unwrap_or_else(|error| {
-                panic!("copy release binary `{}`: {error}", binary.display())
-            });
+            copy_executable_fixture(binary, &bin_dir.join(name));
         }
         copy_directory(
             &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs-bundle"),
@@ -2274,13 +2268,50 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn write_failing_stub(path: &Path) {
-        use std::os::unix::fs::PermissionsExt;
+    fn write_executable_fixture(path: &Path, contents: &[u8]) {
+        let mut child = Command::new("sh")
+            .args([
+                "-c",
+                "cat > \"$1\" && chmod 755 \"$1\"",
+                "write-executable-fixture",
+            ])
+            .arg(path)
+            .stdin(Stdio::piped())
+            .spawn()
+            .expect("executable fixture writer starts");
+        child
+            .stdin
+            .take()
+            .expect("executable fixture writer stdin")
+            .write_all(contents)
+            .expect("write executable fixture contents");
+        assert!(
+            child
+                .wait()
+                .expect("executable fixture writer waits")
+                .success(),
+            "executable fixture writer succeeds"
+        );
+    }
 
-        fs::write(path, "#!/bin/sh\nexit 97\n").expect("stale helper");
-        let mut permissions = fs::metadata(path).expect("stub metadata").permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions).expect("make stub executable");
+    #[cfg(unix)]
+    fn copy_executable_fixture(source: &Path, destination: &Path) {
+        let status = Command::new("sh")
+            .args([
+                "-c",
+                "cat \"$1\" > \"$2\" && chmod 755 \"$2\"",
+                "copy-executable-fixture",
+            ])
+            .arg(source)
+            .arg(destination)
+            .status()
+            .expect("executable fixture copy starts");
+        assert!(status.success(), "executable fixture copy succeeds");
+    }
+
+    #[cfg(unix)]
+    fn write_failing_stub(path: &Path) {
+        write_executable_fixture(path, b"#!/bin/sh\nexit 97\n");
     }
 
     #[cfg(unix)]
@@ -2288,51 +2319,17 @@ mod tests {
         let script = format!(
             "#!/bin/sh\nprintf '%s\\n' '{{\"ok\":true,\"command\":\"version\",\"data\":{{\"tool\":\"sc-lint\",\"version\":\"{version}\",\"contract_schema\":\"sc-lint-version-v1\"}}}}'"
         );
-        // Write the executable in a child so the test process never owns its write fd.
-        let mut child = Command::new("sh")
-            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-probe"])
-            .arg(path)
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .expect("probe writer starts");
-        child
-            .stdin
-            .take()
-            .expect("probe writer stdin")
-            .write_all(script.as_bytes())
-            .expect("script text");
-        assert!(child.wait().expect("probe writer waits").success());
+        write_executable_fixture(path, script.as_bytes());
     }
 
     fn write_backend_probe(path: &Path, name: &str) {
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-
             let about = backend_about(name).expect("known backend identity");
             let script = format!(
                 "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
             );
-            let mut child = Command::new("sh")
-                .args([
-                    "-c",
-                    "cat > \"$1\" && chmod 755 \"$1\"",
-                    "write-backend-probe",
-                ])
-                .arg(path)
-                .stdin(Stdio::piped())
-                .spawn()
-                .expect("backend probe writer starts");
-            child
-                .stdin
-                .take()
-                .expect("backend probe stdin")
-                .write_all(script.as_bytes())
-                .expect("backend probe script");
-            assert!(child.wait().expect("backend probe writer waits").success());
-            let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(path, permissions).expect("make backend probe executable");
+            write_executable_fixture(path, script.as_bytes());
         }
         #[cfg(not(unix))]
         {
@@ -2344,24 +2341,14 @@ mod tests {
 
     #[cfg(unix)]
     fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path, holder_fifo: &Path) {
-        use std::os::unix::fs::PermissionsExt;
-
         let ready_fifo = ready_fifo.to_string_lossy().replace('\'', "'\\''");
         let holder_fifo = holder_fifo.to_string_lossy().replace('\'', "'\\''");
         // The shell holds the liveness FIFO open for writing before it forks, so
         // both children inherit it. Only process exit releases it.
-        fs::write(
-            path,
-            format!(
-                "#!/bin/sh\nexec 8>'{holder_fifo}'\nexec 9<>'{holder_fifo}'\ncat <&9 >/dev/null &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf 'noisy-child\\n'\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
-            ),
-        )
-        .expect("write hanging noisy backend");
-        let mut permissions = fs::metadata(path)
-            .expect("hanging backend metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions).expect("make hanging backend executable");
+        let script = format!(
+            "#!/bin/sh\nexec 8>'{holder_fifo}'\nexec 9<>'{holder_fifo}'\ncat <&9 >/dev/null &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf 'noisy-child\\n'\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
+        );
+        write_executable_fixture(path, script.as_bytes());
     }
 
     #[cfg(unix)]
