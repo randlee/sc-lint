@@ -1,0 +1,48 @@
+@prefix jj:   <urn:judge-jev:ontology#> .
+@prefix jjs:  <urn:judge-jev:shapes#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+# SHACL shapes for a judge-jev definitions file (ADR-JEV-0008): jj:Definition and
+# jj:Attachment nodes and the edges between them. A definition's body (term, text,
+# source) is checked again by the pydantic model (ADR-JEV-0005); here: the graph.
+# The shapes are closed like the tree shapes: only the listed properties, rdf:type
+# ignored. jev_graph.validate_definitions also checks, before this pass, that every
+# subject is a jj:Definition or jj:Attachment and every rdf:type object is one of
+# those two classes (the same rules as the tree's jjs:AllSubjectsShaped and
+# jjs:TypesAreShapedClasses), so no blank-node chain can exist: an attachment's
+# properties are an IRI or literals only.
+
+jjs:DefinitionPrefixes a owl:Ontology ;
+    sh:declare [ sh:prefix "jj" ; sh:namespace "urn:judge-jev:ontology#"^^xsd:anyURI ] .
+
+jjs:DefinitionShape a sh:NodeShape ;
+    sh:targetClass jj:Definition ;
+    sh:nodeKind sh:IRI ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:message "a jj:Definition is an IRI and has only the properties jj:term, jj:text, jj:source, jj:attachedTo" ;
+    sh:property [ sh:path jj:term ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:pattern "\\S" ;
+                  sh:message "a definition has exactly one non-blank xsd:string jj:term" ] ;
+    sh:property [ sh:path jj:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:pattern "\\S" ;
+                  sh:message "a definition has exactly one non-blank xsd:string jj:text" ] ;
+    sh:property [ sh:path jj:source ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:pattern "\\S" ;
+                  sh:message "a definition has exactly one non-blank xsd:string jj:source (a repo-relative path or a record IRI as a string)" ] ;
+    sh:property [ sh:path jj:attachedTo ; sh:class jj:Attachment ;
+                  sh:message "jj:attachedTo must name a jj:Attachment" ] ;
+    sh:property [ sh:path jj:attachedTo ; sh:minCount 1 ; sh:severity sh:Warning ;
+                  sh:message "the definition has no jj:attachedTo: no request will carry it" ] .
+
+jjs:AttachmentShape a sh:NodeShape ;
+    sh:targetClass jj:Attachment ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:message "a jj:Attachment has only the properties jj:record, jj:location" ;
+    sh:property [ sh:path jj:record ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ;
+                  sh:message "an attachment has exactly one jj:record, an IRI (<repository URN>#<record id>)" ] ;
+    sh:property [ sh:path jj:location ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:pattern "\\S" ;
+                  sh:message "an attachment has at most one non-blank xsd:string jj:location" ] ;
+    sh:property [ sh:path [ sh:inversePath jj:attachedTo ] ; sh:minCount 1 ;
+                  sh:message "an attachment belongs to a jj:Definition (jj:attachedTo)" ] .
