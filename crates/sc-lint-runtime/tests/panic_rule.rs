@@ -64,18 +64,17 @@ fn allowance_is_scoped_to_function_and_requires_reason() {
     );
     let report = analyze(root).unwrap();
     assert_eq!(report.findings.len(), 2, "{report:?}");
+    let source_path = Path::new("src").join("lib.rs");
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.message.contains("src/lib.rs:1:")),
+        report.findings.iter().any(|finding| finding
+            .message
+            .contains(&format!("{}:1:", source_path.display()))),
         "the nested function retains its own finding: {report:?}"
     );
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.message.contains("src/lib.rs:2:")),
+        report.findings.iter().any(|finding| finding
+            .message
+            .contains(&format!("{}:2:", source_path.display()))),
         "the sibling function retains its finding: {report:?}"
     );
     write(
