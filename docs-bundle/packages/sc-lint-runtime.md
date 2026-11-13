@@ -25,6 +25,8 @@ CI orchestration.
 
 ## Runtime rules
 
+Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
+
 - `SCB-RUNTIME-001`: Bare `Condvar::wait(...)` in production code; use a
   timeout and inspect the result.
 - `SCB-RUNTIME-002`: Discarded `Condvar::wait_timeout*` result; inspect the
