@@ -176,3 +176,19 @@ fn production_function_named_tests_is_not_exempt() {
     write(root, "src/lib.rs", "fn tests() { panic!(); }\n");
     assert_eq!(analyze(root).unwrap().findings.len(), 1);
 }
+
+#[test]
+fn disabled_analyzer_still_validates_configured_package_names() {
+    let fixture = fixture();
+    let root = fixture.path();
+    write(root, "src/lib.rs", "fn f() {}\n");
+    write(
+        root,
+        "sc-lint.toml",
+        "[tool.sc-lint.analyzers.runtime]\nenabled=false\npanic_rule_packages=['missing']\n",
+    );
+    assert!(matches!(
+        analyze(root),
+        Err(RuntimeError::PanicPackages(PanicPackageError::Unknown(_)))
+    ));
+}
