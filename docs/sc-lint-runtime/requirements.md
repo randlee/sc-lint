@@ -87,13 +87,13 @@ Rule IDs and this analyzer's JSON output are stable consumer contracts
 
 ## REQ-RUNTIME-002: REQ-RUNTIME-002 panic rule and adoption
 
-**Status:** Proposed  
+**Status:** Accepted  
 
 ### Requirement Statement
 
 Definitions: REQ-RUNTIME-002 is this requirement's sc-lint identifier. `SCB-RUNTIME-008` is the runtime analyzer's panicking-call rule. Production code is source that the existing runtime test-scope rules classify as non-test. An opted-in package is a Cargo package listed in the repository-root configuration. The ADR-022 amendment is the phase-q ADR-022 amendment. The package list is the list of opted-in packages in the repository-root configuration. An analyzer's catalog-owned configuration keys are the analyzer-specific configuration keys that the analyzer publishes in its rule catalog. The generated runtime CLI references are the Markdown and HTML CLI reference documents for `sc-lint-runtime`. The generated runtime CLI references stay consistent with runtime CLI help when they match the runtime CLI help output.
 
-Status: AWAITING RAND ACCEPTANCE. The package opt-in is an exception to REQ-RUNTIME-001's fail-by-default rule for new rules; the pending ADR-022 amendment specifies it. A recorded baseline is provisionally outside phase q pending Rand; no request for a baseline is on record.
+Status: ACCEPTED by Rand, 2026-11-12 ("approved"). The package opt-in is an exception to REQ-RUNTIME-001's fail-by-default rule for new rules; the accepted phase-q ADR-022 amendment specifies it. A recorded baseline is provisionally outside phase q pending Rand; no request for a baseline is on record.
 
 **MUST statements:**
 
@@ -135,7 +135,7 @@ Issue #931 asks for runtime detection of production panicking calls. Limiting th
 - [ ] Documentation check: `sc-lint-runtime --help` and the generated CLI references both list `SCB-RUNTIME-008`, and the generated reference matches the help output.
 - [ ] Documentation review: the rule's documentation states that macro expansion and type-aware proof are not claimed.
 - [ ] Phase-q review: no phase-q deliverable implements a recorded baseline unless Rand has decided to include one.
-- [ ] Status check: this record stays Proposed until Rand's acceptance of it and of the phase-q ADR-022 amendment is recorded.
+- [x] Status check: Rand accepted this record and the phase-q ADR-022 amendment on 2026-11-12.
 
 ### Dependencies
 
@@ -154,13 +154,13 @@ Issue #931 asks for runtime detection of production panicking calls. Limiting th
 
 ## REQ-RUNTIME-003: REQ-RUNTIME-003 example target coverage
 
-**Status:** Proposed  
+**Status:** Accepted  
 
 ### Requirement Statement
 
 Definitions: REQ-RUNTIME-003 is this requirement's sc-lint identifier. Example source is the source of a supported Cargo example target, including its nested modules. Rules 001 to 008 are `SCB-RUNTIME-001` to `SCB-RUNTIME-008`. The runtime analyzer is `sc-lint-runtime`, the analyzer run by `sc-lint lint sc-runtime`. An example-only file is a file that an example target contains and no lib or bin target contains. A target-aware context records, for each source file, its package, its Cargo target and that target's kind (lib, bin, example, test, bench, build script or other). A crate-private context is visible only inside the runtime analyzer crate. A separate context is one apart from the existing source-discovery entry points. The 003/004 sleep scope is the runtime analyzer's selection of the files that rules 003 and 004 visit. A file's target classification is the target kind that the target-aware context records for that file. A file is attributed deterministically when repeated runs over the same workspace attribute it to the same example target. Shared source discovery is the source-file discovery that the shared analyzer support library provides to the boundary, portability and runtime analyzers. The existing example exclusion is that shared source discovery walks only each package's `src/` and `tests/` directories, so it does not discover example source outside them. The existing source-discovery entry points are the shared scanner's public functions `discover_source_files` and `discover_source_files_with_metadata`. Their defaults are their current behaviour of discovering Rust files only under each workspace package's `src/` and `tests/` directories.
 
-Status: AWAITING RAND ACCEPTANCE. Rand must accept or revise this requirement before dispatch.
+Status: ACCEPTED by Rand, 2026-11-12 ("approved").
 
 **MUST statements:**
 
@@ -201,7 +201,7 @@ Issue #935: the shared source scanner walks only package `src/` and `tests/`, so
 - [ ] API check: the signatures and default behaviour of the existing source-discovery entry points are unchanged, and the example-discovery context is crate-private to the runtime analyzer.
 - [ ] Regression test: findings in existing lib/bin source keep the same target attribution as before the change.
 - [ ] Determinism test: repeated runs attribute each example-only file to the same example target.
-- [ ] Status check: this record stays Proposed until Rand's acceptance is recorded.
+- [x] Status check: Rand accepted this record on 2026-11-12.
 
 ### Dependencies
 
