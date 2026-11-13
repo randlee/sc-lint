@@ -75,11 +75,11 @@ pub(crate) fn analyze_runtime_liveness(
     root: &Path,
     workspace: &WorkspaceMetadata,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
-    let source_files = discover_source_files_with_metadata(workspace)?;
+    let source_files = discover_runtime_sources(workspace)?;
     let sleep_scope = SleepScope::from_workspace(workspace);
     let file_findings = source_files
         .par_iter()
-        .map(|file_context| analyze_file(file_context, &sleep_scope))
+        .map(|file_context| analyze_file(&file_context.file, &sleep_scope, file_context.kind))
         .collect::<Vec<Result<Vec<_>>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
@@ -126,6 +126,7 @@ pub(crate) fn analyze_runtime_liveness(
 fn analyze_file(
     file_context: &FileContext,
     sleep_scope: &SleepScope,
+    target_kind: PackageTargetKind,
 ) -> Result<Vec<RuntimeFinding>> {
     let source = fs::read_to_string(&file_context.source_path).with_context(|| {
         format!(
@@ -152,7 +153,7 @@ fn analyze_file(
         })?;
     let mut collector = RuntimeCollector::new(file_context);
     collector.visit_file_items(&parsed);
-    if sleep_scope.includes(file_context) {
+    if sleep_scope.includes(file_context, target_kind) {
         for site in crate::sleep::find_blocking_sleeps(&parsed) {
             collector
                 .findings
@@ -160,7 +161,9 @@ fn analyze_file(
         }
     }
     for site in crate::practices::find(&parsed) {
-        if site.rule.id() != RuleId::ScbRuntime004 || sleep_scope.includes(file_context) {
+        if site.rule.id() != RuleId::ScbRuntime004
+            || sleep_scope.includes(file_context, target_kind)
+        {
             collector
                 .findings
                 .push(practice_finding(file_context, site));
@@ -203,6 +206,145 @@ fn practice_finding(file: &FileContext, site: crate::practices::Site) -> Runtime
     )
 }
 
+#[derive(Debug)]
+struct RuntimeFileContext {
+    file: FileContext,
+    kind: PackageTargetKind,
+}
+
+fn discover_runtime_sources(workspace: &WorkspaceMetadata) -> Result<Vec<RuntimeFileContext>> {
+    let packages = workspace.workspace_packages();
+    let existing = discover_source_files_with_metadata(workspace)?;
+    let mut seen = existing
+        .iter()
+        .map(|file| canonical_or_original(&file.source_path))
+        .collect::<BTreeSet<_>>();
+    let mut files = existing
+        .into_iter()
+        .map(|file| {
+            let kind = packages
+                .iter()
+                .find(|package| package.name == file.package)
+                .and_then(|package| {
+                    package
+                        .targets
+                        .iter()
+                        .find(|target| target.name == file.target)
+                })
+                .map_or(PackageTargetKind::Other, |target| target.kind);
+            RuntimeFileContext { file, kind }
+        })
+        .collect::<Vec<_>>();
+    for package in packages {
+        let mut examples = package
+            .targets
+            .into_iter()
+            .filter(|target| target.kind == PackageTargetKind::Example)
+            .collect::<Vec<_>>();
+        examples.sort_by(|left, right| left.name.cmp(&right.name));
+        for target in examples {
+            let root = &target.src_path;
+            let module_dir = root.parent().unwrap_or_else(|| Path::new("")).to_path_buf();
+            collect_example_module(
+                root,
+                &module_dir,
+                &package.name,
+                &target.name,
+                &mut seen,
+                &mut files,
+            )?;
+        }
+    }
+    Ok(files)
+}
+
+fn module_directory(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    match path.file_name().and_then(|name| name.to_str()) {
+        Some("main.rs" | "lib.rs" | "mod.rs") => parent.to_path_buf(),
+        _ => parent.join(path.file_stem().unwrap_or_default()),
+    }
+}
+
+fn collect_example_module(
+    path: &Path,
+    module_dir: &Path,
+    package: &PackageName,
+    target: &TargetName,
+    seen: &mut BTreeSet<PathBuf>,
+    files: &mut Vec<RuntimeFileContext>,
+) -> Result<()> {
+    if !path.is_file() || !seen.insert(canonical_or_original(path)) {
+        return Ok(());
+    }
+    let source = fs::read_to_string(path)
+        .with_context(|| format!("failed to read example source {}", path.display()))?;
+    let parsed = syn::parse_file(&source)
+        .with_context(|| format!("failed to parse example source {}", path.display()))?;
+    files.push(RuntimeFileContext {
+        file: FileContext {
+            source_path: path.to_path_buf(),
+            package: package.clone(),
+            target: target.clone(),
+            is_test_file: false,
+        },
+        kind: PackageTargetKind::Example,
+    });
+    collect_nested_example_modules(&parsed.items, module_dir, package, target, seen, files)
+}
+
+fn collect_nested_example_modules(
+    items: &[Item],
+    module_dir: &Path,
+    package: &PackageName,
+    target: &TargetName,
+    seen: &mut BTreeSet<PathBuf>,
+    files: &mut Vec<RuntimeFileContext>,
+) -> Result<()> {
+    for item in items {
+        let Item::Mod(module) = item else { continue };
+        let name = module.ident.to_string();
+        if let Some((_, nested)) = &module.content {
+            collect_nested_example_modules(
+                nested,
+                &module_dir.join(name),
+                package,
+                target,
+                seen,
+                files,
+            )?;
+        } else {
+            let direct = module_dir.join(format!("{name}.rs"));
+            let nested = module_dir.join(&name).join("mod.rs");
+            let explicit = module.attrs.iter().find_map(|attr| {
+                let syn::Meta::NameValue(value) = &attr.meta else {
+                    return None;
+                };
+                if !value.path.is_ident("path") {
+                    return None;
+                }
+                let syn::Expr::Lit(expr) = &value.value else {
+                    return None;
+                };
+                let syn::Lit::Str(path) = &expr.lit else {
+                    return None;
+                };
+                Some(module_dir.join(path.value()))
+            });
+            let path = explicit.unwrap_or_else(|| if direct.is_file() { direct } else { nested });
+            collect_example_module(
+                &path,
+                &module_directory(&path),
+                package,
+                target,
+                seen,
+                files,
+            )?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Default)]
 struct SleepScope {
     excluded_roots: BTreeMap<PackageName, BTreeSet<PathBuf>>,
@@ -234,8 +376,9 @@ impl SleepScope {
         }
     }
 
-    fn includes(&self, file: &FileContext) -> bool {
-        !file.is_test_file
+    fn includes(&self, file: &FileContext, kind: PackageTargetKind) -> bool {
+        kind != PackageTargetKind::Example
+            && !file.is_test_file
             && self
                 .excluded_roots
                 .get(&file.package)

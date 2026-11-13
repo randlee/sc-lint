@@ -18,6 +18,8 @@ Use `sc-runtime` to detect unsafe wait patterns in production Rust code.
 
 Current rule families:
 
+Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
+
 - `SCB-RUNTIME-001`
   - bare `Condvar::wait(...)` in production code
 - `SCB-RUNTIME-002`
