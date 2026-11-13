@@ -228,6 +228,111 @@ Plan authority: `lint-l-8`.
   Sprint comparison for inventory parity must use parsed ordering, not lexical
   string comparison.
 
+## REQ-SCB-028: REQ-SCB-028 environment-variable read boundary
+
+**Status:** Accepted  
+
+### Requirement Statement
+
+Definitions: REQ-SCB-028 is this requirement's sc-lint identifier. `SCB-ENV-001` is the boundary analyzer's environment-variable read rule. The env-var boundary configuration is the optional `env_var_boundary` table family under `[tool.sc-lint.analyzers.boundary]` in the repository-root `sc-lint.toml`, with the keys `forbidden_env_vars`, `restricted_crate_roots` and `boundary_reader_functions`. A forbidden variable is a variable named in `forbidden_env_vars`. A restricted crate is a workspace crate whose directory is under a path in `restricted_crate_roots`. A reader function is a function named by its path in `boundary_reader_functions`. A direct read is a call to `std::env::var` or `std::env::var_os` whose argument is a string literal. A forwarding helper is a function in the same file that passes its parameter to a direct read. A transitive wrapper is a function in the same file that calls a forwarding helper or another transitive wrapper with a string literal. Test code is code that the boundary analyzer's existing test handling classifies as test code. The atm-core guard is atm-core's `.just/check_env_var_boundary.py`. A read form is a way that code reads an environment variable; direct reads, forwarding-helper calls and transitive-wrapper calls are the read forms that `SCB-ENV-001` detects. The boundary guide is the sc-lint-boundary package guide in sc-lint's published documentation.
+
+Status: ACCEPTED by Rand, 2026-11-13 (approved PR #943). Issue #133: the atm-core guard has no counterpart in released sc-lint-boundary.
+
+**MUST statements:**
+
+- `SCB-ENV-001` MUST report a direct read of a forbidden variable in a restricted crate outside a reader function.
+- `SCB-ENV-001` MUST report a forwarding-helper call that reads a forbidden variable in a restricted crate outside a reader function.
+- `SCB-ENV-001` MUST report a transitive-wrapper call that reads a forbidden variable in a restricted crate outside a reader function.
+- Each `SCB-ENV-001` finding MUST give the source file and line of the read.
+- The boundary analyzer MUST reject an unknown key in the env-var boundary configuration as a configuration error naming the key.
+- The boundary analyzer MUST reject a wrongly typed value in the env-var boundary configuration as a configuration error naming the key.
+- The boundary guide MUST list the read forms that `SCB-ENV-001` does not detect.
+
+**MUST NOT statements:**
+
+- `SCB-ENV-001` MUST NOT report reads in test code.
+- `SCB-ENV-001` MUST NOT report reads of variables that are not forbidden variables.
+- `SCB-ENV-001` MUST NOT run when the repository-root `sc-lint.toml` has no env-var boundary configuration.
+
+### Rationale
+
+Issue #133 asks for a released equivalent of the atm-core guard so atm-core can move to released sc-lint. The rule is configuration-driven, so repositories without the configuration see no change.
+
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] Fixture test: a direct read of a forbidden variable in a restricted crate yields an `SCB-ENV-001` finding with its file and line.
+- [ ] Fixture test: the same read inside a reader function yields no finding.
+- [ ] Fixture test: a forwarding helper and a transitive wrapper that read a forbidden variable each yield an `SCB-ENV-001` finding at the call site.
+- [ ] Fixture test: a read of a variable that is not forbidden, a read outside restricted crates, and a read in test code each yield no finding.
+- [ ] Configuration test: an unknown key and a wrongly typed value each exit 3 with a message naming the key.
+- [ ] CLI fixture: `sc-lint lint sc-boundary` reports `SCB-ENV-001` in its JSON report and exits 10; with no env-var boundary configuration it reports no `SCB-ENV-001` finding.
+- [ ] Documentation review: the boundary guide lists the read forms that `SCB-ENV-001` does not detect.
+- [x] Status check: Rand accepted this record on 2026-11-13 (approved PR #943).
+
+### Test Strategy
+
+**Test Types:**
+
+- Fixture test
+- Configuration test
+- CLI integration test
+
+## REQ-SCB-029: REQ-SCB-029 manifest dependency requirements
+
+**Status:** Accepted  
+
+### Requirement Statement
+
+Definitions: REQ-SCB-029 is this requirement's sc-lint identifier. `SCB-MANIFEST-007` is the boundary analyzer's exact-or-tilde requirement rule. `SCB-MANIFEST-008` is the boundary analyzer's upper-bound rule. The dependency-requirements configuration is the optional `dependency_requirements` table family under `[tool.sc-lint.analyzers.boundary]` in the repository-root `sc-lint.toml`, with the keys `template_manifests`, `package_archives` and `test_manifests`. A checked manifest is a workspace member's `Cargo.toml`, a manifest matched by `template_manifests` or `test_manifests`, or the `Cargo.toml.orig` inside a `.crate` archive matched by `package_archives`. A registry dependency is a dependency with no `path` and no `git` key. An exact requirement is a version requirement with the `=` operator. A tilde requirement is a version requirement with the `~` operator. A caret range is the range that Cargo's default caret requirement allows for a version. An extra upper bound is a `<` or `<=` bound that excludes versions inside the caret range of the requirement's lower bound. A bound comment is a comment on the requirement's line or the line above it, of the form `upper-bound: <api|links|toolchain> break first in <version>`. An internal package is a package in the same workspace. An archive entry path is the path that a `.crate` archive matched by `package_archives` stores for one of its entries; it leaves the archive root when it names a location outside the top directory that holds the archive's entries; and a typed error is an error the boundary analyzer returns as a variant of a declared Rust error type, not as a finding.
+
+Status: ACCEPTED by Rand, 2026-11-13 (approved PR #943). Issue #936: consumers need a lint that fails dependency requirements that stop downstream users from selecting newer SemVer-compatible releases.
+
+**MUST statements:**
+
+- `SCB-MANIFEST-007` MUST report each exact requirement on a registry dependency in a checked manifest.
+- `SCB-MANIFEST-007` MUST report each tilde requirement on a registry dependency in a checked manifest.
+- `SCB-MANIFEST-008` MUST report each extra upper bound on a registry dependency in a checked manifest that has no bound comment.
+- `SCB-MANIFEST-008` MUST report each extra upper bound whose value differs from the version named in its bound comment.
+- Each finding MUST give the manifest path of the requirement.
+- Each finding MUST give the line of the requirement.
+- A finding in a `.crate` archive MUST name the archive.
+- A finding in a `.crate` archive MUST name the `Cargo.toml.orig` line.
+- The boundary analyzer MUST reject an archive entry path that leaves the archive root as a typed error naming the archive.
+
+**MUST NOT statements:**
+
+- `SCB-MANIFEST-007` MUST NOT report caret requirements.
+- `SCB-MANIFEST-007` MUST NOT report path or workspace version requirements of internal packages.
+- `SCB-MANIFEST-008` MUST NOT report a requirement whose range lies within one caret range.
+- The boundary analyzer MUST NOT claim to verify that the break named in a bound comment exists.
+- `SCB-MANIFEST-007` and `SCB-MANIFEST-008` MUST NOT run when the repository-root `sc-lint.toml` has no dependency-requirements configuration.
+
+### Rationale
+
+Issue #936: sc-runtime runs an interim manifest check until sc-lint ships this lint. The normalized `Cargo.toml` in a `.crate` archive drops comments, so archives are read through `Cargo.toml.orig`.
+
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] Fixture test: exact and tilde requirements on registry dependencies yield `SCB-MANIFEST-007` findings in a workspace manifest, a template manifest and a test manifest.
+- [ ] Fixture test: a caret requirement, an internal path or workspace version requirement, and a test-manifest caret requirement on an older compatible line yield no finding.
+- [ ] Fixture test: an extra upper bound with no bound comment yields an `SCB-MANIFEST-008` finding; with a bound comment naming a break kind and a version equal to the bound it yields no finding; with a differing version it yields a finding.
+- [ ] Fixture test: caret ranges for `0.x` versions and prerelease versions follow Cargo's rules.
+- [ ] Fixture test: a `.crate` archive fixture yields a finding naming the archive and the `Cargo.toml.orig` line; an archive entry path that leaves the archive root is a typed error.
+- [ ] CLI fixture: `sc-lint lint sc-boundary` reports the findings in its JSON report and exits 10; a clean fixture exits 0.
+- [ ] Documentation review: the boundary guide states that the lint checks the bound comment's form and version, not the existence of the break.
+- [x] Status check: Rand accepted this record on 2026-11-13 (approved PR #943).
+
+### Test Strategy
+
+**Test Types:**
+
+- Fixture test
+- CLI integration test
+
 ## Stable consumer interfaces
 
 Rule IDs and this analyzer's JSON output are stable consumer contracts

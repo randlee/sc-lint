@@ -433,6 +433,9 @@ pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
             | RuleId::ScbManifest004
             | RuleId::ScbManifest005
             | RuleId::ScbManifest006
+            | RuleId::ScbManifest007
+            | RuleId::ScbManifest008
+            | RuleId::ScbEnv001
     )
 }
 

@@ -1,12 +1,20 @@
 use std::collections::HashMap;
+#[cfg(unix)]
+use std::ffi::CString;
 use std::ffi::OsString;
 use std::fs;
+#[cfg(unix)]
+use std::io::{BufRead, Write};
+#[cfg(unix)]
+use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::path::PathBuf;
 #[cfg(any(unix, windows))]
 use std::process::Command as ProcessCommand;
 use std::sync::Mutex;
 use std::sync::mpsc;
+#[cfg(unix)]
+use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
@@ -50,6 +58,146 @@ use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
 const CLI_CONTRACT: &str = include_str!("../../../docs/sc-lint/cli-contract.md");
+
+#[cfg(unix)]
+fn write_executable_fixture_after_open(
+    path: &Path,
+    contents: &[u8],
+    after_writer_open: impl FnOnce(Option<i32>),
+) {
+    let mut child = ProcessCommand::new("sh")
+        .args([
+            "-c",
+            "exec 9> \"$1\"; printf 'writer-open\\n'; cat >&9; chmod 755 \"$1\"",
+            "write-executable-fixture",
+        ])
+        .arg(path)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("executable fixture writer starts");
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stdout.take().expect("writer stdout"))
+        .read_line(&mut ready)
+        .expect("read writer readiness");
+    assert_eq!(ready, "writer-open\n");
+
+    let writer_stdin_fd = child.stdin.as_ref().expect("writer stdin").as_raw_fd();
+    after_writer_open(Some(writer_stdin_fd));
+
+    child
+        .stdin
+        .take()
+        .expect("writer stdin")
+        .write_all(contents)
+        .expect("write executable fixture to child");
+    assert!(
+        child
+            .wait()
+            .expect("executable fixture writer waits")
+            .success(),
+        "executable fixture writer must finish successfully"
+    );
+}
+
+#[cfg(windows)]
+fn write_executable_fixture_after_open(
+    path: &Path,
+    contents: &[u8],
+    after_writer_open: impl FnOnce(Option<i32>),
+) {
+    after_writer_open(None);
+    fs::write(path, contents).expect("write executable fixture");
+}
+
+fn write_executable_fixture(path: &Path, contents: &[u8]) {
+    write_executable_fixture_after_open(path, contents, |_| {});
+}
+
+#[cfg(unix)]
+fn copy_executable_fixture(source: &Path, destination: &Path) {
+    let status = ProcessCommand::new("sh")
+        .args([
+            "-c",
+            "cat \"$1\" > \"$2\" && chmod 755 \"$2\"",
+            "copy-executable-fixture",
+        ])
+        .arg(source)
+        .arg(destination)
+        .status()
+        .expect("executable fixture copy starts");
+    assert!(status.success(), "executable fixture copy succeeds");
+}
+
+#[cfg(windows)]
+fn copy_executable_fixture(source: &Path, destination: &Path) {
+    fs::copy(source, destination).expect("copy executable fixture");
+}
+
+#[cfg(unix)]
+#[test]
+fn child_writer_keeps_its_file_descriptor_out_of_an_unlocked_fork() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let fixture = TempDir::new().expect("fixture");
+    let executable = fixture.path().join("mock-backend");
+    let (read_end, write_end) = {
+        let mut pipe = [0; 2];
+        assert_eq!(
+            unsafe { libc::pipe(pipe.as_mut_ptr()) },
+            0,
+            "create release pipe"
+        );
+        (pipe[0], pipe[1])
+    };
+    let mut child_pid = None;
+    write_executable_fixture_after_open(&executable, b"#!/bin/sh\nexit 0\n", |writer_stdin_fd| {
+        let executable = CString::new(executable.as_os_str().as_bytes()).expect("path CString");
+        let forker = thread::spawn(move || {
+            let pid = unsafe { libc::fork() };
+            if pid == 0 {
+                unsafe {
+                    libc::close(write_end);
+                    if let Some(writer_stdin_fd) = writer_stdin_fd {
+                        libc::close(writer_stdin_fd);
+                    }
+                    let mut release = 0_u8;
+                    if libc::read(read_end, &mut release as *mut u8 as *mut _, 1) != 1 {
+                        libc::_exit(120);
+                    }
+                    libc::close(read_end);
+                    let argv = [executable.as_ptr(), std::ptr::null()];
+                    let env = [std::ptr::null()];
+                    libc::execve(executable.as_ptr(), argv.as_ptr(), env.as_ptr());
+                    libc::_exit(121);
+                }
+            }
+            assert!(pid > 0, "fork executable runner");
+            unsafe { libc::close(read_end) };
+            pid
+        });
+        child_pid = Some(
+            forker
+                .join()
+                .expect("unlocked thread forks executable runner"),
+        );
+    });
+
+    let child_pid = child_pid.expect("fork happened while child writer held the file");
+    assert_eq!(
+        unsafe { libc::write(write_end, b"x".as_ptr() as *const _, 1) },
+        1
+    );
+    unsafe { libc::close(write_end) };
+    let mut child_status = 0;
+    assert_eq!(
+        unsafe { libc::waitpid(child_pid, &mut child_status, 0) },
+        child_pid,
+        "wait for forked executable runner"
+    );
+    assert!(libc::WIFEXITED(child_status));
+    assert_eq!(libc::WEXITSTATUS(child_status), 0, "exec fixture succeeds");
+}
 
 #[test]
 fn cli_contract_exit_code_mapping_matches_code_constants() {
@@ -790,12 +938,10 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
     let binary = bin_dir.join("sc-lint");
-    fs::write(
+    write_executable_fixture(
         &binary,
-        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SC_LINT_RECORD\"\n",
-    )
-    .expect("fake sc-lint");
-    set_mock_backend_permissions(&binary);
+        b"#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SC_LINT_RECORD\"\n",
+    );
     let path = std::env::join_paths(
         std::iter::once(bin_dir.clone()).chain(
             std::env::var_os("PATH")
@@ -873,7 +1019,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
     let binary = bin_dir.join("sc-lint.cmd");
-    fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
+    write_executable_fixture(&binary, b"@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n");
     let path = std::env::join_paths(
         std::iter::once(bin_dir.clone()).chain(
             std::env::var_os("PATH")
@@ -952,7 +1098,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
     );
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
-    fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
+    write_executable_fixture(&binary, b"@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n");
     let output = ProcessCommand::new("python")
         .args([
             bootstrap.to_str().expect("UTF-8 bootstrap path"),
@@ -1158,7 +1304,7 @@ fn compatibility_check_uses_semver_not_lexical_comparison() {
         ]);
         let context = CommandContext::from_cli(&cli).expect("compatibility context");
         let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-        let result = crate::command::execute(&context, &loaded);
+        let result = crate::command::execute(&context, &loaded).map_err(Box::new);
         assert_eq!(result.is_ok(), expected_ok, "version {version}");
         if expected_ok {
             let success = result.expect("compatible release passes");
@@ -1208,7 +1354,9 @@ fn compatibility_check_reports_malformed_installed_version_in_human_and_json_for
     ]);
     let context = CommandContext::from_cli(&cli).expect("compatibility context");
     let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-    let error = crate::command::execute(&context, &loaded).expect_err("bad version fails");
+    let error = crate::command::execute(&context, &loaded)
+        .map_err(Box::new)
+        .expect_err("bad version fails");
     assert_eq!(error.code(), "CLI.SC_LINT_VERSION_UNPARSABLE");
     assert!(error.cause.is_some());
     let json: Value = serde_json::from_str(&crate::render::render_error_json(
@@ -1365,7 +1513,9 @@ fn compatibility_check_human_error_includes_all_available_identity_details() {
     ]);
     let context = CommandContext::from_cli(&cli).expect("compatibility context");
     let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
-    let error = crate::command::execute(&context, &loaded).expect_err("old version fails");
+    let error = crate::command::execute(&context, &loaded)
+        .map_err(Box::new)
+        .expect_err("old version fails");
     let human = crate::render::render_error_human(context.command_id(), &error);
     for required in [
         "0.4.1",
@@ -1956,10 +2106,9 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
         .map(|target_dir| target_dir.join(cli_name))
         .expect("sc-lint executable path");
     let cli_copy = mock_backend._tempdir.path().join(cli_name);
-    fs::copy(cli_source, &cli_copy).expect("copy sc-lint beside mock backend");
-
-    // The backend resolver prefers binaries next to sc-lint over PATH. Running
-    // this copy makes the mocked sibling binary the one the CLI dispatches to.
+    // The child writer owns the destination handle; the test process never
+    // holds a writable descriptor that another test's fork can inherit.
+    copy_executable_fixture(&cli_source, &cli_copy);
     let output = ProcessCommand::new(cli_copy)
         .args(["--json", "--root"])
         .arg(fixture.root())
@@ -1991,8 +2140,7 @@ fn run_lint_with_path_backend_without_version() -> (std::process::Output, MockBa
         .map(|target_dir| target_dir.join(cli_name))
         .expect("sc-lint executable path");
     let cli_copy = launcher_dir.path().join(cli_name);
-    fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
-
+    copy_executable_fixture(&cli_source, &cli_copy);
     let output = ProcessCommand::new(cli_copy)
         .env("PATH", backend.search_path())
         .args(["--json", "--root"])
@@ -2090,24 +2238,22 @@ fn run_lint_with_real_path_backend(
         }
     };
     let launcher_name = binary_name(crate::consts::SERVICE_NAME);
-    fs::copy(
+    copy_executable_fixture(
         built_binaries
             .get(crate::consts::SERVICE_NAME)
             .expect("shared sc-lint launcher"),
-        launcher_dir.path().join(&launcher_name),
-    )
-    .expect("copy isolated sc-lint launcher");
+        &launcher_dir.path().join(&launcher_name),
+    );
     for backend in [
         crate::consts::TOOL_BOUNDARY,
         crate::consts::TOOL_PORTABILITY,
         crate::consts::TOOL_RUNTIME,
     ] {
         let name = binary_name(backend);
-        fs::copy(
+        copy_executable_fixture(
             built_binaries.get(backend).expect("shared backend binary"),
-            backend_dir.path().join(&name),
-        )
-        .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
+            &backend_dir.path().join(&name),
+        );
     }
     let path = std::env::var_os("PATH").unwrap_or_default();
     let path = std::env::join_paths(
@@ -2179,7 +2325,9 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
     )
     .expect("portability context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let success = crate::command::execute(&context, &loaded)
+        .map_err(Box::new)
+        .expect("dispatch succeeds");
     let expected_finding_count = success
         .data
         .get("findings")
@@ -2253,7 +2401,9 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
     )
     .expect("runtime context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let success = crate::command::execute(&context, &loaded)
+        .map_err(Box::new)
+        .expect("dispatch succeeds");
     let expected_finding_count = success
         .data
         .get("findings")
@@ -2529,7 +2679,7 @@ fn lint_profiles_have_stable_membership() {
 
     assert_eq!(
         step_names(steps),
-        vec!["fmt", "version", "manifests", "spell", "pytests"]
+        vec!["version", "fmt", "manifests", "spell", "pytests"]
     );
 }
 
@@ -2614,7 +2764,7 @@ fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
     let steps = success.data["steps"].as_array().expect("steps array");
     assert_eq!(
         step_names(steps),
-        ["fmt", "version", "manifests", "spell", "pytests"]
+        ["version", "fmt", "manifests", "spell", "pytests"]
     );
 }
 
@@ -2627,6 +2777,7 @@ fn lint_profile_starts_cargo_lane_steps_in_plan_order() {
         .expect("full profile succeeds");
 
     let cargo_lane = [
+        "version",
         "fmt",
         "clippy",
         "deny",
@@ -2660,7 +2811,7 @@ fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
         .expect_err("the profile fails");
     assert_eq!(
         error.message,
-        "3 of 14 steps failed: [1] clippy, [6] spell, [8] sc-boundary"
+        "3 of 14 steps failed: [3] spell, [5] clippy, [8] sc-boundary"
     );
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
     assert_eq!(error.code(), "profile.steps_failed");
@@ -2677,8 +2828,8 @@ fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
             .collect::<Vec<_>>();
         assert_eq!(keys, ["exit_code", "index", "message", "name"]);
     }
-    assert_eq!(failed[1]["index"], 6);
-    assert_eq!(failed[1]["name"], "spell");
+    assert_eq!(failed[0]["index"], 3);
+    assert_eq!(failed[0]["name"], "spell");
     let ran = adapter
         .invocations
         .lock()
@@ -2692,7 +2843,7 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
     let loaded = load_repo_lint_profile("fast");
     let mut adapter = FakeSystemAdapter::new(false);
     let (manifests_done, version_waits) = mpsc::channel();
-    // `version` (plan index 1) cannot finish until `manifests` (index 2) has.
+    // `version` (plan index 0) cannot finish until `manifests` (index 2) has.
     let version_waits = Mutex::new(version_waits);
     adapter.on_start.insert(
         "version",
@@ -2719,7 +2870,7 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
         .expect_err("the profile fails");
     assert_eq!(
         error.message,
-        "2 of 5 steps failed: [1] version, [2] manifests"
+        "2 of 5 steps failed: [0] version, [2] manifests"
     );
 
     let completions = adapter
@@ -3330,8 +3481,7 @@ impl MockBackend {
                 "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' '{tool} {version}'; else printf '%s\\n' '{payload}'; fi\n"
             )
         };
-        std::fs::write(&script_path, script).expect("mock backend script");
-        set_mock_backend_permissions(&script_path);
+        write_executable_fixture(&script_path, script.as_bytes());
 
         Self::with_path(tempdir, script_path)
     }
@@ -3438,20 +3588,6 @@ impl MockBackend {
         &self.search_path
     }
 }
-
-#[cfg(unix)]
-fn set_mock_backend_permissions(path: &Path) {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mut permissions = std::fs::metadata(path)
-        .expect("mock backend metadata")
-        .permissions();
-    permissions.set_mode(0o755);
-    std::fs::set_permissions(path, permissions).expect("mock backend perms");
-}
-
-#[cfg(windows)]
-fn set_mock_backend_permissions(_path: &Path) {}
 
 fn step_names(steps: &[Value]) -> Vec<String> {
     steps
@@ -4789,6 +4925,24 @@ fn rust_loader_rejects_semantic_invalid_profile_fixtures() {
 // Shared scheduler, fail-fast and test selectors (Phase L, l-6).
 // ---------------------------------------------------------------------------
 
+#[test]
+fn version_lint_step_is_first_cargo_step_in_every_profile() {
+    for profile in [
+        crate::cli::LintProfile::Fast,
+        crate::cli::LintProfile::Ci,
+        crate::cli::LintProfile::Full,
+    ] {
+        let plan = workflow::lint_profile_plan(Path::new("."), profile, false);
+        let cargo_steps = plan
+            .iter()
+            .filter(|step| step.lane() == workflow::Lane::Cargo)
+            .map(workflow::StepPlan::name)
+            .collect::<Vec<_>>();
+        assert_eq!(cargo_steps.first().copied(), Some("version"), "{profile:?}");
+        assert!(cargo_steps.iter().skip(1).all(|name| *name != "version"));
+    }
+}
+
 fn parallel_step(name: &str) -> workflow::StepPlan {
     workflow::StepPlan::new(
         name,
@@ -5051,6 +5205,20 @@ fn fail_fast_skips_unstarted_cargo_steps_only() {
     assert_eq!(sorted(adapter.invoked()), ["c1", "p"]);
     assert_eq!(detail_names(&error, "failed_steps"), ["c1"]);
     assert_eq!(detail_names(&error, "skipped_steps"), ["c2", "tail"]);
+}
+
+#[test]
+fn fail_fast_runs_version_before_failing_cargo_step() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("cargo-fails", "cargo failed");
+    let error = run_scheduled(
+        &adapter,
+        vec![cargo_step("version"), cargo_step("cargo-fails")],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("cargo failure fails the run");
+    assert_eq!(adapter.invoked(), ["version", "cargo-fails"]);
+    assert_eq!(detail_names(&error, "failed_steps"), ["cargo-fails"]);
 }
 
 #[test]

@@ -6,22 +6,25 @@ by this package (arch-qa, req-qa, ...) is checked against its agent file only wh
 """
 from __future__ import annotations
 
-import ast
 import importlib.machinery
 import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
-from subprocess_helpers import run_command
 import rendering
+from subprocess_helpers import (
+    isolated_git_env,
+    run_command,
+    run_fixture_git,
+    set_fixture_hooks_path,
+)
 
 ROOT = Path(__file__).parents[2]
 AGENTS = ROOT.parents[1] / "agents"
@@ -119,12 +122,19 @@ class DevSanityHandoffTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         repo = Path(self.tmp.name) / "repo"
         repo.mkdir()
+        self.git_env, _ = isolated_git_env(self.tmp.name)
+        environ = patch.dict(os.environ, self.git_env, clear=True)
+        environ.start()
+        self.addCleanup(environ.stop)
 
         def git(*args):
-            return run_command(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t", *args],
-                                  check=True, capture_output=True, text=True).stdout.strip()
+            return run_fixture_git(
+                ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t", *args],
+                env=self.git_env,
+            ).stdout.strip()
 
         git("init", "-q")
+        set_fixture_hooks_path(repo, env=self.git_env)
         (repo / "crates/example-otlp/src").mkdir(parents=True)
         (repo / "docs").mkdir()
         (repo / "docs/retry.md").write_text("retry policy\n")
@@ -200,11 +210,10 @@ class DevSanityHandoffTests(unittest.TestCase):
         paragraph = text[anchor.start():]
         paragraph = paragraph[:paragraph.index("\n\n")]
         documented = set(re.findall(r"`(\w+)`", paragraph[anchor.end() - anchor.start():].split(". ", 1)[0]))
-        merge = (ROOT / "scripts/sanity-merge").read_text()
-        required = ast.literal_eval(required_match(re.search(r"required = (\{[^}]*\})", merge)).group(1))
-        self.assertEqual(documented, required)
-        self.assertIn("`{reviewer, context, reply}`", paragraph)
-        self.assertIn("set(rerun) != {'reviewer', 'context', 'reply'}".replace("'", '"'), merge)
+        merge = load_merge()
+        self.assertEqual(documented, set(merge.SelectionEntry.__required_keys__))
+        rerun_keys = required_match(re.search(r"`\{([^}]*)\}`", paragraph)).group(1)
+        self.assertEqual({key.strip() for key in rerun_keys.split(",")}, set(merge.RerunSelection.__required_keys__))
 
 
     def test_the_jev_client_takes_the_assignment_exactly_as_received_in_its_fence(self):

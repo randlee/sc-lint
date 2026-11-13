@@ -44,10 +44,12 @@ use syn::visit::Visit;
 use thiserror::Error;
 
 mod analysis;
+mod env_var_policy;
 mod graph;
 mod inventory;
 mod manifest_dependency_policy;
 mod manifest_policy;
+mod manifest_requirements;
 mod package_policy;
 mod render;
 mod rule_catalog;
@@ -97,6 +99,8 @@ pub enum BoundaryError {
         #[source]
         source: BoundaryErrorSource,
     },
+    #[error("archive entry `{entry}` escapes archive `{archive}`")]
+    ArchivePathEscape { archive: PathBuf, entry: PathBuf },
     #[error(transparent)]
     AnalyzerConfig(#[from] sc_lint_analyzer_support::AnalyzerConfigError),
 }
@@ -687,7 +691,7 @@ pub fn analyze_workspace_configured(
                 inventory.as_ref(),
                 &policy_config,
             )
-            .map_err(|error| BoundaryError::manifest_policy(&common.root, error))?,
+            .map_err(|error| manifest_policy_analysis_error(&common.root, error))?,
         );
         report.findings.sort_by(|left, right| {
             analysis::finding_sort_key(left)
@@ -724,7 +728,7 @@ fn analyze_inventory_free_manifest_policy(
                 None,
                 policy_config,
             )
-            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+            .map_err(|error| manifest_policy_analysis_error(&options.root, error))?,
         );
     }
     Ok(apply_configured_rule_filter(
@@ -733,6 +737,13 @@ fn analyze_inventory_free_manifest_policy(
         options.root.as_path(),
         &NodeSourcePaths::new(),
     ))
+}
+
+fn manifest_policy_analysis_error(root: &Path, error: anyhow::Error) -> BoundaryError {
+    match error.downcast::<BoundaryError>() {
+        Ok(error) => error,
+        Err(error) => BoundaryError::manifest_policy(root, error),
+    }
 }
 
 fn apply_configured_rule_filter(
@@ -766,7 +777,7 @@ fn apply_configured_rule_filter_with_canonicalizer(
             )
         })
         .map(|finding| {
-            let path = manifest_finding_path(&finding);
+            let path = finding_path(&finding);
             (finding, path)
         })
         .collect();
@@ -818,10 +829,13 @@ fn finding_source_paths(
 
 fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSettings) -> bool {
     let manifest_policy_ids = [
+        rule(RuleId::ScbEnv001),
         rule(RuleId::ScbManifest003),
         rule(RuleId::ScbManifest004),
         rule(RuleId::ScbManifest005),
         rule(RuleId::ScbManifest006),
+        rule(RuleId::ScbManifest007),
+        rule(RuleId::ScbManifest008),
     ];
     settings.rule_filter.as_ref().is_none_or(|selected| {
         manifest_policy_ids
@@ -838,6 +852,8 @@ fn inventory_free_manifest_policy_selected(
         rule(RuleId::ScbManifest002),
         rule(RuleId::ScbManifest004),
         rule(RuleId::ScbManifest005),
+        rule(RuleId::ScbManifest007),
+        rule(RuleId::ScbManifest008),
     ];
     settings.rule_filter.as_ref().is_some_and(|selected| {
         !selected.is_empty()
@@ -864,15 +880,18 @@ fn load_validated_inventory(
     Ok(inventory)
 }
 
-fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
+fn finding_path(finding: &Finding) -> Option<RepoRelativePath> {
     matches!(
         finding.rule_id,
-        RuleId::ScbManifest001
+        RuleId::ScbEnv001
+            | RuleId::ScbManifest001
             | RuleId::ScbManifest002
             | RuleId::ScbManifest003
             | RuleId::ScbManifest004
             | RuleId::ScbManifest005
             | RuleId::ScbManifest006
+            | RuleId::ScbManifest007
+            | RuleId::ScbManifest008
     )
     .then(|| finding.owner_ids.first())
     .flatten()

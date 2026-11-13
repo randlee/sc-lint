@@ -1,0 +1,64 @@
+{
+  "schema": "judge-jev/quality-tree/1",
+  "id": "quality-adr",
+  "kind": "adr",
+  "version": 1,
+  "approved": true,
+  "note": "wave-1 wording approved by Rand Lee, 2026-11-08",
+  "start": "wave-1",
+  "nodes": {
+    "wave-1": {
+      "questions": {
+        "context": {
+          "type": "choice",
+          "instructions": "`item.text` is one architecture decision record as JSON. Does its context name the problem and the forces behind the decision?",
+          "criteria": {
+            "problem and forces": "Names the problem and the forces or constraints that shaped the decision.",
+            "background only": "Gives background but no problem. Fix: state the problem.",
+            "missing": "No context in substance. Fix: add the problem and its forces."
+          }
+        },
+        "alternatives": {
+          "type": "choice",
+          "instructions": "`item.text` is one architecture decision record as JSON. Does it name the alternatives considered?",
+          "criteria": {
+            "named with reasons rejected": "Names alternatives and why each was rejected.",
+            "named only": "Names alternatives without why they were rejected. Fix: add why rejected.",
+            "none": "Names no alternative. Fix: add alternatives."
+          }
+        },
+        "consequences": {
+          "type": "choice",
+          "instructions": "`item.text` is one architecture decision record as JSON. Does it name the decision's consequences?",
+          "criteria": {
+            "positive and negative": "Names benefits and costs.",
+            "positive only": "Names only benefits. Fix: add the costs.",
+            "missing": "Names no consequence. Fix: add benefits and costs."
+          }
+        }
+      },
+      "verdict_rules": [
+        {
+          "any": {
+            "context": [
+              "background only",
+              "missing"
+            ],
+            "alternatives": [
+              "named only",
+              "none"
+            ],
+            "consequences": [
+              "positive only",
+              "missing"
+            ]
+          },
+          "verdict": "no"
+        },
+        {
+          "verdict": "yes"
+        }
+      ]
+    }
+  }
+}

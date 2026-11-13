@@ -1,8 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11,<3.12"
+# dependencies = ["pydantic>=2", "pyyaml", "sc-compose>=1.8.0,<2"]
+# ///
 """Read-only, injectable pre-claim gates for dev, sanity, and QA work, and the read-only stack-top lookup.
 
 Every command the gates run (bd, git, gh, validate-plan) is bounded by `ATM_BD_GATE_TIMEOUT_S` seconds
-(default 180; validate-plan gets at least 300). A command that exceeds it is `GATE_CANNOT_RUN` (exit 2) with
+(default 180, or `gate_timeout_s` of the repository configuration;
+the env var wins; validate-plan gets at least 300). A command that exceeds it is `GATE_CANNOT_RUN` (exit 2) with
 the command and the fix on stderr: retry once, or raise `ATM_BD_GATE_TIMEOUT_S` when the host is loaded.
 """
 from __future__ import annotations
@@ -19,8 +24,8 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "atm-beads/scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from command_timeout import DEFAULT_COMMAND_TIMEOUT, RAISE_FIX, TIMEOUT_ENV, command_timeout, import_timeout
-from stack_top import select_stack_top, stack_bead_id
+from command_timeout import DEFAULT_COMMAND_TIMEOUT, RAISE_FIX, TIMEOUT_ENV, command_timeout, import_timeout, repo_timeout
+from stack_top import StackTop, StackTopMismatch, select_confirmed_stack_top, select_passed_unlinked_top, stack_bead_id
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 IGNORED_STATUS_PATHS = (".beads.gate.lock", ".sc-compose/")
@@ -113,8 +118,9 @@ def descends(runner: Runner, lower: str, base: str, git: list[str] | None = None
     result = invoke(runner, ["git", *(git or []), "merge-base", "--is-ancestor", f"origin/{lower}", f"origin/{base}"], capture_output=True, text=True)
     if result.returncode > 1:
         if invoke(runner, ["git", *(git or []), "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{lower}"], capture_output=True, text=True).returncode:
-            for pr in run_json(runner, "gh", "pr", "list", "--head", lower, "--state", "merged", "--json", "mergeCommit"):
-                if invoke(runner, ["git", *(git or []), "merge-base", "--is-ancestor", str((pr.get("mergeCommit") or {}).get("oid")), f"origin/{base}"],
+            closed = run_json(runner, "gh", "api", f"repos/{{owner}}/{{repo}}/pulls?state=closed&head={{owner}}:{lower}&per_page=100")
+            for pr in (row for row in closed if row.get("merged_at")):
+                if invoke(runner, ["git", *(git or []), "merge-base", "--is-ancestor", str(pr.get("merge_commit_sha")), f"origin/{base}"],
                           capture_output=True, text=True).returncode == 0:
                     return True
         raise RuntimeError(result.stderr.strip() or "git merge-base failed")
@@ -125,11 +131,41 @@ def stack_top(runner: Runner, args: argparse.Namespace) -> str:
     rows = json.loads(run(runner, "bd", "show", stack_bead_id(args.root), "--json", cwd=str(PRIMARY)))
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
         raise ValueError("stack bead lookup must return exactly one bead object")
-    branch, _head = select_stack_top(
-        rows[0], args.pr_target,
-        lambda target: run(runner, "git", *git_dir(args), "rev-parse", f"origin/{target}"),
-    )
-    return branch
+    if rows[0].get("metadata") is not None and not isinstance(rows[0]["metadata"], dict):
+        raise ValueError("stack bead metadata must be an object or null")
+    meta = metadata(rows[0])
+    layers = meta.get("layers", [])
+    if not isinstance(layers, list):
+        raise ValueError("stack bead metadata.layers must be an array")
+    raw = run(runner, "gh", "api", "repos/{owner}/{repo}/stacks", "--paginate", "--jq",
+              ".[] | {number, base: .base.ref, prs: [.pull_requests[].number]}", cwd=args.worktree or None)
+    try:
+        decoded = json.loads(raw) if raw else []
+        stacks = decoded if isinstance(decoded, list) else [decoded]
+    except json.JSONDecodeError:
+        stacks = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    if any(not isinstance(stack, dict) or type(stack.get("number")) is not int or
+           not isinstance(stack.get("base"), str) or not isinstance(stack.get("prs"), list) or
+           any(type(pr) is not int for pr in stack["prs"]) for stack in stacks):
+        raise ValueError("hosted stack list has invalid fields")
+    known = {layer.get("pr") for layer in layers if isinstance(layer, dict)}
+    matches = [stack for stack in stacks if
+               (meta.get("stack_number") is not None and stack["number"] == meta["stack_number"] or
+                stack["base"] == meta.get("trunk", args.pr_target) and
+                (bool(known.intersection(stack["prs"])) or not layers and meta.get("stack_number") is None))]
+    if len(matches) > 1:
+        raise ValueError("ambiguous hosted stacks overlap the ledger")
+    hosted_prs = matches[0]["prs"] if matches else []
+    selected = select_confirmed_stack_top(layers, hosted_prs)
+    if isinstance(selected, StackTopMismatch):
+        raise ValueError(f"stack top mismatch: ledger {selected.ledger_top}; hosted {selected.hosted_top}")
+    if isinstance(selected, StackTop) and selected.branch is not None:
+        return selected.branch
+    passed = select_passed_unlinked_top(layers)
+    if passed is not None and passed.branch is not None:
+        return passed.branch
+    run(runner, "git", *git_dir(args), "rev-parse", f"origin/{args.pr_target}")
+    return args.pr_target
 
 
 def dev_gate(args: argparse.Namespace, runner: Runner, identity: str) -> str:
@@ -231,8 +267,10 @@ def main(argv: list[str] | None = None, runner: Runner = subprocess.run) -> int:
     parser.add_argument("--worktree", default="")
     parser.add_argument("--base", default="", help="accepted for compatibility; sanity does not check PR bases")
     args = parser.parse_args(argv)
+    global COMMAND_TIMEOUT, VALIDATE_PLAN_TIMEOUT
     try:
-        command_timeout()
+        COMMAND_TIMEOUT = repo_timeout()  # resolved per run, so a configuration change applies without a reload
+        VALIDATE_PLAN_TIMEOUT = max(MIN_VALIDATE_PLAN_TIMEOUT, COMMAND_TIMEOUT)
     except ValueError as exc:
         print(f"assignment-gates: {exc}", file=sys.stderr)
         print("GATE_CANNOT_RUN")

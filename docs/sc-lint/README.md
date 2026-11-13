@@ -162,14 +162,14 @@ That formula installs the CLI and the three analyzer binaries:
 - `sc-lint-portability`
 - `sc-lint-runtime`
 
-`randlee/tap/sc-lint-boundary` remains as a legacy formula for boundary-only
-callers; it is not the default install path. Release archives and Python
+`brew install randlee/tap/sc-lint` installs all four executables, including
+`sc-lint-boundary`; there is no separate `sc-lint-boundary` formula. Release archives and Python
 wheels are described in the offline
 [installation guide](../../docs-bundle/installation.md).
 
 ## Workspace crates
 
-All crates share the workspace version line (0.8.8). The primary product is
+All crates share the workspace version line (0.8.9). The primary product is
 `sc-lint`; the other crates are its analyzers and support libraries, and each
 crate README points back to `sc-lint`.
 

@@ -1,6 +1,6 @@
 ---
 name: dev-sanity
-version: 3.3.0
+version: 3.4.0
 description: Check pinned deliverables, reconcile independent reviewers, close, then hand off stacking.
 tools: Glob, Grep, LS, Read, BashOutput, Bash, Task
 model: sonnet
@@ -50,7 +50,7 @@ one sc-sanity-llm and one sc-sanity-jev child. Dispatch both families before
 waiting; neither child looks up beads. Keep raw success/failure envelopes.
 The Jev client owns API retries and lossless splitting of oversized evidence,
 including context and inline notes; never ask the coordinator to trim them.
-A terminal client error is retained verbatim. A failed LLM API spawn may be
+A terminal client error is retained verbatim; SANITY.JEV_REQUEST_TOO_LARGE is returned only after the client has already split losslessly and is never a reason to run an LLM or haiku check in the Jev slot. When a Jev child returns it, announce it once per run with `.claude/skills/atm-bd-orchestration/scripts/jev_client.py --announce --phase <phase> --error "<code>: <message>"` (the message names the request size) and keep that envelope in the deliverable's Jev slot; the selected LLM reply is the one already running beside it, never a new check. A failed LLM API spawn may be
 retried up to three times; retain the exhausted SANITY.LLM_API_FAILURE
 envelope. Stop a silent child after 30 minutes.
 
@@ -63,6 +63,11 @@ Do not include lint-wait time in a reviewer's epochs.
 For split Jev parts that disagree, retain every receipt, triage with a reason,
 and use wrap_jev_receipt.py --assignment <file> --reply <file> --final <file>
 with matching --findings. Never hand-write data.jev or edit receipts.
+
+When Jev and the LLM both return a valid result on iteration 1, a FAIL from
+either is the deliverable's FAIL; an LLM PASS never overrides a Jev FAIL.
+From iteration 2, triage the disagreement and name it in `reason`
+(requirement 57).
 
 Select one whole valid result per deliverable. `sanity-merge` accepts exactly these keys:
 `deliverable`, `llm`, `jev`, `selected`, `reason`, `rerun`, `llm_sha256`, `jev_sha256`. `rerun` is null or `{reviewer, context, reply}`.
@@ -132,8 +137,7 @@ Fix your malformed result; the phase lead fixes planning data; the hook maintain
 fixes schema/producer defects. Retry atm task close after correction.
 Bead writes are journaled in bd-cache and applied to bd by its drain; a write
 that cannot be applied is escalated to the phase lead by the bd-cache cron.
-Do not retry bead writes or start Cargo work. A bd-repair task assigned
-before this change is still finished with its repair runner, as assigned.
+Do not retry bead writes or start Cargo work.
 After successful PASS, prepare stack-input.json with
 checked_bead, branch, commit, pr_number, worktree_path, and stack_bead/budget/lead
 from current task/bead context (phase_lead supplies lead). This requires no

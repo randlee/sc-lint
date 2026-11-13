@@ -5,7 +5,7 @@ repository-policy problems. The Rust CLI is the product command surface; the
 separately published Python distribution provides bindings and repository
 helper modules.
 
-Current release: **0.8.8**.
+Current release: **0.8.9**.
 
 ## Install
 
@@ -18,7 +18,7 @@ brew install randlee/tap/sc-lint
 Release archives are available from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). The `sc-lint`
 crate page is [on crates.io](https://crates.io/crates/sc-lint); crate API docs
-are on [docs.rs](https://docs.rs/sc-lint/0.8.8).
+are on [docs.rs](https://docs.rs/sc-lint/0.8.9).
 
 The Python package is installed separately:
 
@@ -70,7 +70,7 @@ cargo run -p sc-lint-runtime -- analyze --root . --format text
 
 ## Analyzer rules
 
-The rule inventories below match the 0.8.8 analyzer crates. Full descriptions,
+The rule inventories below match the 0.8.9 analyzer crates. Full descriptions,
 configuration, and examples are in each linked crate guide.
 
 ### Boundary
@@ -84,7 +84,8 @@ manifests. Its rules are:
 - `SCB-CALLER-001`
 - `SCB-DEPENDENCY-001`–`SCB-DEPENDENCY-004`
 - `SCB-FEATURE-001`
-- `SCB-MANIFEST-001`–`SCB-MANIFEST-006`
+- `SCB-MANIFEST-001`–`SCB-MANIFEST-008`
+- `SCB-ENV-001`
 
 Boundary records must not contain an `[enforcement]` section; that section was
 removed from the record schema and causes inventory loading to fail. The
@@ -93,6 +94,8 @@ removed from the record schema and causes inventory loading to fail. The
 `[implementation].constructor` against the type's inherent `fn new`. See the
 [boundary guide](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-boundary/README.md)
 for checked values and remediation details.
+The optional `env_var_boundary` and `dependency_requirements` families enable
+the environment-read and dependency-requirement checks.
 
 ### Portability
 
@@ -105,14 +108,16 @@ checks cross-platform paths, environment access, Unix shell assumptions, and
 ### Runtime
 
 [`sc-lint-runtime`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-runtime/README.md)
-checks blocking waits, sleep calls, `block_on`, and mutex guards held across
-`.await`:
+checks blocking waits, sleep calls, `block_on`, mutex guards held across
+`.await`, and opted-in panicking calls:
 
-- `SCB-RUNTIME-001`–`SCB-RUNTIME-007`
+- `SCB-RUNTIME-001`–`SCB-RUNTIME-008`
+
+Configure `panic_rule_packages` to opt workspace packages into rule 008.
 
 ## Packages
 
-The workspace version is **0.8.8**. The `sc-lint` CLI composes the analyzer
+The workspace version is **0.8.9**. The `sc-lint` CLI composes the analyzer
 crates; the support crates are reusable building blocks.
 
 | Package | Role |

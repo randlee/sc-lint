@@ -87,6 +87,9 @@ changing a background channel-worker contract or registry inquiry helper.
   publication.
 - Complete readiness preflight before a `main` merge and final preflight on
   the exact `main` commit before publishing, as the shared policy requires.
+- Generate and commit the passing integration report for the release version
+  with `just integration-evidence`; preflight and the final Release gate reject
+  a missing or non-passing report.
 - Under explicit publisher assignment, dispatch `release-candidate.yml` to
   establish `release-candidate-vX.Y.Z` from `develop` before creating the
   release branch. Do not create that tag locally. The final gate requires the

@@ -84,3 +84,136 @@ Rule IDs and this analyzer's JSON output are stable consumer contracts
   common analyzer configuration. The CLI exits 10 for unsuppressed findings,
   0 for test/exempt/allowed fixtures, and non-zero for malformed allowances.
   Tests drive source/AST inputs and never execute the prohibited operations.
+
+## REQ-RUNTIME-002: REQ-RUNTIME-002 panic rule and adoption
+
+**Status:** Accepted  
+
+### Requirement Statement
+
+Definitions: REQ-RUNTIME-002 is this requirement's sc-lint identifier. `SCB-RUNTIME-008` is the runtime analyzer's panicking-call rule. Production code is source that the existing runtime test-scope rules classify as non-test. An opted-in package is a Cargo package listed in the repository-root configuration. The ADR-022 amendment is the phase-q ADR-022 amendment. The package list is the list of opted-in packages in the repository-root configuration. An analyzer's catalog-owned configuration keys are the analyzer-specific configuration keys that the analyzer publishes in its rule catalog. The generated runtime CLI references are the Markdown and HTML CLI reference documents for `sc-lint-runtime`. The generated runtime CLI references stay consistent with runtime CLI help when they match the runtime CLI help output.
+
+Status: ACCEPTED by Rand, 2026-11-12 ("approved"). The package opt-in is an exception to REQ-RUNTIME-001's fail-by-default rule for new rules; the accepted phase-q ADR-022 amendment specifies it. A recorded baseline is provisionally outside phase q pending Rand; no request for a baseline is on record.
+
+**MUST statements:**
+
+- `SCB-RUNTIME-008` MUST detect `.unwrap()`, `.expect(...)`, `panic!`, `unreachable!`, `todo!` and `unimplemented!` in production code of opted-in packages.
+- `SCB-RUNTIME-008` MUST exempt test code under the existing runtime test-scope rules.
+- A separate out-of-line test file MUST carry its own `#![cfg(test)]` to be exempt through that file's test marker.
+- Suppression of `SCB-RUNTIME-008` MUST use the existing ADR-022 function/method allowance.
+- An ADR-022 function/method allowance that suppresses `SCB-RUNTIME-008` MUST carry a nonblank reason.
+- A nested function MUST carry its own allowance to be suppressed.
+- The runtime analyzer MUST validate the package list through its catalog-owned configuration keys.
+- Shared analyzer configuration MUST remain the single source of the package list.
+- Runtime CLI help MUST include `SCB-RUNTIME-008`.
+- The generated runtime CLI references MUST include `SCB-RUNTIME-008`.
+- The generated runtime CLI references MUST stay consistent with runtime CLI help.
+
+**MUST NOT statements:**
+
+- `SCB-RUNTIME-008` MUST NOT run in Cargo packages that the repository-root configuration does not list.
+- A parent-only `cfg(test)` attribute MUST NOT propagate into an out-of-line module file.
+- `SCB-RUNTIME-008` MUST NOT claim macro expansion.
+- `SCB-RUNTIME-008` MUST NOT claim type-aware proof.
+- A phase-q sprint MUST NOT claim this requirement as accepted before Rand accepts it and the ADR-022 amendment.
+
+### Rationale
+
+Issue #931 asks for runtime detection of production panicking calls. Limiting the rule to opted-in packages leaves every other package and rule on its current defaults.
+
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] CLI fixture: in an opted-in package, each of the six call forms in production code with no allowance yields an `SCB-RUNTIME-008` finding in the `sc-lint lint sc-runtime` JSON report.
+- [ ] CLI fixture: the same source in a package not listed in the repository-root configuration yields no `SCB-RUNTIME-008` finding.
+- [ ] CLI fixture: the same calls in code that the existing runtime test-scope rules classify as test code yield no `SCB-RUNTIME-008` finding.
+- [ ] CLI fixture: an out-of-line module file with its own `#![cfg(test)]` yields no finding. The same file without the marker, declared by a parent `#[cfg(test)] mod x;` in a production target, yields findings.
+- [ ] CLI fixture: a function with `#[sc_lint(allow(SCB-RUNTIME-008), reason = "...")]` yields no finding in its body. A function nested inside it, without its own allowance, yields a finding.
+- [ ] CLI fixture: an allowance for `SCB-RUNTIME-008` with a blank reason is reported as an error and does not suppress the finding.
+- [ ] Configuration test: an invalid package list is rejected by the shared analyzer configuration loader through the runtime catalog's own configuration keys.
+- [ ] Documentation check: `sc-lint-runtime --help` and the generated CLI references both list `SCB-RUNTIME-008`, and the generated reference matches the help output.
+- [ ] Documentation review: the rule's documentation states that macro expansion and type-aware proof are not claimed.
+- [ ] Phase-q review: no phase-q deliverable implements a recorded baseline unless Rand has decided to include one.
+- [x] Status check: Rand accepted this record and the phase-q ADR-022 amendment on 2026-11-12.
+
+### Dependencies
+
+**Related:**
+
+- REQ-RUNTIME-003
+- the phase-q ADR-022 amendment
+
+### Test Strategy
+
+**Test Types:**
+
+- CLI integration test
+- Configuration unit test
+- Documentation check
+
+## REQ-RUNTIME-003: REQ-RUNTIME-003 example target coverage
+
+**Status:** Accepted  
+
+### Requirement Statement
+
+Definitions: REQ-RUNTIME-003 is this requirement's sc-lint identifier. Example source is the source of a supported Cargo example target, including its nested modules. Rules 001 to 008 are `SCB-RUNTIME-001` to `SCB-RUNTIME-008`. The runtime analyzer is `sc-lint-runtime`, the analyzer run by `sc-lint lint sc-runtime`. An example-only file is a file that an example target contains and no lib or bin target contains. A target-aware context records, for each source file, its package, its Cargo target and that target's kind (lib, bin, example, test, bench, build script or other). A crate-private context is visible only inside the runtime analyzer crate. A separate context is one apart from the existing source-discovery entry points. The 003/004 sleep scope is the runtime analyzer's selection of the files that rules 003 and 004 visit. A file's target classification is the target kind that the target-aware context records for that file. A file is attributed deterministically when repeated runs over the same workspace attribute it to the same example target. Shared source discovery is the source-file discovery that the shared analyzer support library provides to the boundary, portability and runtime analyzers. The existing example exclusion is that shared source discovery walks only each package's `src/` and `tests/` directories, so it does not discover example source outside them. The existing source-discovery entry points are the shared scanner's public functions `discover_source_files` and `discover_source_files_with_metadata`. Their defaults are their current behaviour of discovering Rust files only under each workspace package's `src/` and `tests/` directories.
+
+Status: ACCEPTED by Rand, 2026-11-12 ("approved").
+
+**MUST statements:**
+
+- The runtime analyzer MUST analyze supported Cargo example source for rule 001.
+- The runtime analyzer MUST analyze supported Cargo example source for rule 002.
+- The runtime analyzer MUST analyze supported Cargo example source for rule 005.
+- The runtime analyzer MUST analyze supported Cargo example source for rule 006.
+- The runtime analyzer MUST analyze supported Cargo example source for rule 007.
+- The runtime analyzer MUST apply rule 008 to example source once rule 008 is integrated and the example's package is opted in.
+- The runtime README MUST document the 003/004 example exclusion.
+- The runtime rule catalog MUST document the 003/004 example exclusion.
+- The runtime analyzer MUST discover example source through a separate crate-private target-aware context.
+- The 003/004 sleep scope MUST use that target classification, including for nested example modules.
+- Each example-only file MUST be attributed deterministically to its example target.
+
+**MUST NOT statements:**
+
+- Rules 003 and 004 MUST NOT report findings in example source.
+- Shared source discovery MUST NOT change boundary's or portability's existing example exclusion unless a separate approved requirement changes it.
+- Existing source-discovery entry points MUST NOT change their signatures.
+- Existing source-discovery entry points MUST NOT change their defaults.
+- Existing lib/bin target attribution MUST NOT change.
+
+### Rationale
+
+Issue #935: the shared source scanner walks only package `src/` and `tests/`, so example source outside those directories is not analyzed while `scanned_crates` still counts its package. Rules 003 and 004 deliberately exclude examples. No analyzer report schema change is required.
+
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] CLI fixture: an example-only `Condvar::wait` yields an `SCB-RUNTIME-001` finding with the example path. Fixtures for rules 002, 005, 006 and 007 in example source each yield that rule's finding.
+- [ ] CLI fixture (after rule 008 is integrated): an opted-in package's example source yields `SCB-RUNTIME-008` findings, and a non-opted-in package's example source yields none.
+- [ ] CLI fixture: blocking sleep and `sleep_until` in example source of a Tokio package, including a nested example module, yield no `SCB-RUNTIME-003` or `SCB-RUNTIME-004` finding.
+- [ ] Documentation review: the runtime README and rule catalog state the 003/004 example exclusion.
+- [ ] Schema test: the runtime report validates against the existing analyzer report schema artifacts, unchanged.
+- [ ] Regression tests: boundary and portability results on a workspace with example targets are the same before and after the change.
+- [ ] API check: the signatures and default behaviour of the existing source-discovery entry points are unchanged, and the example-discovery context is crate-private to the runtime analyzer.
+- [ ] Regression test: findings in existing lib/bin source keep the same target attribution as before the change.
+- [ ] Determinism test: repeated runs attribute each example-only file to the same example target.
+- [x] Status check: Rand accepted this record on 2026-11-12.
+
+### Dependencies
+
+**Related:**
+
+- REQ-RUNTIME-002
+- the phase-q ADR-022 amendment
+
+### Test Strategy
+
+**Test Types:**
+
+- CLI integration test
+- Cross-analyzer regression test
+- Schema test

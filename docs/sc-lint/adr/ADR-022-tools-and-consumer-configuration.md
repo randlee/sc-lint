@@ -195,3 +195,66 @@ this amendment adds `sc-lint-runtime` as a consumer of the directive model.
 4. **Difference from `PORT-010`.** The runtime analyzer omits suppressed
    sites from its findings; the reason stays in source. It does not list
    honoured allowances in its report as decision 4 describes for `PORT-010`.
+
+
+## the phase-q ADR-022 amendment: ADR-022 amendment: phase q panic-rule package opt-in
+
+**Status:** Accepted  
+
+### Related Documents
+
+**Requirements:**
+
+- REQ-RUNTIME-002
+
+### Context
+
+Status: ACCEPTED by Rand, 2026-11-12 ("approved"). REQ-RUNTIME-001 says new runtime rules fail by default. The problem is that issue #931 asks for runtime panic detection with per-crate opt-in, while REQ-RUNTIME-001's fail-by-default rule would apply `SCB-RUNTIME-008` to every package. REQ-RUNTIME-002 makes `SCB-RUNTIME-008` apply only to opted-in Cargo packages.
+
+### Decision
+
+The key `panic_rule_packages` in `[tool.sc-lint.analyzers.runtime]` of the repository-root `sc-lint.toml` opts named Cargo packages into `SCB-RUNTIME-008`, for example `panic_rule_packages = ["worker"]`.
+
+**Key Principles:**
+
+- An absent or empty `panic_rule_packages` opts in no package.
+- An opted-in package includes its supported production lib, bin and example targets.
+- An unknown or duplicate package name is a typed configuration error.
+- `exclude_rules`, `rule_filter`, `fail_rules` and `exclude_paths_by_rule` keep their documented effects.
+- A site is evaluated only when both the package opt-in and the common rule/path selection allow it.
+- `fail_rules` decides whether a remaining finding fails.
+
+### Rationale
+
+A named package list in the existing runtime analyzer table lets `SCB-RUNTIME-008` be adopted per package without changing other rules' defaults.
+
+**Benefits:**
+
+- Packages not listed see no change from `SCB-RUNTIME-008`.
+
+### Consequences
+
+**Negative:**
+
+- A Cargo package not listed in `panic_rule_packages` gets no `SCB-RUNTIME-008` detection.
+- A repository must list each package in `panic_rule_packages` in the repository-root `sc-lint.toml` before `SCB-RUNTIME-008` checks it.
+
+**Neutral:**
+
+- `SCB-RUNTIME-008` has a narrow exception to REQ-RUNTIME-001's fail-by-default wording.
+- Other rules keep their current defaults.
+- Existing ADR-022 function/method site allowances are unchanged.
+
+### Alternatives Considered
+
+#### Alternative 1: Global fail-by-default
+
+**Description:** `SCB-RUNTIME-008` fails by default in every package, as REQ-RUNTIME-001 specifies for new runtime rules.
+
+**Why Rejected:** Issue #931 asks for runtime panic detection with per-crate opt-in, and REQ-RUNTIME-002 limits the rule to opted-in packages.
+
+#### Alternative 2: Repository panic baseline
+
+**Description:** An optional repository baseline file `.sc-lint/runtime-panic-baseline.json`, refreshed by `sc-lint lint sc-runtime --update-panic-baseline`, records existing `SCB-RUNTIME-008` findings.
+
+**Why Rejected:** Not rejected: its disposition is deferred from phase q pending Rand's decision, and no request for a baseline is on record (REQ-RUNTIME-002). It would be a limited exception to ADR-022's rule that there is no repository-wide suppression switch.

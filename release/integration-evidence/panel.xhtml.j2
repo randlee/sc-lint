@@ -1,0 +1,30 @@
+---
+required_variables:
+  - version
+  - commit
+  - timestamp
+  - counts.passed
+  - counts.failed
+  - counts.error
+  - counts.skipped
+  - counts.deselected
+  - status
+  - source_status
+  - exit_code
+  - tests
+  - tests.name
+  - tests.outcome
+  - tests.detail
+metadata:
+  purpose: Integration test evidence panel
+---
+<section xmlns="http://www.w3.org/1999/xhtml" class="integration-panel">
+  <h2>Integration tests: v{{ version }}</h2>
+  <p>Commit <code>{{ commit }}</code>; generated {{ timestamp }}</p>
+  <p>Working tree changes at start: {{ source_status | length }} (see results JSON).</p>
+  <p>Status: {{ status }} (command exit {{ exit_code }})</p>
+  <p>Passed: {{ counts.passed }}; failed: {{ counts.failed }}; errors: {{ counts.error }}; skipped: {{ counts.skipped }}; deselected: {{ counts.deselected }}</p>
+  <table><thead><tr><th>Test</th><th>Outcome</th><th>Detail</th></tr></thead><tbody>
+  {% for test in tests %}<tr><td>{{ test.name }}</td><td>{{ test.outcome }}</td><td>{{ test.detail }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>

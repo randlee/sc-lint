@@ -95,6 +95,8 @@ Before sending a synthetic-evaluation receipt, verify all four items:
   release assignment from the named coordinator.
 - Run `Release Preflight` before the root release workflow. It is the sole
   authority that permits the root release workflow to start.
+- Require a committed passing integration report for the release version;
+  `just integration-evidence` generates it, and preflight and Release enforce it.
 - Run all independent preflight checks and collect their sanitized results
   before denying release authorization; fail closed, but do not fail fast.
 - A candidate-tag validation failure (a non-normalized tag, or one that does

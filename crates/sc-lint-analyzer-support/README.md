@@ -5,8 +5,8 @@
 analyzer or command. See the
 [sc-lint repository](https://github.com/randlee/sc-lint).
 
-Current crate release: **0.8.8**. API documentation is on
-[docs.rs](https://docs.rs/sc-lint-analyzer-support/0.8.8).
+Current crate release: **0.8.9**. API documentation is on
+[docs.rs](https://docs.rs/sc-lint-analyzer-support/0.8.9).
 
 It provides shared AST source discovery, scope
 classification, stable text-report rendering, and a rule-neutral parser for

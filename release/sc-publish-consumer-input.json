@@ -225,18 +225,6 @@
           "test_command": "--version",
           "test_output": "sc-lint",
           "release_track": "stable"
-        },
-        {
-          "path": "Formula/sc-lint-boundary.rb",
-          "template": "release/homebrew/formula.rb.j2",
-          "class": "ScLintBoundary",
-          "binaries": [
-            "sc-lint-boundary"
-          ],
-          "test_binary": "sc-lint-boundary",
-          "test_command": "--version",
-          "test_output": "sc-lint-boundary",
-          "release_track": "stable"
         }
       ],
       "assets": [

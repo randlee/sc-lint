@@ -25,6 +25,8 @@ CI orchestration.
 
 ## Runtime rules
 
+Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
+
 - `SCB-RUNTIME-001`: Bare `Condvar::wait(...)` in production code; use a
   timeout and inspect the result.
 - `SCB-RUNTIME-002`: Discarded `Condvar::wait_timeout*` result; inspect the
@@ -39,6 +41,10 @@ CI orchestration.
   `futures::executor::block_on`, all non-test source.
 - `SCB-RUNTIME-007`: A bound std Mutex guard live at `.await` in an async fn
   or async block, all non-test source.
+- `SCB-RUNTIME-008`: Production `.unwrap()`, `.expect(...)`, `panic!`,
+  `unreachable!`, `todo!`, and `unimplemented!` in opted-in packages.
+  Matching is syntactic and does not depend on receiver type. Macro bodies
+  are not expanded, and type-aware proof is not performed.
 
 Rules 005–007 do not require a declared Tokio dependency. `yield_now` is legal.
 Test files/targets and inline `cfg(test)`, `#[test]` and framework test
@@ -112,7 +118,7 @@ fn checks_behavior() {
 ```
 
 The file-level marker makes the whole file test code for every runtime rule,
-`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`SCB-RUNTIME-001` through `SCB-RUNTIME-008`, exactly like a file under
 `tests/`. The parent module's `cfg(test)` attribute alone does not propagate
 into it.
 

@@ -5,18 +5,20 @@
 concurrency checks. The `sc-runtime` name is the analyzer target accepted by
 `sc-lint lint`.
 
-Current crate release: **0.8.8**. Install the product CLI with
+Current crate release: **0.8.9**. Install the product CLI with
 `brew install randlee/tap/sc-lint` or from
 [GitHub Releases](https://github.com/randlee/sc-lint/releases). To use this
 crate as a Rust library, run `cargo add sc-lint-runtime@0.8`. See the
 [repository](https://github.com/randlee/sc-lint) and
-[API documentation](https://docs.rs/sc-lint-runtime/0.8.8).
+[API documentation](https://docs.rs/sc-lint-runtime/0.8.9).
 
 ## Purpose
 
 Use `sc-runtime` to detect unsafe wait patterns in production Rust code.
 
 Current rule families:
+
+Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
 
 - `SCB-RUNTIME-001`
   - bare `Condvar::wait(...)` in production code
@@ -37,6 +39,20 @@ Current rule families:
 - `SCB-RUNTIME-007`
   - a bound `std::sync::Mutex` guard live at `.await` inside an async function
     or async block, in all non-test source
+- `SCB-RUNTIME-008`
+  - `.unwrap()`, `.expect(...)`, `panic!`, `unreachable!`, `todo!`, and
+    `unimplemented!` in production source of opted-in workspace packages
+
+Enable rule 008 for selected workspace package names in `sc-lint.toml`:
+
+```toml
+[tool.sc-lint.analyzers.runtime]
+panic_rule_packages = ["my-package"]
+```
+
+The list defaults to empty. Matching is syntactic: methods with these names
+are detected regardless of receiver type; macro bodies are not expanded, and
+the analyzer does not perform type-aware proof.
 
 Rules 005–007 do not require a declared Tokio dependency. `yield_now` remains
 legal. Prefer event-driven synchronization; a timer is not a replacement for
@@ -222,7 +238,7 @@ fn checks_behavior() {
 ```
 
 The file-level marker makes the whole file test code for every runtime rule,
-`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`SCB-RUNTIME-001` through `SCB-RUNTIME-008`, exactly like a file under
 `tests/`. A parent module's `cfg(test)` attribute alone does not propagate into
 the separate file.
 

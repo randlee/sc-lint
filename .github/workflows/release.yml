@@ -115,6 +115,12 @@ jobs:
           ALREADY_PUBLISHED_CHANNELS: ${{ inputs.already_published_channels }}
         run: .github/scripts/release_gate.sh final origin/main "release-candidate-${{ steps.meta.outputs.release_tag }}" '${{ steps.meta.outputs.release_version }}' "${RELEASE_ARTIFACT_MANIFEST}" '${{ steps.build_plan.outputs.workspace_toml }}' "${ALREADY_PUBLISHED_CHANNELS}"
 
+      - name: Require passing integration evidence
+        env:
+          RELEASE_VERSION: ${{ steps.meta.outputs.release_version }}
+          RELEASE_SHA: ${{ steps.release_gate.outputs.release_sha }}
+        run: python3 .github/scripts/integration_evidence_gate.py --version "$RELEASE_VERSION" --ref "$RELEASE_SHA" --candidate-ref "release-candidate-v${RELEASE_VERSION}"
+
       - name: Verify npm source at resolved release commit
         env:
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}

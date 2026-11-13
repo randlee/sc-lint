@@ -1,0 +1,98 @@
+{
+  "schema": "judge-jev/quality-tree/1",
+  "id": "quality-nfr",
+  "kind": "nfr",
+  "version": 1,
+  "approved": true,
+  "note": "wave-1 wording approved by Rand Lee, 2026-11-08",
+  "start": "wave-1",
+  "nodes": {
+    "wave-1": {
+      "per": "statement",
+      "statements": "requirement_statement.statements",
+      "modals": [
+        "Must",
+        "MustNot"
+      ],
+      "questions": {
+        "obligations": {
+          "type": "choice",
+          "instructions": "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. How many independent obligations does this statement impose?",
+          "criteria": {
+            "1": "One obligation.",
+            "2": "Two independent obligations.",
+            "3": "Three independent obligations.",
+            "4+": "Four or more independent obligations."
+          }
+        },
+        "joined_by": {
+          "type": "choice",
+          "instructions": "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What joins its obligations?",
+          "criteria": {
+            "none": "One obligation; nothing is joined.",
+            "and-list": "A list of items joined by and or commas. Fix: split into one statement per item.",
+            "condition+obligation": "A condition (when, if, unless) plus one obligation. Acceptable: a condition is not a second obligation.",
+            "alternatives": "Alternatives joined by or. Fix: split, or state the choice.",
+            "obligation+rationale": "An obligation plus its reason or purpose. Fix: move the rationale to Rationale."
+          }
+        },
+        "term": {
+          "type": "choice",
+          "instructions": "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What kind of term in this statement is unclear?",
+          "criteria": {
+            "none": "Every term is common usage or defined in the record.",
+            "project term defined in a linked record": "A project term defined in a record this one links. Acceptable.",
+            "project term defined nowhere": "A project term defined neither here nor in a linked record. Fix: define it or link the record.",
+            "vague qualifier": "A qualifier such as fast, clear or robust with no measure. Fix: replace it with a measure.",
+            "undefined acronym": "An acronym that is never expanded or defined. Fix: define the acronym."
+          }
+        },
+        "check": {
+          "type": "choice",
+          "instructions": "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the non-functional requirement record in `record`. Judge only `statement`; use `record` as context. What would check this statement?",
+          "criteria": {
+            "unit test": "A unit or integration test.",
+            "CLI run": "Running a command and reading its output or exit code.",
+            "inspection or grep": "Reading or searching files or output.",
+            "needs a measure": "A check exists only once a number is given. Fix: add a threshold.",
+            "none": "Nothing could check it. Fix: rewrite as an outcome."
+          }
+        }
+      },
+      "verdict_rules": [
+        {
+          "all": {
+            "obligations": [
+              "2",
+              "3",
+              "4+"
+            ],
+            "joined_by": [
+              "and-list",
+              "alternatives",
+              "obligation+rationale"
+            ]
+          },
+          "verdict": "no"
+        },
+        {
+          "any": {
+            "term": [
+              "project term defined nowhere",
+              "vague qualifier",
+              "undefined acronym"
+            ],
+            "check": [
+              "needs a measure",
+              "none"
+            ]
+          },
+          "verdict": "no"
+        },
+        {
+          "verdict": "yes"
+        }
+      ]
+    }
+  }
+}

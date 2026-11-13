@@ -762,7 +762,7 @@ pub(crate) fn run_ci_with(
     })))
 }
 
-fn lint_profile_plan(
+pub(crate) fn lint_profile_plan(
     repo_root: &Path,
     profile: LintProfile,
     xwin_available: bool,
@@ -783,15 +783,17 @@ fn lint_profile_plan(
 }
 
 fn fast_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
-    let mut steps = vec![cargo_step("fmt", "lint", ["fmt", "--all", "--check"])];
+    let mut steps = vec![
+        version_check_step(repo_root),
+        cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
+    ];
     steps.extend(source_check_steps(repo_root));
     steps
 }
 
-/// Python source checks that never touch the cargo build directory.
+/// Python source checks that run in parallel and do not touch the cargo build directory.
 fn source_check_steps(repo_root: &Path) -> Vec<StepPlan> {
     [
-        ("version", "sc_lint.check_version_sync"),
         ("manifests", "sc_lint.lint_manifests"),
         ("spell", "sc_lint.lint_codespell"),
         ("pytests", "sc_lint.run_pytests"),
@@ -801,10 +803,25 @@ fn source_check_steps(repo_root: &Path) -> Vec<StepPlan> {
     .collect()
 }
 
+/// Reads Cargo.lock, so it must run first on the serialized Cargo lane.
+fn version_check_step(repo_root: &Path) -> StepPlan {
+    python_step(
+        repo_root,
+        "version",
+        "lint",
+        Lane::Cargo,
+        "sc_lint.check_version_sync",
+    )
+}
+
 /// The steps shared by the Full and CI profiles, in plan order.
 fn gate_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
     let mut steps = vec![
+        version_check_step(repo_root),
         cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
+    ];
+    steps.extend(source_check_steps(repo_root));
+    steps.extend([
         cargo_step(
             "clippy",
             "lint",
@@ -831,8 +848,7 @@ fn gate_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
             Lane::Cargo,
             "sc_lint.lint_cargo_shear",
         ),
-    ];
-    steps.extend(source_check_steps(repo_root));
+    ]);
     steps.extend(
         ["sc-boundary", "sc-portability", "sc-runtime"]
             .map(|name| product_step(name, "lint", Lane::Cargo, ["lint", name])),

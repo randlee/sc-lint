@@ -33,6 +33,7 @@ impl BoundaryDispatchError {
             Self::Analysis(error) => match *error {
                 BoundaryBackendError::InventoryLoad { .. }
                 | BoundaryBackendError::ManifestPolicyAnalysis { .. }
+                | BoundaryBackendError::ArchivePathEscape { .. }
                 | BoundaryBackendError::PackagePolicyAnalysis { .. } => {
                     CliError::config(format!("{tool} rejected repository configuration"))
                         .with_source(error)
@@ -553,6 +554,27 @@ mod tests {
         assert_eq!(
             cli_error.details.get("analyzer_config_code"),
             Some(&serde_json::json!("ANALYZER_CONFIG.WRONG_TYPE"))
+        );
+    }
+
+    #[test]
+    fn archive_path_escape_maps_to_config_exit_three_and_names_archive() {
+        let error = sc_lint_boundary::BoundaryError::ArchivePathEscape {
+            archive: "target/package/example.crate".into(),
+            entry: "../Cargo.toml".into(),
+        };
+        let cli_error = BoundaryDispatchError::Analysis(Box::new(error))
+            .into_cli_error(consts::TOOL_BOUNDARY, None);
+
+        assert_eq!(cli_error.kind, CliErrorKind::Config);
+        assert_eq!(cli_error.exit_code(), 3);
+        assert!(
+            cli_error
+                .cause
+                .as_deref()
+                .is_some_and(|cause| { cause.contains("target/package/example.crate") }),
+            "{:?}",
+            cli_error.cause
         );
     }
 

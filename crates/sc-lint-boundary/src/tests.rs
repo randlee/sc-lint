@@ -260,6 +260,9 @@ fn catalog_lists_every_rule_id() {
         ScbManifest004,
         ScbManifest005,
         ScbManifest006,
+        ScbEnv001,
+        ScbManifest007,
+        ScbManifest008,
     ];
     for id in every {
         match id {
@@ -267,7 +270,7 @@ fn catalog_lists_every_rule_id() {
             | ScbBoundary003 | ScbBoundary004 | ScbBoundary005 | ScbCaller001
             | ScbDependency001 | ScbDependency002 | ScbDependency003 | ScbDependency004
             | ScbFeature001 | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
-            | ScbManifest005 | ScbManifest006 => {}
+            | ScbManifest005 | ScbManifest006 | ScbEnv001 | ScbManifest007 | ScbManifest008 => {}
         }
     }
     assert_eq!(
@@ -277,6 +280,57 @@ fn catalog_lists_every_rule_id() {
             .map(|rule| rule.as_str())
             .collect::<Vec<_>>(),
         every.map(RuleId::as_str).to_vec()
+    );
+}
+
+#[test]
+fn archive_path_escape_error_names_archive_and_entry() {
+    let error = BoundaryError::ArchivePathEscape {
+        archive: PathBuf::from("target/package/example.crate"),
+        entry: PathBuf::from("../Cargo.toml"),
+    };
+
+    assert_eq!(
+        error.to_string(),
+        "archive entry `../Cargo.toml` escapes archive `target/package/example.crate`"
+    );
+}
+
+#[test]
+fn q10_analyzer_entry_points_are_inactive_without_policy_entries() {
+    let fixture = TempDir::new().expect("workspace fixture");
+    fs::write(
+        fixture.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\"app\"]\nresolver = \"2\"\n",
+    )
+    .expect("write workspace manifest");
+    fs::create_dir_all(fixture.path().join("app/src")).expect("create app source");
+    fs::write(
+        fixture.path().join("app/Cargo.toml"),
+        "[package]\nname = \"app\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .expect("write app manifest");
+    fs::write(fixture.path().join("app/src/lib.rs"), "pub struct App;\n")
+        .expect("write app source");
+    let metadata = graph::load_metadata(fixture.path()).expect("load workspace metadata");
+
+    assert!(
+        env_var_policy::analyze(
+            fixture.path(),
+            &metadata,
+            &env_var_policy::EnvVarBoundaryConfig::default(),
+        )
+        .expect("inactive env-var analysis")
+        .is_empty()
+    );
+    assert!(
+        manifest_requirements::analyze(
+            fixture.path(),
+            &metadata,
+            &manifest_requirements::DependencyRequirementsConfig::default(),
+        )
+        .expect("inactive dependency requirements analysis")
+        .is_empty()
     );
 }
 
@@ -328,7 +382,7 @@ fn malformed_manifest_owner_has_no_repository_relative_path() {
         node_ids: Vec::new(),
     };
 
-    assert!(manifest_finding_path(&finding).is_none());
+    assert!(finding_path(&finding).is_none());
 }
 
 #[test]
