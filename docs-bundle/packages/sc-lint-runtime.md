@@ -116,7 +116,7 @@ fn checks_behavior() {
 ```
 
 The file-level marker makes the whole file test code for every runtime rule,
-`SCB-RUNTIME-001` through `SCB-RUNTIME-007`, exactly like a file under
+`SCB-RUNTIME-001` through `SCB-RUNTIME-008`, exactly like a file under
 `tests/`. The parent module's `cfg(test)` attribute alone does not propagate
 into it.
 
