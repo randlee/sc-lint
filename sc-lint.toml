@@ -1,5 +1,5 @@
 [tool.sc-lint]
-minimum_version = "0.8.8"
+minimum_version = "0.8.9"
 
 # The root repository is the executable model for consumers: public recipes
 # call installed-product command shapes, while these profiles retain every

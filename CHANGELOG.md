@@ -4,6 +4,29 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.9]
+
+### Added
+
+- `SCB-RUNTIME-008` detects panicking calls in packages opted in with
+  `panic_rule_packages` (REQ-RUNTIME-002).
+- `SCB-ENV-001` checks environment-variable reads with the `env_var_boundary`
+  policy family (REQ-SCB-028, #133).
+- `SCB-MANIFEST-007` and `SCB-MANIFEST-008` check dependency requirements
+  using the `dependency_requirements` policy family (REQ-SCB-029, #936).
+
+### Changed
+
+- Runtime rules analyze supported Cargo example targets, including nested
+  modules; rules 003 and 004 retain their example exclusions (REQ-RUNTIME-003).
+- Archive entries that escape the archive root produce a configuration error
+  (exit 3).
+
+### Removed
+
+- Retired the standalone `sc-lint-boundary` Homebrew formula; install
+  `randlee/tap/sc-lint` for the product and its analyzers (#153).
+
 ## [0.8.8]
 
 ### Added
