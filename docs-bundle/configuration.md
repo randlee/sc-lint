@@ -161,13 +161,13 @@ Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
   other findings only report. Absent, the analyzer's built-in set applies.
 - `exclude_paths` (globs relative to the workspace root; `**` spans
   directories) drops findings in matching files. In Boundary, only
-  `SCB-MANIFEST-001` through `SCB-MANIFEST-006` carry a finding path;
+  `SCB-MANIFEST-001` through `SCB-MANIFEST-008` and `SCB-ENV-001` carry a finding path;
   `SCB-CYCLE-001`, `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
   their nodes, and are excluded when any such file matches.
 - `exclude_paths_by_rule` maps exact rule ids to arrays of workspace-relative
   globs. It drops only findings from that rule at matching paths; other rules
   in the same file still run. Boundary supports `SCB-MANIFEST-001` through
-  `SCB-MANIFEST-006`, `SCB-CYCLE-001`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
+  `SCB-MANIFEST-008`, `SCB-ENV-001`, `SCB-CYCLE-001`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
   other Boundary rules are configuration errors naming the rule because their
   findings have no source path; configuration loading rejects them before
   analysis. Remove the entry or choose a rule with source paths.
@@ -181,13 +181,14 @@ Windows module paths, with a review reason, for equivalent implementations
 whose names differ.
 Only the configured pair and its enclosed private implementation receive the
 adapter treatment; separately Unix-gated public items remain subject to parity
-checks. Boundary accepts the optional manifest dependency policy families
-`manifest_dependency_allowlists`, `global_dependency_ownership`, and
-`manifest_section_rules`; these are released consumer-owned configuration,
-while atm-core retains its record-lock parity checks for the allowlist fields.
-Its package-edge policy is supplied by its inventory. Runtime has no
-analyzer-specific keys. Any unknown
-key, unknown rule, or wrong value type is a configuration error (exit 3)
+checks. Boundary accepts the optional policy families
+`manifest_dependency_allowlists`, `global_dependency_ownership`,
+`manifest_section_rules`, `env_var_boundary`, and `dependency_requirements`.
+These are consumer-owned configuration; atm-core retains its record-lock parity
+checks for the allowlist fields. Boundary package-edge policy is supplied by
+its inventory. Runtime accepts `panic_rule_packages` to opt workspace packages
+into `SCB-RUNTIME-008`. Any unknown key, unknown rule, or wrong value type is
+a configuration error (exit 3)
 identifying the analyzer and field.
 
 ```toml
@@ -195,6 +196,21 @@ identifying the analyzer and field.
 fail_rules = ["PORT-001", "PORT-002"]
 exclude_paths = ["tests/fixtures/**"]
 unix_path_prefixes = ["/opt/"]
+
+[[tool.sc-lint.analyzers.boundary.env_var_boundary]]
+forbidden_env_vars = ["APP_SECRET"]
+restricted_crate_roots = ["crates/server"]
+boundary_reader_functions = ["server::config::read_secret"]
+
+[[tool.sc-lint.analyzers.boundary.dependency_requirements]]
+template_manifests = ["templates/**/Cargo.toml"]
+test_manifests = ["tests/fixtures/**/Cargo.toml"]
+package_archives = ["target/package/*.crate"]
+
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-ENV-001" = ["crates/generated/**"]
+"SCB-MANIFEST-007" = ["templates/legacy/**"]
+"SCB-MANIFEST-008" = ["templates/legacy/**"]
 
 [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
 "SCB-RUNTIME-001" = ["tests/fixtures/generated/**"]
