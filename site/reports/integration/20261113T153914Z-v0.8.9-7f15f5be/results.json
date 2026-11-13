@@ -1,0 +1,87 @@
+{
+  "version": "0.8.9",
+  "commit": "7f15f5be39d277639c9025b7bf49d7e76f03d3d0",
+  "timestamp": "2026-11-13T15:39:14Z",
+  "exit_code": 0,
+  "status": "PASS",
+  "counts": {
+    "passed": 14,
+    "failed": 0,
+    "error": 0,
+    "skipped": 0,
+    "deselected": 217
+  },
+  "tests": [
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[0]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[1]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[2]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[3]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[4]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_passes_through_product_exit_codes[7]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_reports_bootstrap_unreadable_minimum_version",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_bootstrap_assets::test_just_reports_bootstrap_install_failure",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_helper_policy::test_product_accepts_kit_helper_policies_and_default_profile",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_install::test_analyzer_worked_example_runs_all_declared_just_layers",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_manifest_policy::test_issue136_installer_roundtrip",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_profile_install::test_consumer_profile_installed_wheel_and_binary",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_profiles_schema::test_binary_owns_cross_field_checks_after_install[fields0-PROFILE.DUPLICATE_STEP_ENV_KEY]",
+      "outcome": "passed",
+      "detail": ""
+    },
+    {
+      "name": "tests.adoption.test_profiles_schema::test_binary_owns_cross_field_checks_after_install[fields1-PROFILE.INVALID_HOST]",
+      "outcome": "passed",
+      "detail": ""
+    }
+  ],
+  "source_status": []
+}
