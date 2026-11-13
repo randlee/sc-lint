@@ -105,10 +105,10 @@ checks cross-platform paths, environment access, Unix shell assumptions, and
 ### Runtime
 
 [`sc-lint-runtime`](https://github.com/randlee/sc-lint/blob/main/crates/sc-lint-runtime/README.md)
-checks blocking waits, sleep calls, `block_on`, and mutex guards held across
-`.await`:
+checks blocking waits, sleep calls, `block_on`, mutex guards held across
+`.await`, and opted-in panicking calls:
 
-- `SCB-RUNTIME-001`–`SCB-RUNTIME-007`
+- `SCB-RUNTIME-001`–`SCB-RUNTIME-008`
 
 ## Packages
 

@@ -763,3 +763,20 @@ def test_rerun_preserves_consumer_files_and_ignores_old_manifest(
         assert result.stdout == ""
         for relative, content in contents.items():
             assert (consumer / relative).read_bytes() == content
+
+
+def test_runtime_panic_rule_package_list_is_validated_and_rendered(tmp_path: Path) -> None:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data["analyzers"]["runtime"] = {"panic_rule_packages": ["worker", "server"]}
+    input_path = tmp_path / "install.json"
+    input_path.write_text(json.dumps(data))
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(input_path), str(consumer))
+    assert result.returncode == 0, result.stderr
+    assert 'panic_rule_packages = ["worker", "server"]' in (consumer / "sc-lint.toml").read_text()
+
+    data["analyzers"]["runtime"]["panic_rule_packages"] = "worker"
+    input_path.write_text(json.dumps(data))
+    invalid = run("--input", str(input_path), str(copy_fixture("empty-workspace")))
+    assert invalid.returncode == 2
+    assert "panic_rule_packages" in invalid.stderr

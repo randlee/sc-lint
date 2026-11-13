@@ -33,6 +33,16 @@ pub(crate) fn analyze_policy(
     )?);
     findings.extend(ownership::analyze(root, metadata, &config.ownership)?);
     findings.extend(sections::analyze(root, metadata, &config.sections)?);
+    findings.extend(crate::env_var_policy::analyze(
+        root,
+        metadata,
+        &config.env_var_boundary,
+    )?);
+    findings.extend(crate::manifest_requirements::analyze(
+        root,
+        metadata,
+        &config.dependency_requirements,
+    )?);
     findings.sort_by(|left, right| {
         left.rule_id
             .cmp(&right.rule_id)

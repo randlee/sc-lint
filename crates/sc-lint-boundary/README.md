@@ -42,6 +42,9 @@ Rule IDs include:
 - `SCB-MANIFEST-004`
 - `SCB-MANIFEST-005`
 - `SCB-MANIFEST-006`
+- `SCB-MANIFEST-007`
+- `SCB-MANIFEST-008`
+- `SCB-ENV-001`
 - `SCB-BOUNDARY-004`
 - `SCB-BOUNDARY-005`
 
@@ -120,8 +123,9 @@ exclude_paths = ["crates/generated/**"]
 ```
 
 The table supports the common keys `enabled`, `reason`, `exclude_rules`,
-`fail_rules`, `exclude_paths`, and `exclude_paths_by_rule`; boundary has no
-analyzer-specific keys. `exclude_paths_by_rule` maps an exact rule ID to path
+`fail_rules`, `exclude_paths`, and `exclude_paths_by_rule`. Boundary also
+accepts optional analyzer-specific policy families, including
+`env_var_boundary` and `dependency_requirements`. `exclude_paths_by_rule` maps an exact rule ID to path
 globs and filters findings from that rule without excluding other rules in the
 same file. Global and per-rule path exclusions only affect findings with a
 source path (or rules whose analyzer resolves their source paths, as
@@ -145,6 +149,52 @@ top-level `lint sc-boundary` contract:
 cargo run -p sc-lint-boundary -- export-graph --root . --format json
 cargo run -p sc-lint-boundary -- export-graph --root . --format turtle
 ```
+
+## Environment and dependency requirements
+
+The optional `env_var_boundary` family enables `SCB-ENV-001` (`boundaries`)
+for workspace packages under the configured crate roots:
+
+```toml
+[[tool.sc-lint.analyzers.boundary.env_var_boundary]]
+forbidden_env_vars = ["APP_SECRET"]
+restricted_crate_roots = ["crates/server"]
+boundary_reader_functions = ["server::config::read_secret"]
+```
+
+The rule reports literal `std::env::var` and `var_os` reads and same-file
+forwarding helpers and wrappers, outside the named reader functions. Test
+code and other variables are exempt. It also recognizes the `env::var` and
+`env::var_os` spellings. Detection is syntactic: it does not expand macros,
+resolve imported aliases or calls across files, evaluate computed variable
+names, follow method calls, or detect other read APIs such as `env::vars`.
+
+The optional `dependency_requirements` family enables `SCB-MANIFEST-007` and
+`SCB-MANIFEST-008` (`manifests`) for workspace manifests and configured
+additional paths:
+
+```toml
+[[tool.sc-lint.analyzers.boundary.dependency_requirements]]
+template_manifests = ["templates/**/Cargo.toml"]
+test_manifests = ["tests/fixtures/**/Cargo.toml"]
+package_archives = ["target/package/*.crate"]
+```
+
+Rule 007 reports exact and tilde registry requirements. Rule 008 reports an
+extra upper bound that narrows a caret-compatible range unless a comment on
+the dependency line or preceding line has the required form and matching
+version, for example:
+
+```toml
+# upper-bound: api break first in 1.5.0
+example = ">=1.2.3, <1.5.0"
+```
+
+The comment kind is `api`, `links`, or `toolchain`. The lint checks the
+comment's form and version; it does not verify that the named break exists.
+Archive checks inspect `Cargo.toml.orig`. Without the respective policy
+family these rules do not run. Each of the three rule IDs supports
+`exclude_paths_by_rule` using workspace-relative paths.
 
 ## Representative Pass
 
