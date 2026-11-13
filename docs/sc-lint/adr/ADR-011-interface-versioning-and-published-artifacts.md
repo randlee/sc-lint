@@ -144,4 +144,3 @@ The public schema API also changes with this report versioning: the existing
 function signatures remain unchanged, but callers that relied on
 `analyzer_report_schema()` returning v1 must select the explicit v1 function
 or update their validation expectations.
-
