@@ -29,6 +29,9 @@ pub enum RuleId {
     ScbManifest004,
     ScbManifest005,
     ScbManifest006,
+    ScbEnv001,
+    ScbManifest007,
+    ScbManifest008,
 }
 
 impl RuleId {
@@ -54,6 +57,9 @@ impl RuleId {
             Self::ScbManifest004 => "SCB-MANIFEST-004",
             Self::ScbManifest005 => "SCB-MANIFEST-005",
             Self::ScbManifest006 => "SCB-MANIFEST-006",
+            Self::ScbEnv001 => "SCB-ENV-001",
+            Self::ScbManifest007 => "SCB-MANIFEST-007",
+            Self::ScbManifest008 => "SCB-MANIFEST-008",
         }
     }
 }
@@ -165,6 +171,9 @@ pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbManifest004),
     rule(RuleId::ScbManifest005),
     rule(RuleId::ScbManifest006),
+    rule(RuleId::ScbEnv001),
+    rule(RuleId::ScbManifest007),
+    rule(RuleId::ScbManifest008),
 ];
 
 /// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
@@ -187,6 +196,9 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbManifest004),
     rule(RuleId::ScbManifest005),
     rule(RuleId::ScbManifest006),
+    rule(RuleId::ScbEnv001),
+    rule(RuleId::ScbManifest007),
+    rule(RuleId::ScbManifest008),
 ];
 
 /// Rules with findings that can be matched to repository source paths.
@@ -200,6 +212,9 @@ pub const PATH_ADDRESSABLE_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbManifest004),
     rule(RuleId::ScbManifest005),
     rule(RuleId::ScbManifest006),
+    rule(RuleId::ScbEnv001),
+    rule(RuleId::ScbManifest007),
+    rule(RuleId::ScbManifest008),
 ];
 
 /// Families keep today's CLI spellings (kebab-case, as clap rendered the old
@@ -226,6 +241,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
                 rule(RuleId::ScbBoundary004),
                 rule(RuleId::ScbBoundary005),
                 rule(RuleId::ScbCaller001),
+                rule(RuleId::ScbEnv001),
             ],
         ),
         (
@@ -253,6 +269,8 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
                 rule(RuleId::ScbManifest004),
                 rule(RuleId::ScbManifest005),
                 rule(RuleId::ScbManifest006),
+                rule(RuleId::ScbManifest007),
+                rule(RuleId::ScbManifest008),
             ],
         ),
     ],
@@ -261,5 +279,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
         "manifest_dependency_allowlists",
         "global_dependency_ownership",
         "manifest_section_rules",
+        "env_var_boundary",
+        "dependency_requirements",
     ],
 };
