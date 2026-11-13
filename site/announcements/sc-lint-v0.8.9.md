@@ -67,9 +67,11 @@ One removal, and it is a packaging change rather than a behavior change: the sta
 
 ## Upgrade Notes
 
-Nothing in this release changes a verdict for a repository that has not opted in: `env_var_boundary`, `dependency_requirements` and `panic_rule_packages` are all absent by default, and an empty `panic_rule_packages` list opts in no packages. The changes that can surface new findings on upgrade without any configuration are the runtime rules' widened example-target analysis and the stricter archive validation.
+Nothing in this release changes a verdict for a repository that has not opted in. `env_var_boundary`, `dependency_requirements` and `panic_rule_packages` are all absent by default, and an empty family or an empty `panic_rule_packages` list adds no checks. Opt-in configuration, not the verdict rules, is what keeps the new checks inert on upgrade.
 
-Repositories that keep an explicit `fail_rules` list must add `SCB-RUNTIME-008`, `SCB-ENV-001`, `SCB-MANIFEST-007` and `SCB-MANIFEST-008` to it before any of the new checks gate — each rule is reported but does not fail a run until listed, while a default-configured repository gains the gating immediately.
+Once you opt in, the verdict rules decide what gates, and their default is stricter than it sounds: a repository that sets **no** `fail_rules` at all gates **every** finding, so the newly enabled rules fail a run as soon as their policy is configured. A repository that keeps an **explicit** `fail_rules` list must add `SCB-RUNTIME-008`, `SCB-ENV-001`, `SCB-MANIFEST-007` and `SCB-MANIFEST-008` to it, or those findings are reported but never fail a run.
+
+Two changes can surface new findings on upgrade with no configuration at all: the runtime rules now analyze supported Cargo example targets including nested modules (rules 003 and 004 keep their existing example exclusions), and an archive entry that escapes the archive root is now a configuration error exiting `3`.
 
 If you installed `sc-lint-boundary` from the tap, replace it with `randlee/tap/sc-lint`.
 
