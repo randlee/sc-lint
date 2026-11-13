@@ -25,6 +25,8 @@ CI orchestration.
 
 ## Runtime rules
 
+Rule 008 detects production `.unwrap()`, `.expect(...)`, `panic!`, `unreachable!`, `todo!`, and `unimplemented!` in opted-in packages. It does not expand macros or perform type-aware proof.
+
 Runtime rules 001, 002, and 005–007 analyze supported Cargo example targets, including nested modules. Rules 003 and 004 exclude example targets.
 
 - `SCB-RUNTIME-001`: Bare `Condvar::wait(...)` in production code; use a

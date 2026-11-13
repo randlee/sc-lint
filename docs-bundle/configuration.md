@@ -229,3 +229,7 @@ consumers and keep the human diagnostics available for operators.
 See [profiles, platform scope, and declared tools](./using-sc-lint.md#profiles-platform-scope-and-declared-tools)
 for consumer lint-step syntax, and the package guides for analyzer
 configuration details.
+
+### Runtime panic rule opt-in
+
+Set `[tool.sc-lint.analyzers.runtime]` `panic_rule_packages = ["worker"]` in the repository-root `sc-lint.toml` to enable rule `SCB-RUNTIME-008` for named Cargo packages. An absent or empty list opts in no packages. Unknown, duplicate, and empty names are configuration errors. Existing analyzer rule and path filters still apply.

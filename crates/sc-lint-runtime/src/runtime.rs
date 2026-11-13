@@ -74,12 +74,20 @@ impl RuntimeFinding {
 pub(crate) fn analyze_runtime_liveness(
     root: &Path,
     workspace: &WorkspaceMetadata,
+    panic_packages: &BTreeSet<String>,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let source_files = discover_runtime_sources(workspace)?;
     let sleep_scope = SleepScope::from_workspace(workspace);
     let file_findings = source_files
         .par_iter()
-        .map(|file_context| analyze_file(&file_context.file, &sleep_scope, file_context.kind))
+        .map(|file_context| {
+            analyze_file(
+                &file_context.file,
+                &sleep_scope,
+                file_context.kind,
+                panic_packages,
+            )
+        })
         .collect::<Vec<Result<Vec<_>>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
@@ -127,6 +135,7 @@ fn analyze_file(
     file_context: &FileContext,
     sleep_scope: &SleepScope,
     target_kind: PackageTargetKind,
+    panic_packages: &BTreeSet<String>,
 ) -> Result<Vec<RuntimeFinding>> {
     let source = fs::read_to_string(&file_context.source_path).with_context(|| {
         format!(
@@ -168,6 +177,13 @@ fn analyze_file(
                 .findings
                 .push(practice_finding(file_context, site));
         }
+    }
+    if panic_packages.contains(file_context.package.as_str()) {
+        collector.findings.extend(
+            crate::panicking_calls::detect_panicking_calls(&parsed)
+                .into_iter()
+                .map(|site| practice_finding(file_context, site)),
+        );
     }
     collector
         .findings
