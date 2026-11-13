@@ -199,7 +199,7 @@ this amendment adds `sc-lint-runtime` as a consumer of the directive model.
 
 ## the phase-q ADR-022 amendment: ADR-022 amendment: phase q panic-rule package opt-in
 
-**Status:** Proposed  
+**Status:** Accepted  
 
 ### Related Documents
 
@@ -209,7 +209,7 @@ this amendment adds `sc-lint-runtime` as a consumer of the directive model.
 
 ### Context
 
-Status: AWAITING RAND ACCEPTANCE. This amendment to ADR-022 is not accepted, and its acceptance is a prerequisite for phase-q dispatch. REQ-RUNTIME-001 says new runtime rules fail by default. The problem is that issue #931 asks for runtime panic detection with per-crate opt-in, while REQ-RUNTIME-001's fail-by-default rule would apply `SCB-RUNTIME-008` to every package. REQ-RUNTIME-002 (REQ-RUNTIME-002) makes `SCB-RUNTIME-008` apply only to opted-in Cargo packages.
+Status: ACCEPTED by Rand, 2026-11-12 ("approved"). REQ-RUNTIME-001 says new runtime rules fail by default. The problem is that issue #931 asks for runtime panic detection with per-crate opt-in, while REQ-RUNTIME-001's fail-by-default rule would apply `SCB-RUNTIME-008` to every package. REQ-RUNTIME-002 makes `SCB-RUNTIME-008` apply only to opted-in Cargo packages.
 
 ### Decision
 
