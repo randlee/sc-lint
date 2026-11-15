@@ -14,20 +14,45 @@ function temporaryDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "sc-lint-action-test-"));
 }
 
+function tarEntry(name, contents, type = "0", prefix = "") {
+  const data = Buffer.from(contents);
+  const header = Buffer.alloc(512);
+  header.write(name);
+  header.write(prefix, 345);
+  header.write("0000755\0", 100);
+  header.write(data.length.toString(8).padStart(11, "0") + "\0", 124);
+  header.write(type, 156);
+  header.write("ustar\0", 257);
+  for (let index = 148; index < 156; index += 1) header[index] = 32;
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148);
+  return [header, data, Buffer.alloc((512 - (data.length % 512)) % 512)];
+}
+
 function tarGz(entries) {
   const blocks = [];
-  for (const [name, contents] of entries) {
-    const data = Buffer.from(contents);
-    const header = Buffer.alloc(512);
-    header.write(name);
-    header.write("0000755\0", 100);
-    header.write(data.length.toString(8).padStart(11, "0") + "\0", 124);
-    header.write("0", 156);
-    header.write("ustar\0", 257);
-    for (let index = 148; index < 156; index += 1) header[index] = 32;
-    const checksum = header.reduce((sum, byte) => sum + byte, 0);
-    header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148);
-    blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+  for (const [name, contents] of entries) blocks.push(...tarEntry(name, contents));
+  return zlib.gzipSync(Buffer.concat([...blocks, Buffer.alloc(1024)]));
+}
+
+function paxRecord(key, value) {
+  let length = Buffer.byteLength(`${key}=${value}\n`) + 2;
+  while (true) {
+    const record = Buffer.from(`${length} ${key}=${value}\n`);
+    if (record.length === length) return record;
+    length = record.length;
+  }
+}
+
+function paxTarGz(entries) {
+  const blocks = [];
+  let index = 0;
+  for (const entry of entries) {
+    if (entry.paxPath) {
+      blocks.push(...tarEntry(`PaxHeaders/${index}`, paxRecord("path", entry.paxPath), "x"));
+    }
+    blocks.push(...tarEntry(entry.name, entry.contents, entry.type || "0", entry.prefix || ""));
+    index += 1;
   }
   return zlib.gzipSync(Buffer.concat([...blocks, Buffer.alloc(1024)]));
 }
@@ -125,6 +150,32 @@ test("release-base-url builds artifact URLs when explicit URLs are absent", asyn
   };
   await runAction(local.options);
   assert.deepEqual(urls, ["https://mirror/releases/v0.4.0/sc-lint_0.4.0_x86_64-unknown-linux-gnu.tar.gz", "https://mirror/releases/v0.4.0/checksums.txt"]);
+});
+
+test("PAX path metadata keeps long release docs paths out of truncated tar header names", async () => {
+  const local = fixture("linux", "x64", "setup");
+  const root = "sc-lint_0.4.0_x86_64-unknown-linux-gnu";
+  const docsRoot = `${root}/share/sc-lint/sc-lint-docs`;
+  const portabilityDir = `${docsRoot}/cli-reference/sc-lint-portability/`;
+  const indexPath = `${portabilityDir}index.html`;
+  const archive = paxTarGz([
+    { name: `${root}/bin/sc-lint`, contents: "fixture binary" },
+    { name: `${docsRoot}/README.md`, contents: "offline guide" },
+    { name: portabilityDir, contents: "", type: "5" },
+    {
+      name: "sc-lint-portability/",
+      prefix: `${docsRoot}/cli-reference`,
+      contents: "PAX-resolved documentation",
+      paxPath: indexPath,
+    },
+  ]);
+  const archiveName = "sc-lint_0.4.0_x86_64-unknown-linux-gnu.tar.gz";
+  const checksums = Buffer.from(`${crypto.createHash("sha256").update(archive).digest("hex")}  ${archiveName}\n`);
+  local.options.download = async (url) => url.endsWith("archive") ? archive : checksums;
+
+  await runAction(local.options);
+
+  assert.equal(fs.readFileSync(path.join(local.options.installRoot, indexPath), "utf8"), "PAX-resolved documentation");
 });
 
 test("underscore-spelled input keys drive action execution", async () => {
