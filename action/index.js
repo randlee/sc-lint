@@ -199,8 +199,8 @@ function extractZip(archive, destination) {
   }
 }
 
-function invoke(binary, args, cwd, execute) {
-  const result = execute(binary, args, { cwd, encoding: "utf8" });
+function invoke(binary, args, cwd, execute, env) {
+  const result = execute(binary, args, { cwd, encoding: "utf8", env });
   if (result.error) return { status: 1, stderr: result.error.message };
   return { status: result.status ?? 1, stdout: result.stdout || "", stderr: result.stderr || "" };
 }
@@ -260,17 +260,25 @@ async function runAction(options = {}) {
 
   const execute = options.execute || spawnSync;
   const cwd = path.resolve(inputs.workingDirectory);
-  const compatibility = invoke(binary, ["--config", inputs.configPath, "compatibility", "check", "--binary", binary], cwd, execute);
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") || "PATH";
+  const binaryDirectory = path.dirname(binary);
+  const existingPath = env[pathKey];
+  // GITHUB_PATH affects later runner steps; this action's own lint subprocesses need it now.
+  const commandEnv = {
+    ...env,
+    [pathKey]: existingPath ? `${binaryDirectory}${path.delimiter}${existingPath}` : binaryDirectory,
+  };
+  const compatibility = invoke(binary, ["--config", inputs.configPath, "compatibility", "check", "--binary", binary], cwd, execute, commandEnv);
   if (compatibility.status !== 0) {
     throw new ActionError(ERROR.compatibility, `Compatibility preflight failed: ${compatibility.stderr || compatibility.stdout}`.trim(), "Align sc-lint.toml minimum_version with the selected release or select a newer release.");
   }
-  const docsCheck = invoke(binary, ["docs", "--path"], cwd, execute);
+  const docsCheck = invoke(binary, ["docs", "--path"], cwd, execute, commandEnv);
   if (docsCheck.status !== 0) {
     throw new ActionError(ERROR.command, `Offline documentation discovery failed: ${docsCheck.stderr || docsCheck.stdout}`.trim(), "Use the complete verified release archive containing sc-lint-docs.");
   }
   if (inputs.operation !== "setup") {
     const command = inputs.operation === "lint" ? ["lint", "ci", "--consumer", "--config", inputs.configPath] : ["test", "--config", inputs.configPath];
-    const operation = invoke(binary, command, cwd, execute);
+    const operation = invoke(binary, command, cwd, execute, commandEnv);
     if (operation.status !== 0) {
       throw new ActionError(ERROR.command, `Consumer ${inputs.operation} failed: ${operation.stderr || operation.stdout}`.trim(), "Inspect the command output, fix the consumer profile, then rerun the Action.");
     }

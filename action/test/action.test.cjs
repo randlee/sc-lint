@@ -89,7 +89,10 @@ function fixture(platform, architecture, operation, layout = "nested") {
   const docsPath = layout === "nested"
     ? entry("share/sc-lint/sc-lint-docs/README.md")
     : "sc-lint-docs/README.md";
-  const entries = [[binaryPath, "fixture binary"], [docsPath, "offline guide"]];
+  const backendNames = ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
+    .map((name) => platform === "win32" ? `${name}.exe` : name);
+  const backendDir = layout === "nested" ? entry("bin") : ".";
+  const entries = [[binaryPath, "fixture binary"], ...backendNames.map((name) => [`${backendDir}/${name}`, "fixture backend"]), [docsPath, "offline guide"]];
   const archive = target[1] === "zip" ? zip(entries) : tarGz(entries);
   const archiveName = `sc-lint_0.4.0_${target[0]}.${target[1]}`;
   const checksums = Buffer.from(`${crypto.createHash("sha256").update(archive).digest("hex")}  ${archiveName}\n`);
@@ -107,7 +110,7 @@ function fixture(platform, architecture, operation, layout = "nested") {
       platform,
       arch: architecture,
       installRoot: path.join(root, "installed"),
-      env: { GITHUB_OUTPUT: output, GITHUB_PATH: runnerPath, RUNNER_TEMP: root },
+      env: { GITHUB_OUTPUT: output, GITHUB_PATH: runnerPath, RUNNER_TEMP: root, PATH: "/runner/bin" },
       inputs: { operation, version: "0.4.0", configPath: "sc-lint.toml", workingDirectory: root, artifactUrl: "https://fixture/archive", checksumsUrl: "https://fixture/checksums", releaseBaseUrl: "https://fixture" },
       download: async (url) => url.endsWith("archive") ? archive : checksums,
       execute(binaryPath, args, options) {
@@ -245,7 +248,14 @@ for (const [platform, architecture] of [["linux", "x64"], ["linux", "arm64"], ["
       assert.deepEqual(local.calls[0].args.slice(0, 3), ["--config", "sc-lint.toml", "compatibility"]);
       assert.deepEqual(local.calls[1].args, ["docs", "--path"]);
       if (operation === "setup") assert.equal(local.calls.length, 2);
-      if (operation === "lint") assert.deepEqual(local.calls[2].args.slice(0, 3), ["lint", "ci", "--consumer"]);
+      if (operation === "lint") {
+        assert.deepEqual(local.calls[2].args.slice(0, 3), ["lint", "ci", "--consumer"]);
+        assert.equal(local.calls[2].options.env.PATH, `${path.dirname(result.binaryPath)}${path.delimiter}/runner/bin`);
+        for (const backend of ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]) {
+          const suffix = platform === "win32" ? ".exe" : "";
+          assert.ok(fs.existsSync(path.join(path.dirname(result.binaryPath), `${backend}${suffix}`)));
+        }
+      }
       if (operation === "test") assert.deepEqual(local.calls[2].args.slice(0, 1), ["test"]);
       assert.match(fs.readFileSync(local.output, "utf8"), /binary-path=.*\ndocs-path=.*sc-lint-docs\nversion=0\.4\.0/);
       assert.match(fs.readFileSync(local.runnerPath, "utf8"), /installed/);
