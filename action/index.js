@@ -109,18 +109,57 @@ function writeEntry(root, entryName, contents, mode) {
   if (mode) fs.chmodSync(destination, mode & 0o777);
 }
 
+function parsePaxAttributes(contents) {
+  const attributes = {};
+  let offset = 0;
+  while (offset < contents.length) {
+    const separator = contents.indexOf(0x20, offset);
+    if (separator < 0) throw new ActionError(ERROR.artifact, "Release archive has malformed PAX metadata.", "Use an unmodified official sc-lint release archive.");
+    const length = Number.parseInt(contents.subarray(offset, separator).toString("ascii"), 10);
+    const end = offset + length;
+    if (!Number.isSafeInteger(length) || length <= separator - offset + 2 || end > contents.length || contents[end - 1] !== 0x0a) {
+      throw new ActionError(ERROR.artifact, "Release archive has malformed PAX metadata.", "Use an unmodified official sc-lint release archive.");
+    }
+    const record = contents.subarray(separator + 1, end - 1).toString("utf8");
+    const equals = record.indexOf("=");
+    if (equals > 0) attributes[record.slice(0, equals)] = record.slice(equals + 1);
+    offset = end;
+  }
+  return attributes;
+}
+
 function extractTarGz(archive, destination) {
   const bytes = gunzipSync(archive);
+  let globalAttributes = {};
+  let pendingAttributes = {};
   for (let offset = 0; offset + 512 <= bytes.length;) {
     const header = bytes.subarray(offset, offset + 512);
     if (header.every((byte) => byte === 0)) break;
-    const name = header.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
+    const headerName = header.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
     const prefix = header.subarray(345, 500).toString("utf8").replace(/\0.*$/, "");
-    const size = Number.parseInt(header.subarray(124, 136).toString("utf8").replace(/\0.*$/, "").trim() || "0", 8);
+    const headerSize = Number.parseInt(header.subarray(124, 136).toString("utf8").replace(/\0.*$/, "").trim() || "0", 8);
     const mode = Number.parseInt(header.subarray(100, 108).toString("utf8").replace(/\0.*$/, "").trim() || "644", 8);
     const type = String.fromCharCode(header[156] || 48);
-    const entry = prefix ? `${prefix}/${name}` : name;
-    offset += 512;
+    const dataOffset = offset + 512;
+    const headerPath = prefix ? `${prefix}/${headerName}` : headerName;
+    if (!Number.isSafeInteger(headerSize) || headerSize < 0 || dataOffset + headerSize > bytes.length) {
+      throw new ActionError(ERROR.artifact, "Release archive has an invalid tar entry size.", "Use an unmodified official sc-lint release archive.");
+    }
+    if (type === "x" || type === "g") {
+      const attributes = parsePaxAttributes(bytes.subarray(dataOffset, dataOffset + headerSize));
+      if (type === "g") globalAttributes = { ...globalAttributes, ...attributes };
+      else pendingAttributes = { ...pendingAttributes, ...attributes };
+      offset = dataOffset + Math.ceil(headerSize / 512) * 512;
+      continue;
+    }
+    const attributes = { ...globalAttributes, ...pendingAttributes };
+    pendingAttributes = {};
+    const entry = attributes.path || headerPath;
+    const sizeValue = attributes.size;
+    const size = sizeValue === undefined ? headerSize : Number(sizeValue);
+    if ((sizeValue !== undefined && !/^\d+$/.test(sizeValue)) || !Number.isSafeInteger(size) || size < 0 || dataOffset + size > bytes.length) {
+      throw new ActionError(ERROR.artifact, "Release archive has an invalid PAX entry size.", "Use an unmodified official sc-lint release archive.");
+    }
     if (type === "5") {
       const directory = path.resolve(destination, entry);
       if (!directory.startsWith(`${path.resolve(destination)}${path.sep}`)) {
@@ -128,8 +167,8 @@ function extractTarGz(archive, destination) {
       }
       fs.mkdirSync(directory, { recursive: true });
     }
-    else if (type === "0" || type === "\0") writeEntry(destination, entry, bytes.subarray(offset, offset + size), mode);
-    offset += Math.ceil(size / 512) * 512;
+    else if (type === "0" || type === "\0") writeEntry(destination, entry, bytes.subarray(dataOffset, dataOffset + size), mode);
+    offset = dataOffset + Math.ceil(size / 512) * 512;
   }
 }
 
@@ -160,8 +199,8 @@ function extractZip(archive, destination) {
   }
 }
 
-function invoke(binary, args, cwd, execute) {
-  const result = execute(binary, args, { cwd, encoding: "utf8" });
+function invoke(binary, args, cwd, execute, env) {
+  const result = execute(binary, args, { cwd, encoding: "utf8", env });
   if (result.error) return { status: 1, stderr: result.error.message };
   return { status: result.status ?? 1, stdout: result.stdout || "", stderr: result.stderr || "" };
 }
@@ -221,17 +260,25 @@ async function runAction(options = {}) {
 
   const execute = options.execute || spawnSync;
   const cwd = path.resolve(inputs.workingDirectory);
-  const compatibility = invoke(binary, ["--config", inputs.configPath, "compatibility", "check", "--binary", binary], cwd, execute);
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") || "PATH";
+  const binaryDirectory = path.dirname(binary);
+  const existingPath = env[pathKey];
+  // GITHUB_PATH affects later runner steps; this action's own lint subprocesses need it now.
+  const commandEnv = {
+    ...env,
+    [pathKey]: existingPath ? `${binaryDirectory}${path.delimiter}${existingPath}` : binaryDirectory,
+  };
+  const compatibility = invoke(binary, ["--config", inputs.configPath, "compatibility", "check", "--binary", binary], cwd, execute, commandEnv);
   if (compatibility.status !== 0) {
     throw new ActionError(ERROR.compatibility, `Compatibility preflight failed: ${compatibility.stderr || compatibility.stdout}`.trim(), "Align sc-lint.toml minimum_version with the selected release or select a newer release.");
   }
-  const docsCheck = invoke(binary, ["docs", "--path"], cwd, execute);
+  const docsCheck = invoke(binary, ["docs", "--path"], cwd, execute, commandEnv);
   if (docsCheck.status !== 0) {
     throw new ActionError(ERROR.command, `Offline documentation discovery failed: ${docsCheck.stderr || docsCheck.stdout}`.trim(), "Use the complete verified release archive containing sc-lint-docs.");
   }
   if (inputs.operation !== "setup") {
     const command = inputs.operation === "lint" ? ["lint", "ci", "--consumer", "--config", inputs.configPath] : ["test", "--config", inputs.configPath];
-    const operation = invoke(binary, command, cwd, execute);
+    const operation = invoke(binary, command, cwd, execute, commandEnv);
     if (operation.status !== 0) {
       throw new ActionError(ERROR.command, `Consumer ${inputs.operation} failed: ${operation.stderr || operation.stdout}`.trim(), "Inspect the command output, fix the consumer profile, then rerun the Action.");
     }
